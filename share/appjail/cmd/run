@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+run_desc="Run an init script from an appjail application."
+
+run_main()
+{
+	local appjail
+
+	appjail="$1"
+
+	if [ -z "${appjail}" ]; then
+		run_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift
+
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	run_appjail -C -c "${CONFIG}" -a "${appjail}" -- $@
+}
+
+run_appjail()
+{
+	lib_debug "Running..."
+
+	lib_su /bin/sh "${SCRIPTSDIR}/run_jail.sh" $@
+}
+
+run_help()
+{
+	run_usage
+
+	echo
+	echo "${run_desc}"
+	echo
+	echo "The command only executes the *cmd functions. The *start and *stop functions are the"
+	echo "responsibility of the start and stop commands."
+	echo
+	echo "  appjail          Name of the appjail application."
+}
+
+run_usage()
+{
+	echo "usage: run appjail [args]"
+}

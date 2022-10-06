@@ -1,0 +1,202 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+jail_desc="Create a jail. This command must be used before the build command."
+
+jail_main()
+{
+	local _o jail_name
+	local _cj_cmd _cj_opts
+	local opt_download opt_extract
+
+	if [ $# -eq 0 ]; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	opt_download=1
+	opt_extract=1
+
+	while getopts ":delrCa:c:p:t:u:v:U:D:n:" _o; do
+		case "${_o}" in
+			d)
+				opt_download=0
+				;;
+			e)
+				opt_extract=0
+				;;
+			l)
+				_cj_opts="${_cj_opts} -l"
+				;;
+			r)
+				_cj_opts="${_cj_opts} -r"
+				;;
+			C)
+				_cj_opts="${_cj_opts} -c"
+				;;
+			a)
+				FREEBSD_ARCH="${OPTARG}"
+				;;
+			c)
+				COMPONENTS="${COMPONENTS} ${OPTARG}"
+				;;
+			p)
+				CHROOT_PROGRAM="${OPTARG}"
+				;;
+			t)
+				TEMPLATE_PREBUILD="${OPTARG}"
+				;;
+			u)
+				DOWNLOADURL="${OPTARG}"
+				;;
+			v)
+				FREEBSD_VERSION="${OPTARG}"
+				;;
+			D)
+				_cj_opts="${_cj_opts} -d ${OPTARG}"
+				;;
+			U)
+				JAILUSER="${OPTARG}"
+				;;
+			n)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ -z "${jail_name}" ]; then
+		jail_usage
+		return ${EX_USAGE}
+	fi
+
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/tempfile"
+	. "${LIBDIR}/su"
+	. "${LIBDIR}/strlen"
+
+	lib_replace_downloadurl
+	lib_replace_componentsdir
+	lib_replace_jaildir
+
+	if [ $opt_download -eq 1 ]; then
+		download_components || exit $?
+	fi
+
+	if [ $opt_extract -eq 1 ]; then
+		extract_components "${jail_name}" || exit $?
+	fi
+
+	create_jail \
+		${_cj_opts} \
+		-p "${CHROOT_PROGRAM}" \
+		-t "${TEMPLATE_PREBUILD}" \
+		-C "${CONFIG}" \
+		-u "${JAILUSER}" \
+		-n "${jail_name}"
+}
+
+download_components()
+{
+	local component _out _f
+
+	mkdir -p "${COMPONENTSDIR}"
+
+	lib_debug "Downloading components..."
+
+	for component in ${COMPONENTS}; do
+		_out="${COMPONENTSDIR}/${component}"
+
+		_f="`lib_replace %DOWNLOADURL% \"${DOWNLOADURL}/${component}\" \"${FETCH_CMD}\"`"
+		_f="`lib_replace %OUTPUT_NAME% \"${_out}\" \"${_f}\"`"
+
+		if [ "${FORCE_DOWNLOAD}" -eq 0 -a -f "${_out}" ]; then
+			lib_warn "The \"${component}\" component already exists."
+		else
+			lib_debug "Downloading \"${component}\" component..."
+			eval ${_f}
+		fi
+	done
+}
+
+extract_components()
+{
+	local component _d _j _su _cmd _out
+
+	_j="$1"
+	if [ -z "${_j}" ]; then
+		echo "usage: extract_components jail_name"
+		exit ${EX_USAGE}
+	fi
+
+	if [ -d "${JAILDIR}/${_j}" ] && [ `lib_countfiles "${JAILDIR}/${_j}"` -gt 0 ]; then
+		lib_err ${EX_DATAERR} "The \"${JAILDIR}/${_j}\" directory already exists."
+	fi
+
+	mkdir -p "${JAILDIR}/${_j}"
+
+	lib_debug "Extracting components..."
+
+	for component in ${COMPONENTS}; do
+		_out="${COMPONENTSDIR}/${component}"
+
+		_d="`lib_replace %FILE% \"${_out}\" \"${DECOMPRESS_CMD}\"`"
+		_d="`lib_replace %DIRECTORY% \"${JAILDIR}/${_j}\" \"${_d}\"`"
+
+		lib_su ${_d}
+	done
+}
+
+create_jail()
+{
+	lib_debug "Creating jail..."
+
+	lib_su /bin/sh "${SCRIPTSDIR}/create_jail.sh" $@
+}
+
+jail_help()
+{
+	jail_usage
+
+	echo
+	echo "${jail_desc}"
+	echo
+	echo "The classic jails. Nothing more, nothing less. The workflow of this command is easy to"
+	echo "understand: Download components that do not exist, extract them, enter to a chroot"
+	echo "environment, enter in the jail, and delete the jail. Of course, you can control"
+	echo "which stages are used."
+	echo
+	echo "This command is very useful to create and use a jail in a few minutes."
+	echo
+	echo "  -d                        Don't download the components."
+	echo "  -e                        Don't extract the components."
+	echo "  -l                        Don't enter the jail after creating it."
+	echo "  -r                        Don't remove the jail after exiting it."
+	echo "  -C                        Don't run chroot(8) before create the jail."
+	echo "  -a freebsd_arch           FreeBSD architecture used by components. Default: ${FREEBSD_ARCH}"
+	echo "  -c components             Components to be downloaded. Default: ${COMPONENTS}"
+	echo "  -p chroot_program         Program to run when chroot(8) is executed."
+	echo "  -t template               Template used to create the jail."
+	echo "  -u url                    URL where the components will be downloaded. Default: ${DOWNLOADURL}"
+	echo "  -v freebsd_version        FreeBSD version used by components. Default: ${FREEBSD_VERSION}"
+	echo "  -D dir                    Copy this directory into the jail environment. This directory should"
+	echo "                            be mimicked as the tree directory of the jail. For example, if the"
+	echo "                            directory to copy is foo/ and you want to get an exact copy of"
+	echo "                            /etc/resolv.conf, you must have a file like foo/etc/resolv.conf."
+	echo "  -U jail_user              User to run inside the jail."
+	echo "  -n jail_name              Name of the jail."
+}
+
+jail_usage()
+{
+	echo "usage: jail [-delrC] [-a freebsd_arch] [-c components] [-p chroot_program] [-t template] "
+	echo "            [-u url] [-v freebsd_version] [-D dir] [-U jail_user] -n name"
+}

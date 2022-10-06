@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+stop_desc="Remove a jail using a template from an installed appjail."
+
+stop_main()
+{
+	local appjail
+
+	appjail="$1"
+
+	if [ -z "${appjail}" ]; then
+		stop_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift
+
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	stop_appjail -S -c "${CONFIG}" -a "${appjail}" -- $@
+}
+
+stop_appjail()
+{
+	lib_debug "Stopping..."
+
+	lib_su /bin/sh "${SCRIPTSDIR}/service.sh" $@
+}
+
+stop_help()
+{
+	stop_usage
+
+	echo
+	echo "${stop_desc}"
+	echo
+	echo "Before deleting the jail, the *stop functions are executed."
+	echo
+	echo "  appjail        Name of the appjail application."
+}
+
+stop_usage()
+{
+	echo "usage: stop appjail [args]"
+}

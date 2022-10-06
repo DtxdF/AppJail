@@ -1,0 +1,24 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_generate_tempfile()
+{
+	local _f
+
+	_f=`mktemp -t appjail` || exit ${EX_OSERR}
+
+	echo ${_f}
+}
+
+lib_generate_tempdir()
+{
+	local _d
+
+	_d=`mktemp -d -t appjail` || exit ${EX_OSERR}
+
+	echo ${_d}
+}

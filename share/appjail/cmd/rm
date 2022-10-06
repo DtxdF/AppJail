@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+rm_desc="Remove an existing jail."
+
+rm_main()
+{
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+	
+	lib_replace_jaildir
+
+	rm_jail -c "${CONFIG}" -r "${JAILDIR}" -- $@
+}
+
+rm_jail()
+{
+	lib_su /bin/sh "${SCRIPTSDIR}/rm.sh" $@
+}
+
+rm_help()
+{
+	rm_usage
+
+	echo
+	echo "${rm_desc}"
+	echo
+	echo "  jail             The jail to remove. May be used multiples times."
+}
+
+rm_usage()
+{
+	echo "usage: rm jail..."
+}

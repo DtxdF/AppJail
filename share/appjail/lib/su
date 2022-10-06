@@ -1,0 +1,28 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_su()
+{
+	local _cmd _su _prog
+
+	_prog="$1"
+	if [ -z "${_prog}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_su cmd args..."
+	fi
+
+	shift
+
+	_cmd="`lib_generate_tempfile`"
+	lib_atexit_add rm -f "${_cmd}"
+
+	echo ${_prog} $@ > "${_cmd}"
+	chmod +x "${_cmd}"
+
+	_su="`lib_replace %CMD% \"${_cmd}\" \"${SU_CMD}\"`"
+
+	eval ${_su}
+}

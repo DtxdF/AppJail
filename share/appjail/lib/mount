@@ -1,0 +1,26 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_check_mount()
+{
+	local mountpoint
+	local _chk
+
+	mountpoint="$1"
+
+	if [ -z "${mountpoint}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_mount mountpoint"
+	fi
+
+	_chk="`mount -p | grep \"${mountpoint}\" | awk -F' ' '{print $2}' | grep \"${mountpoint}\" | wc -l | tr -d ' '`"
+
+	if [ "${_chk}" -gt 0 ]; then
+		return 0
+	else
+		return 1
+	fi
+}

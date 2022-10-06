@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+build_desc="Build an appjail that can be shared, installed, and executed on other systems."
+
+build_main()
+{
+	local _o
+	local opts
+	local opt_init_script opt_jail_name opt_template
+
+	if [ $# -eq 0 ]; then
+		build_usage
+		exit ${EX_USAGE}
+	fi
+
+	opt_init_script=0
+	opt_jail_name=0
+	opt_template=0
+
+	while getopts ":d:o:i:j:t:" _o; do
+		case "${_o}" in
+			d)
+				opts="${opts} -d \"${OPTARG}\""
+				;;
+			o)
+				opts="${opts} -o \"${OPTARG}\""
+				;;
+			c)
+				opts="${opts} -c \"${OPTARG}\""
+				;;
+			i)
+				opts="${opts} -i \"${OPTARG}\""
+				opt_init_script=1
+				;;
+			j)
+				opts="${opts} -j \"${OPTARG}\""
+				opt_jail_name=1
+				;;
+			t)
+				opts="${opts} -t \"${OPTARG}\""
+				opt_template=1
+				;;
+			*)
+				build_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ ${opt_init_script} -eq 0 -o ${opt_jail_name} -eq 0 ]; then
+		build_usage
+		exit ${EX_USAGE}
+	fi
+	
+	if [ ${opt_template} -eq 0 ]; then
+		opts="${opts} -t ${TEMPLATE_PREBUILD}"
+	fi
+
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	lib_debug "Building..."
+
+	build_jail ${opts} -c "${CONFIG}"
+}
+
+build_jail()
+{
+	lib_su /bin/sh "${SCRIPTSDIR}/build_jail.sh" $@
+}
+
+build_help()
+{
+	build_usage
+
+	echo
+	echo "${build_desc}"
+	echo
+	echo "This command is ideal for developing an application between co-workers with the"
+	echo "same environment or for running an application with the advantages of a jail."
+	echo
+	echo "  -d dir                Copy this directory into the data/ directory of the resulting"
+	echo "                        appjail. This flag may be used multiples times."
+	echo "  -o output             Output name without the .appjail extension."
+	echo "                        The extension will be appended."
+	echo "  -t template           Template used by the appjail application. This is not"
+	echo "                        necessarily the same used by the \`appjail jail\` command."
+	echo "  -i init_script        Init script executed when the appjail is started."
+	echo "  -j jail_name          The jail used by the appjail application."
+	echo "                        See \`appjail help jail\` for more details."
+}
+
+build_usage()
+{
+	echo "usage: build [-d dir] [-o output] [-t template] -i init_script -j jail_name"
+}

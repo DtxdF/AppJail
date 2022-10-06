@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+usage_desc="Show the syntax of a given command."
+
+usage_main()
+{
+	usage_for "$1"
+}
+
+usage_for()
+{
+	local cmd
+
+	cmd="$1"
+	if [ -z "${cmd}" ]; then
+		echo "usage: usage_for cmd"
+		return ${EX_USAGE}
+	fi
+
+	if [ ! -x "${COMMANDS}/${cmd}" ]; then
+		echo "The command \"${cmd}\" does not exists."
+		return ${EX_NOINPUT}
+	fi
+
+	. "${COMMANDS}/${cmd}"
+
+	if ! lib_check_func "${cmd}_usage"; then
+		echo "${cmd}_usage function does not exists in the ${cmd} command."
+		return ${EX_SOFTWARE}
+	fi
+
+	eval ${cmd}_usage
+}
+
+usage_help()
+{
+	usage_usage
+	
+	echo
+	echo "${usage_desc}"
+}
+
+usage_usage()
+{
+	echo "usage: usage cmd"
+}

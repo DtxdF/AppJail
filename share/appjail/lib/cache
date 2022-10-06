@@ -1,0 +1,22 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_cache_name()
+{
+	local _f _s
+
+	_f="$1"
+	_s="$2"
+
+	if [ -z "${_f}" -o -z "${_s}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_cache_name filename string"
+	fi
+
+	mkdir -p "${CACHEDIR}/apps"
+
+	echo "${_s}" > "${CACHEDIR}/apps/${_f}"
+}

@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+unlink_desc="Unlinks a jail linked by the link command."
+
+unlink_main()
+{
+	local jail
+
+	jail="$1"
+
+	if [ -z "${jail}" ]; then
+		unlink_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift
+	
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	unlink_appjail -c "${CONFIG}" -n "${jail}"
+}
+
+unlink_appjail()
+{
+	lib_su /bin/sh "${SCRIPTSDIR}/unlink.sh" $@
+}
+
+unlink_help()
+{
+	unlink_usage
+
+	echo
+	echo "${unlink_desc}"
+	echo
+	echo
+	echo "  jail           The name of jail to be unlinked."
+}
+
+unlink_usage()
+{
+	echo "usage: unlink jail"
+}

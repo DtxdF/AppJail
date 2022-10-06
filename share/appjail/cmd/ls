@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+ls_desc="Wrapper to ls(1) command to list the appjails and jails."
+
+ls_main()
+{
+	local _o _i
+	local ls_args jail_name root_dir
+	local opt_apps opt_jails
+
+	opt_apps=0
+	opt_jails=0
+
+	while getopts ":aj" _o; do
+		case "${_o}" in
+			a)
+				opt_apps=1
+				;;
+			j)
+				opt_jails=1
+				;;
+			*)
+				ls_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_apps} -eq ${opt_jails} ]; then
+		ls_usage
+		exit ${EX_USAGE}
+	fi
+
+	. "${LIBDIR}/replace"
+
+	if [ ${opt_apps} -eq 1 ]; then
+		root_dir="${APPSDIR}"
+	else
+		lib_replace_jaildir
+		root_dir="${JAILDIR}"
+	fi
+
+	_i=0
+	for _o in $@; do
+		_i=$((_i+1))
+
+		if [ ${_o} = '--' ]; then
+			break
+		fi
+
+		# Files are ignored
+		if [ -e "${_o}" ]; then
+			continue
+		fi
+
+		ls_args="${ls_args} ${_o}"
+	done
+	shift $((_i))
+
+	jail_name="$1"
+
+	if [ ! -z "${jail_name}" ]; then
+		root_dir="${root_dir}/${jail_name}"
+	fi
+
+	if [ ! -e "${root_dir}" ]; then
+		lib_err ${EX_NOINPUT} "${root_dir} does not exists."
+	fi
+
+	. "${LIBDIR}/su"
+
+	lib_su ls ${ls_args} "${root_dir}"
+}
+
+ls_help()
+{
+	ls_usage
+
+	echo
+	echo "${ls_desc}"
+	echo
+	echo "The listing is relative to the root directory depending on whether you are"
+	echo "listing jails or appjails. So, you can list the files in the foo jail using"
+	echo "a syntax like \`ls -j -- -- foo\`."
+	echo
+	echo "  -a             List the appjails installed."
+	echo "  -j             List the jails installed."
+	echo "  ls_args        Arguments that will be passed to ls(1)"
+	echo "  jail           List only this jail."
+}
+
+ls_usage()
+{
+	echo "usage: ls [-a | -j] -- [ls_args] -- [jail]"
+}

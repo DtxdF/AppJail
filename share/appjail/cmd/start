@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+start_desc="Create a jail using a template from an installed appjail."
+
+start_main()
+{
+	local appjail
+
+	appjail="$1"
+
+	if [ -z "${appjail}" ]; then
+		start_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift
+	
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	start_appjail -s -c "${CONFIG}" -a "${appjail}" -- $@
+}
+
+start_appjail()
+{
+	lib_debug "Starting..."
+
+	lib_su /bin/sh "${SCRIPTSDIR}/service.sh" $@
+}
+
+start_help()
+{
+	start_usage
+
+	echo
+	echo "${start_desc}"
+	echo
+	echo "This command creates a jail from an installed appjail. After creating the"
+	echo "jail, it executes the *start functions of the jail init script."
+	echo
+	echo "  appjail        Name of the appjail application."
+}
+
+start_usage()
+{
+	echo "usage: start appjail [args]"
+}

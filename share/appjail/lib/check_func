@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_check_func()
+{
+	local _o _func
+
+	_func="$1"
+	if [ -z "${_func}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_func function"
+	fi
+
+	_o="`type \"${_func}\" 2>&1`"
+	if [ $? -eq 0 ]; then
+		return 0
+	else
+		return 1
+	fi
+}

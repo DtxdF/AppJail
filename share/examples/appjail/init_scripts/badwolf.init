@@ -1,0 +1,52 @@
+
+usage()
+{
+	echo "usage: appjail run \"${APPJAIL_JAILNAME}\" -u username"
+}
+
+cmd()
+{
+	local _o
+	local opt_user=0
+
+	while getopts ":u:" _o; do
+		case "${_o}" in
+			u)
+				USER="${OPTARG}"
+				opt_user=1
+				;;
+			*)
+				usage
+				exit 64 # EX_USAGE
+				;;
+		esac
+	done
+
+	if [ ${opt_user} -eq 0 ]; then
+		usage
+		exit 64 # EX_USAGE
+	fi
+
+	jexec -l "${APPJAIL_JAILNAME}" mkdir -p "/home/badwolf/users/${USER}/.local/share"
+	jexec -l "${APPJAIL_JAILNAME}" mkdir -p "/home/badwolf/users/${USER}/.config"
+
+	if [ -d "${HOME}/.local/share/badwolf" ]; then
+		cp -R "${HOME}/.local/share/badwolf" "${APPJAIL_JAILDIR}/home/badwolf/users/${USER}/.local/share"
+	fi
+
+	if [ -d "${HOME}/.config/badwolf" ]; then
+		cp -R "${HOME}/.config/badwolf" "${APPJAIL_JAILDIR}/home/badwolf/users/${USER}/.config"
+	fi
+
+	jexec -l "${APPJAIL_JAILNAME}" chown -R badwolf:badwolf "/home/badwolf/users/${USER}"
+	jexec -l "${APPJAIL_JAILNAME}" su -m badwolf -c \
+		"sh -c 'env HOME=/home/badwolf/users/${USER} DISPLAY=:0.0 NO_AT_BRIDGE=1 badwolf'"
+}
+
+postcmd()
+{
+	if [ -n "${USER}" ]; then
+		echo "Cleaning /home/badwolf/users/${USER}..." >&2
+		jexec -l "${APPJAIL_JAILNAME}" rm -rf "/home/badwolf/users/${USER}"
+	fi
+}

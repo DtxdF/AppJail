@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+version_desc="Show the appjail version."
+
+version_main()
+{
+	. "${LIBDIR}/version"
+
+	echo "${APPJAIL_VERSION}"
+}
+
+version_help()
+{
+	version_usage
+
+	echo
+	echo "${version_desc}"
+}
+
+version_usage()
+{
+	echo "usage: version"
+}

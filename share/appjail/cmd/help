@@ -1,0 +1,99 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+help_desc="Show help for commands and list the available commands."
+
+help_main()
+{
+	local cmd
+
+	cmd="$1"
+	if [ -z "${cmd}" ]; then
+		help_message
+	else
+		help_for "${cmd}"
+	fi
+}
+
+help_message()
+{
+	local _var _val _desc
+	local _cmd_minlen _cmd_len _cmd_maxlen _cmds cmd
+
+	. "${LIBDIR}/whitespaces"
+	. "${LIBDIR}/strlen"
+
+	echo "Help information"
+	echo "================"
+	echo
+
+	_cmds="`ls "${COMMANDS}"`"
+
+	_cmd_maxlen=0
+	for cmd in ${_cmds}; do
+		_cmd_len="`lib_strlen \"${cmd}\"`"
+
+		if [ ${_cmd_len} -gt ${_cmd_maxlen} ]; then
+			_cmd_maxlen=${_cmd_len}
+		fi
+	done
+
+	for cmd in ${_cmds}; do
+		. "${COMMANDS}/${cmd}"
+
+		_var=`echo \\$${cmd}_desc`
+		_val=`eval echo $_var`
+		_desc=$_val
+
+		_cmd_len="`lib_strlen \"${cmd}\"`"
+		_cmd_minlen=$((${_cmd_maxlen}-${_cmd_len}))
+
+		echo -n "${cmd}"
+		echo -n "`lib_generate_whitespaces ${_cmd_minlen}`"
+		echo -n "`lib_generate_whitespaces 4`"
+		echo "${_desc}"
+	done
+
+	echo
+	echo "Use \`help cmd\` to display the help information for that command."
+}
+
+help_for()
+{
+	local cmd
+
+	cmd="$1"
+	if [ -z "${cmd}" ]; then
+		lib_err ${EX_USAGE} "usage: help_for cmd"
+	fi
+
+	if [ ! -x "${COMMANDS}/${cmd}" ]; then
+		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exists."
+	fi
+
+	. "${COMMANDS}/${cmd}"
+
+	if ! lib_check_func "${cmd}_help"; then
+		lib_err ${EX_SOFTWARE} "${cmd}_help function does not exists in the ${cmd} command."
+	fi
+
+	eval ${cmd}_help
+}
+
+help_help()
+{
+	help_usage
+	
+	echo
+	echo "${help_desc}"
+}
+
+help_usage()
+{
+	echo "usage: help cmd"
+}

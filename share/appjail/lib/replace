@@ -1,0 +1,63 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_replace()
+{
+	local _old _new _str
+
+	_old="$1"
+	_new="$2"
+	_str="$3"
+
+	if [ -z "${_old}" -o -z "${_new}" -o -z "${_str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace old new string"
+	fi
+
+	echo "${_str}" | sed -Ee "s|${_old}|${_new}|g"
+}
+
+lib_replace_componentsdir()
+{
+	COMPONENTSDIR="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${COMPONENTSDIR}\"`"
+	COMPONENTSDIR="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${COMPONENTSDIR}\"`"
+}
+
+lib_replace_downloadurl()
+{
+	DOWNLOADURL="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${DOWNLOADURL}\"`"
+	DOWNLOADURL="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${DOWNLOADURL}\"`"
+}
+
+lib_replace_jaildir()
+{
+	JAILDIR="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${JAILDIR}\"`"
+	JAILDIR="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${JAILDIR}\"`"
+}
+
+lib_filter_jail()
+{
+	local tempfile
+	local jail_name jail_conf jail_root
+
+	jail_name="$1"
+	jail_conf="$2"
+	jail_root="$3"
+
+	if [ -z "${jail_name}" -o -z "${jail_conf}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_filter_jail jail_name jail_conf jail_root"
+	fi
+
+	tempfile="`lib_generate_tempfile`"
+
+	cat "${jail_conf}" | sed \
+				-E \
+				-e "s|%ROOTDIR%|`dirname \"${jail_root}\"`|g" \
+				-e "s|%JAILDIR%|${jail_root}|g" \
+				-e "s|%JAILNAME%|${jail_name}|g" > "${tempfile}"
+
+	echo "${tempfile}"
+}

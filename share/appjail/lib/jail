@@ -1,0 +1,131 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_jail_exists()
+{
+	local _err
+	local jail_name
+
+	jail_name="$1"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_jail_exists jail_name"
+	fi
+
+	_err="`jls -j \"${jail_name}\" name 2>&1`"
+
+	if [ $? -eq 0 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_chroot_jail()
+{
+	local jail_name program
+
+	jail_name="$1"
+	program="$2"
+
+	if [ -z "${jail_name}" -o -z "${program}" ]; then
+		lib_err ${EX_USAGE} "usage: chroot_jail jail_name program"
+	fi
+
+	echo "#" >&2
+	echo "# You are in a chroot environment and you are not yet in the jail." >&2
+	echo "# At this stage, you can create, delete or configure some files that" >&2
+	echo "# need to be configured before starting the jail. For example, you" >&2
+	echo "# can set clear_tmp_X to NO if this jail is for an X11 application." >&2
+	echo "#" >&2
+	echo >&2
+
+	chroot "${JAILDIR}/${jail_name}" "${program}"
+}
+
+lib_create_jail()
+{
+	local jail_conf jail_name
+	local _l
+
+	jail_conf="$1"
+	jail_name="$2"
+
+	if [ -z "${jail_conf}" -o -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: create_jail jail_conf jail_name"
+	fi
+
+	if [ ! -f "${jail_conf}" ]; then
+		lib_err ${EX_NOINPUT} "The file ${jail_conf} does not exists or cannot be read."
+	fi
+
+	lib_debug "Creating the jail..."
+
+	jail -c -f "${jail_conf}" "${jail_name}" 2>&1 |\
+	while read _l; do
+		lib_debug "${_l}"
+	done
+}
+
+lib_enter_jail()
+{
+	local jail_name jail_user
+
+	jail_name="$1"
+	jail_user="$2"
+
+	if [ -z "${jail_name}" -o -z "${jail_user}" ]; then
+		lib_err ${EX_USAGE} "usage: enter_jail jail_name jail_user"
+	fi
+
+	echo "#" >&2
+	echo "# Now you are in jail. Install, configure and do whatever you want." >&2
+	echo "# Remember: the template used by the prebuild is not necessarily the" >&2
+	echo "# template used by the build." >&2
+	echo "#" >&2
+	echo >&2
+
+	jexec -l "${jail_name}" login -f "${jail_user}"
+}
+
+lib_remove_jail()
+{
+	local jail_conf jail_name
+	local _l
+
+	jail_conf="$1"
+	jail_name="$2"
+
+	if [ -z "${jail_conf}" -o -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: remove_jail jail_conf jail_name"
+	fi
+
+	lib_debug "Removing the ${jail_name} jail..."
+	jail -r -f "${jail_conf}" "${jail_name}" 2>&1 |\
+	while read _l; do
+		lib_debug "${_l}"
+	done
+}
+
+lib_req_jail_params()
+{
+	local _t
+
+	_t="$1"
+
+	if [ -z "${_t}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_req_jail_params path/to/some/template"
+	fi
+
+	egrep -n '[^\]<\w+(:.+)?[^\:]>' "${_t}"
+
+	if [ $? -eq 0 ]; then
+		return 0
+	else
+		return 1
+	fi
+}

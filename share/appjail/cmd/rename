@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+rename_desc="Rename a jail or an appjail application."
+
+rename_main()
+{
+	local _o
+	local old new
+	local rn_cmd
+
+	while getopts ":aj" _o; do
+		case "${_o}" in
+			a)
+				rn_cmd="-a"
+				;;
+			j)
+				rn_cmd="-j"
+				;;
+			*)
+				rename_usage
+				exit ${EX_USAGE}
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${rn_cmd}" ]; then
+		rename_usage
+		exit ${EX_USAGE}
+	fi
+
+	old="$1"
+	new="$2"
+
+	if [ -z "${old}" -o -z "${new}" ]; then
+		rename_usage
+		exit ${EX_USAGE}
+	fi
+
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	rename_jail ${rn_cmd} -c "${CONFIG}" "${old}" "${new}"
+}
+
+rename_jail()
+{
+	lib_su /bin/sh "${SCRIPTSDIR}/rename.sh" $@
+}
+
+rename_help()
+{
+	rename_usage
+
+	echo
+	echo "${rename_desc}"
+}
+
+rename_usage()
+{
+	echo "usage: rename [-a | -j] old new"
+}

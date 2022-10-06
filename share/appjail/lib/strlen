@@ -1,0 +1,30 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_strlen()
+{
+	local _str
+
+	_str="$1"
+	if [ -z "${_str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_strlen string"
+	fi
+
+	echo "${_str}" | wc -c | tr -d ' '
+}
+
+lib_countfiles()
+{
+	local _dir
+
+	_dir="$1"
+	if [ -z "${_dir}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_countfiles directory"
+	fi
+
+	ls -A "${_dir}" | wc -l | tr -d ' '
+}

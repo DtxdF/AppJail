@@ -1,0 +1,26 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+lib_atexit_init()
+{
+	. "${LIBDIR}/tempfile"
+
+	_ATEXIT_CMDS=`lib_generate_tempfile`
+
+	chmod +x "${_ATEXIT_CMDS}"
+
+	trap "[ ! -x \"${_ATEXIT_CMDS}\" ] || /bin/sh \"${_ATEXIT_CMDS}\"; rm -f \"${_ATEXIT_CMDS}\"" SIGINT SIGQUIT SIGTERM EXIT
+}
+
+lib_atexit_add()
+{
+	if [ -z "${_ATEXIT_CMDS}" ]; then
+		lib_err ${EX_NOINPUT} "You must first executed lib_atexit_init() function before use this function."
+	fi
+
+	echo $* >> "${_ATEXIT_CMDS}"
+}

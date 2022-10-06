@@ -1,0 +1,123 @@
+#!/bin/sh
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+edit_desc="Create or edit a template."
+
+edit_main()
+{
+	local _o
+	local appjail template new_template
+	local appjail_cmd
+
+	if [ $# -eq 0 ]; then
+		edit_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":ita:e:n:" _o; do
+		case ${_o} in
+			i)
+				appjail_cmd="-i"
+				;;
+			t)
+				appjail_cmd="-t"
+				;;
+			a)
+				appjail="${OPTARG}"
+				;;
+			e)
+				template="${OPTARG}"
+				;;
+			n)
+				new_template="${OPTARG}"
+				;;
+			*)
+				edit_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ -z "${template}" ] && [ -z "${appjail}" -o -z "${appjail_cmd}" ]; then
+		edit_usage
+		exit ${EX_USAGE}
+	fi
+
+	. "${LIBDIR}/tempfile"
+	. "${LIBDIR}/mksum"
+	. "${LIBDIR}/replace"
+	. "${LIBDIR}/su"
+
+	set -e
+
+	if [ -n "${template}" ]; then
+		edit_template "${template}" "${new_template}"
+	else
+
+		edit_appjail_template ${appjail_cmd} -c "${CONFIG}" -a "${appjail}"
+	fi
+}
+
+edit_template()
+{
+	local template new_template tempfile old_sum new_sum
+
+	template="$1"
+	if [ -z "${template}" ]; then
+		echo "usage: edit_template template [new_template]"
+		return 1
+	fi
+
+	new_template="$2"
+	tempfile="`lib_generate_tempfile`"
+	old_sum="`lib_mksum ${tempfile}`"
+
+	lib_atexit_add rm -f "${tempfile}"
+
+	if [ -f "${TEMPLATES}/${template}" ]; then
+		cat "${TEMPLATES}/${template}" > "${tempfile}"
+	fi
+
+	${EDITOR} "${tempfile}"
+
+	new_sum="`lib_mksum ${tempfile}`"
+
+	if [ "${old_sum}" != "${new_sum}" ]; then
+		if [ -z "${new_template}" ]; then
+			mv "${tempfile}" "${TEMPLATES}/${template}"
+		else
+			mv "${tempfile}" "${TEMPLATES}/${new_template}"
+		fi
+	fi
+}
+
+edit_appjail_template()
+{
+	lib_su "${SCRIPTSDIR}/edit.sh" $@
+}
+
+edit_help()
+{
+	edit_usage
+	
+	echo
+	echo "${edit_desc}"
+	echo
+	echo "  -i                 Edit the init script."
+	echo "  -t                 Edit the template."
+	echo "  -a appjail         Edit a template or an init script from an appjail."
+	echo "  -e template        Create or edit an existing template. The -n parameter can be used"
+	echo "                     when \`template\` is an existing template."
+	echo "  -n new_template    The name of the new template."
+}
+
+edit_usage()
+{
+	echo "usage: edit [-n new_template] -e template"
+	echo "       edit [-i | -t] -a appjail"
+}
