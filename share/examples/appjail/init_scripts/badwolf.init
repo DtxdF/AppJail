@@ -4,6 +4,11 @@ usage()
 	echo "usage: appjail run \"${APPJAIL_JAILNAME}\" -u username"
 }
 
+precmd()
+{
+	xhost +
+}
+
 cmd()
 {
 	local _o
