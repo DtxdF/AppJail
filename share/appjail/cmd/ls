@@ -70,10 +70,6 @@ ls_main()
 		root_dir="${root_dir}/${jail_name}"
 	fi
 
-	if [ ! -e "${root_dir}" ]; then
-		lib_err ${EX_NOINPUT} "${root_dir} does not exists."
-	fi
-
 	. "${LIBDIR}/su"
 
 	lib_su ls ${ls_args} "${root_dir}"
