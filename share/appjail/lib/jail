@@ -73,13 +73,13 @@ lib_create_jail()
 
 lib_enter_jail()
 {
-	local jail_name jail_user
+	local jail_name program
 
 	jail_name="$1"
-	jail_user="$2"
+	program="$2"
 
-	if [ -z "${jail_name}" -o -z "${jail_user}" ]; then
-		lib_err ${EX_USAGE} "usage: enter_jail jail_name jail_user"
+	if [ -z "${jail_name}" -o -z "${program}" ]; then
+		lib_err ${EX_USAGE} "usage: enter_jail program"
 	fi
 
 	echo "#" >&2
@@ -89,7 +89,7 @@ lib_enter_jail()
 	echo "#" >&2
 	echo >&2
 
-	jexec -l "${jail_name}" login -f "${jail_user}"
+	jexec -l "${jail_name}" ${program}
 }
 
 lib_remove_jail()

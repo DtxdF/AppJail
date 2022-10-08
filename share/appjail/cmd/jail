@@ -13,6 +13,7 @@ jail_main()
 	local _o jail_name
 	local _cj_cmd _cj_opts
 	local opt_download opt_extract
+	local chroot_tempfile jail_tempfile
 
 	if [ $# -eq 0 ]; then
 		jail_usage
@@ -22,7 +23,7 @@ jail_main()
 	opt_download=1
 	opt_extract=1
 
-	while getopts ":delrCa:c:p:t:u:v:U:D:n:" _o; do
+	while getopts ":delrCa:c:p:t:u:v:D:P:U:n:" _o; do
 		case "${_o}" in
 			d)
 				opt_download=0
@@ -60,8 +61,12 @@ jail_main()
 			D)
 				_cj_opts="${_cj_opts} -d ${OPTARG}"
 				;;
+			P)
+				CONSOLE_PROGRAM="${OPTARG}"
+				;;
 			U)
 				JAILUSER="${OPTARG}"
+				CONSOLE_PROGRAM="login -f \"${JAILUSER}\""
 				;;
 			n)
 				jail_name="${OPTARG}"
@@ -95,12 +100,24 @@ jail_main()
 		extract_components "${jail_name}" || exit $?
 	fi
 
+	# chroot
+	chroot_tempfile="`lib_generate_tempfile`"
+	lib_atexit_add rm -f "${chroot_tempfile}"
+
+	echo "${CHROOT_PROGRAM}" > "${chroot_tempfile}"
+
+	# jail
+	jail_tempfile="`lib_generate_tempfile`"
+	lib_atexit_add rm -f "${jail_tempfile}"
+
+	echo "${CONSOLE_PROGRAM}" > "${jail_tempfile}"
+
 	create_jail \
 		${_cj_opts} \
-		-p "${CHROOT_PROGRAM}" \
+		-p "${chroot_tempfile}" \
 		-t "${TEMPLATE_PREBUILD}" \
 		-C "${CONFIG}" \
-		-u "${JAILUSER}" \
+		-P "${jail_tempfile}" \
 		-n "${jail_name}"
 }
 
@@ -191,12 +208,15 @@ jail_help()
 	echo "                            be mimicked as the tree directory of the jail. For example, if the"
 	echo "                            directory to copy is foo/ and you want to get an exact copy of"
 	echo "                            /etc/resolv.conf, you must have a file like foo/etc/resolv.conf."
-	echo "  -U jail_user              User to run inside the jail."
+	echo "  -P jail_program           Program to run when jexec(8) is executed. Default: ${CONSOLE_PROGRAM}"
+	echo "  -U jail_user              User to run inside the jail. This replace the -P argument and the"
+	echo "                            CONSOLE_PROGRAM variable with \`login -f <jail_user>\`."
 	echo "  -n jail_name              Name of the jail."
 }
 
 jail_usage()
 {
-	echo "usage: jail [-delrC] [-a freebsd_arch] [-c components] [-p chroot_program] [-t template] "
-	echo "            [-u url] [-v freebsd_version] [-D dir] [-U jail_user] -n name"
+	echo "usage: jail [-delrC] [-a freebsd_arch] [-c components] [-p chroot_program] [-t template]"
+	echo "            [-u url] [-v freebsd_version] [-D dir] [-P console_program] [-U jail_user]"
+	echo "            -n name"
 }

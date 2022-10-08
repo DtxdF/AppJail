@@ -10,9 +10,10 @@ main()
 {
 	local _o
 	local config
-	local jail_conf jail_name jail_temp jail_user
+	local jail_conf jail_name jail_temp
 	local opt_remove opt_chroot opt_enter
-	local chroot_program
+	local chroot_program jail_prg
+	local _chroot_program _jail_prg
 	local dirs
 
 	if [ $# -eq 0 ]; then
@@ -23,19 +24,16 @@ main()
 	opt_remove=1
 	opt_chroot=1
 	opt_enter=1
-	jail_user="root"
-	chroot_program="/bin/sh"
+	_jail_prg="login -f root"
+	_chroot_program="/bin/sh"
 
-	while getopts ":clrd:u:t:n:p:C:" _o; do
+	while getopts ":clrd:t:n:p:C:P:" _o; do
 		case "${_o}" in
 			d)
 				dirs="${dirs} ${OPTARG}"
 				;;
 			p)
 				chroot_program="${OPTARG}"
-				;;
-			u)
-				jail_user="${OPTARG}"
 				;;
 			r)
 				opt_remove=0
@@ -54,6 +52,9 @@ main()
 				;;
 			C)
 				config="${OPTARG}"
+				;;
+			P)
+				jail_prg="${OPTARG}"
 				;;
 			*)
 				usage
@@ -89,6 +90,24 @@ main()
 		lib_err ${EX_NOINPUT} "The \`${jail_name}\` jail does not exists."
 	fi
 
+	if [ -z "${jail_prg}" ]; then
+		jail_prg="${_jail_prg}"
+	else
+		if [ ! -f "${jail_prg}" ]; then
+			lib_err ${EX_NOINPUT} "The \`${jail_prg}\` does not exists."
+		fi
+		jail_prg="`head -1 \"${jail_prg}\"`"
+	fi
+
+	if [ -z "${chroot_program}" ]; then
+		chroot_program="${_chroot_program}"
+	else
+		if [ ! -f "${chroot_program}" ]; then
+			lib_err ${EX_NOINPUT} "The \`${chroot_program}\` does not exists."
+		fi
+		chroot_program="`head -1 \"${chroot_program}\"`"
+	fi
+
 	. "${LIBDIR}/copy"
 
 	if [ ! -z "${dirs}" ]; then
@@ -115,13 +134,13 @@ main()
 	lib_create_jail "${jail_temp}" "${jail_name}"
 
 	if [ $opt_enter -eq 1 ]; then
-		lib_enter_jail "${jail_name}" "${jail_user}"
+		lib_enter_jail "${jail_name}" "${jail_prg}"
 	elif [ $opt_remove -eq 1 ]; then # This message is stupid if the jail will be removed.
 		echo "#"
 		echo "# The jail is acting as a service. If you want to enter inside it,"
 		echo "# run the following command as root:"
 		echo "#"
-		echo "# jexec -l '${jail_name}' login -f '${jail_user}'"
+		echo "# jexec -l '${jail_name}' ${jail_prg}"
 		echo "#"
 	fi
 	
@@ -150,8 +169,10 @@ help()
 	echo "  -d dir                              Copy the directory to the jail environment."
 	echo "                                      This directory will be an exact copy of its own tree."
 	echo "                                      This flag may be used multiples times."
-	echo "  -u user                             User to run inside the jail."
-	echo "  -p program                          Program to run when chroot(8) is executed."
+	echo "  -p file                             Program to run when chroot(8) is executed. Must be a"
+	echo "                                      file."
+	echo "  -P file                             Program to run when jexec(8) is executed. Like the -p"
+	echo "                                      parameter, must be a file."
 	echo "  -C path/to/appjail.conf             AppJail configuration file."
 	echo "  -t path/to/some/template.conf       Template used to create the jail."
 	echo "  -n jail_name                        Name of the jail."
@@ -159,7 +180,7 @@ help()
 
 usage()
 {
-	echo "usage: create_jail.sh [-clr] [-d dir] [-u user] [-p program] -n jail_name"
+	echo "usage: create_jail.sh [-clr] [-d dir] [-p program] [-P jail_program] -n jail_name"
 	echo "                      -t path/to/some/template.conf -C path/to/appjail.conf"
 }
 
