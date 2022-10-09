@@ -83,9 +83,7 @@ lib_enter_jail()
 	fi
 
 	echo "#" >&2
-	echo "# Now you are in jail. Install, configure and do whatever you want." >&2
-	echo "# Remember: the template used by the prebuild is not necessarily the" >&2
-	echo "# template used by the build." >&2
+	echo "# Now you are inside the jail. Install, configure and do whatever you want." >&2
 	echo "#" >&2
 	echo >&2
 
