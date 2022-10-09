@@ -82,7 +82,7 @@ main()
 	lib_debug "Checking for required parameters..."
 
 	if lib_req_jail_params "${APPSDIR}/${appjail}/conf/jail.conf"; then
-		lib_err ${EX_USAGE} "There are required parameters. Use \`appjail edit -t -a \"${appjail}\"\` to edit it."
+		lib_err ${EX_USAGE} "There are required parameters. Use \`appjail edit -t -a \"${appjail}\"\` to edit it. See also \`appjail help set\`."
 	fi
 
 	lib_debug "Editing template \"${APPSDIR}/${appjail}/conf/jail.conf\""

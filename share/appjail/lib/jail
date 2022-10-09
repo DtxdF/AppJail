@@ -121,11 +121,30 @@ lib_req_jail_params()
 		lib_err ${EX_USAGE} "usage: lib_req_jail_params path/to/some/template"
 	fi
 
-	egrep -n '[^\]<\w+(:.+)?[^\:]>' "${_t}"
+	egrep -n '<\w+(:.+)?[^:]>' "${_t}"
 
 	if [ $? -eq 0 ]; then
 		return 0
 	else
 		return 1
 	fi
+}
+
+lib_set_param()
+{
+	local _t _k _v
+
+	_t="$1"
+	_k="$2"
+	_v="$3"
+
+	if [ -z "${_t}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_set_param path/to/some/template key value"
+	fi
+
+	if ! egrep -q "<(${_k}){1}(:.+)?>" "${_t}"; then
+		lib_err ${EX_DATAERR} "Key\`${_k}\` not found."
+	fi
+
+	sed -i '' -E "/<${_k}/s#<.*>#${_v}#i" "${_t}"
 }
