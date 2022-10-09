@@ -14,6 +14,7 @@ jail_main()
 	local _cj_cmd _cj_opts
 	local opt_download opt_extract
 	local chroot_tempfile jail_tempfile
+	local components
 
 	if [ $# -eq 0 ]; then
 		jail_usage
@@ -44,7 +45,7 @@ jail_main()
 				FREEBSD_ARCH="${OPTARG}"
 				;;
 			c)
-				COMPONENTS="${COMPONENTS} ${OPTARG}"
+				components="${components} ${OPTARG}"
 				;;
 			p)
 				CHROOT_PROGRAM="${OPTARG}"
@@ -93,16 +94,20 @@ jail_main()
 	lib_replace_componentsdir
 	lib_replace_jaildir
 
-	if [ $opt_download -eq 1 -a -n "${COMPONENTS}" ]; then
-		lib_download_components ${COMPONENTS} || exit $?
+	if [ -z "${components}" ]; then
+		components="${COMPONENTS}"
 	fi
 
-	if [ $opt_extract -eq 1 -a -n "${COMPONENTS}" ]; then
+	if [ $opt_download -eq 1 -a -n "${components}" ]; then
+		lib_download_components ${components} || exit $?
+	fi
+
+	if [ $opt_extract -eq 1 -a -n "${components}" ]; then
 		if [ -d "${JAILDIR}/${jail_name}" ] && [ `lib_countfiles "${JAILDIR}/${jail_name}"` -gt 0 ]; then
 			lib_err ${EX_DATAERR} "The \"${JAILDIR}/${jail_name}\" directory already exists."
 		fi
 
-		lib_extract_components "${JAILDIR}/${jail_name}" ${COMPONENTS} || exit $?
+		lib_extract_components "${JAILDIR}/${jail_name}" ${components} || exit $?
 	fi
 
 	# chroot
