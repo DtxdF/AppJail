@@ -148,3 +148,54 @@ lib_set_param()
 
 	sed -i '' -E "/<${_k}/s#<.*>#${_v}#i" "${_t}"
 }
+
+lib_download_components()
+{
+	local _out _f
+	local component
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_download_components component1 component2 ... componentN"
+	fi
+
+	mkdir -p "${COMPONENTSDIR}"
+
+	lib_debug "Downloading components..."
+
+	for component in $@; do
+		_out="${COMPONENTSDIR}/${component}"
+
+		_f="`lib_replace %DOWNLOADURL% \"${DOWNLOADURL}/${component}\" \"${FETCH_CMD}\"`"
+		_f="`lib_replace %OUTPUT_NAME% \"${_out}\" \"${_f}\"`"
+
+		if [ "${FORCE_DOWNLOAD}" -eq 0 -a -f "${_out}" ]; then
+			lib_warn "The \"${component}\" component already exists."
+		else
+			lib_debug "Downloading \"${component}\" component..."
+			eval ${_f}
+		fi
+	done
+}
+
+lib_extract_components()
+{
+	local component _d _j _out
+
+	_j="$1"; shift
+	if [ -z "${_j}" -o $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_extract_components jail_path component1 component2 ... componentN"
+	fi
+
+	mkdir -p "${_j}"
+
+	lib_debug "Extracting components..."
+
+	for component in $@; do
+		_out="${COMPONENTSDIR}/${component}"
+
+		_d="`lib_replace %FILE% \"${_out}\" \"${DECOMPRESS_CMD}\"`"
+		_d="`lib_replace %DIRECTORY% \"${_j}\" \"${_d}\"`"
+
+		lib_su ${_d}
+	done
+}

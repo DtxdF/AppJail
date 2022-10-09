@@ -87,17 +87,22 @@ jail_main()
 	. "${LIBDIR}/tempfile"
 	. "${LIBDIR}/su"
 	. "${LIBDIR}/strlen"
+	. "${LIBDIR}/jail"
 
 	lib_replace_downloadurl
 	lib_replace_componentsdir
 	lib_replace_jaildir
 
-	if [ $opt_download -eq 1 ]; then
-		download_components || exit $?
+	if [ $opt_download -eq 1 -a -n "${COMPONENTS}" ]; then
+		lib_download_components ${COMPONENTS} || exit $?
 	fi
 
-	if [ $opt_extract -eq 1 ]; then
-		extract_components "${jail_name}" || exit $?
+	if [ $opt_extract -eq 1 -a -n "${COMPONENTS}" ]; then
+		if [ -d "${JAILDIR}/${jail_name}" ] && [ `lib_countfiles "${JAILDIR}/${jail_name}"` -gt 0 ]; then
+			lib_err ${EX_DATAERR} "The \"${JAILDIR}/${jail_name}\" directory already exists."
+		fi
+
+		lib_extract_components "${JAILDIR}/${jail_name}" ${COMPONENTS} || exit $?
 	fi
 
 	# chroot
@@ -119,57 +124,6 @@ jail_main()
 		-C "${CONFIG}" \
 		-P "${jail_tempfile}" \
 		-n "${jail_name}"
-}
-
-download_components()
-{
-	local component _out _f
-
-	mkdir -p "${COMPONENTSDIR}"
-
-	lib_debug "Downloading components..."
-
-	for component in ${COMPONENTS}; do
-		_out="${COMPONENTSDIR}/${component}"
-
-		_f="`lib_replace %DOWNLOADURL% \"${DOWNLOADURL}/${component}\" \"${FETCH_CMD}\"`"
-		_f="`lib_replace %OUTPUT_NAME% \"${_out}\" \"${_f}\"`"
-
-		if [ "${FORCE_DOWNLOAD}" -eq 0 -a -f "${_out}" ]; then
-			lib_warn "The \"${component}\" component already exists."
-		else
-			lib_debug "Downloading \"${component}\" component..."
-			eval ${_f}
-		fi
-	done
-}
-
-extract_components()
-{
-	local component _d _j _su _cmd _out
-
-	_j="$1"
-	if [ -z "${_j}" ]; then
-		echo "usage: extract_components jail_name"
-		exit ${EX_USAGE}
-	fi
-
-	if [ -d "${JAILDIR}/${_j}" ] && [ `lib_countfiles "${JAILDIR}/${_j}"` -gt 0 ]; then
-		lib_err ${EX_DATAERR} "The \"${JAILDIR}/${_j}\" directory already exists."
-	fi
-
-	mkdir -p "${JAILDIR}/${_j}"
-
-	lib_debug "Extracting components..."
-
-	for component in ${COMPONENTS}; do
-		_out="${COMPONENTSDIR}/${component}"
-
-		_d="`lib_replace %FILE% \"${_out}\" \"${DECOMPRESS_CMD}\"`"
-		_d="`lib_replace %DIRECTORY% \"${JAILDIR}/${_j}\" \"${_d}\"`"
-
-		lib_su ${_d}
-	done
 }
 
 create_jail()
