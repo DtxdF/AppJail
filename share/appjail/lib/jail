@@ -193,6 +193,8 @@ lib_extract_components()
 	_d="${TAR_BINARY} ${TAR_DECOMPRESS_JAIL_ARGS}"
 
 	for component in $@; do
+		lib_debug "Extracting \"${component}\" component..."
+
 		_out="${COMPONENTSDIR}/${component}"
 
 		_d="`lib_replace %FILE% \"${_out}\" \"${_d}\"`"
