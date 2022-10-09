@@ -39,16 +39,15 @@ main()
 	. "${LIBDIR}/log"
 
 	for jail in `ls ${APPSDIR}`; do
-		# Clean
-		if [ ! -f "${APPSDIR}/.${jail}" ]; then
+		if [ -f "${APPSDIR}/${jail}/.${jail}" ]; then
 			continue
 		fi
 
 		dirty_jails="${dirty_jails} ${jail}"
 	done
 
-	if [ ! -z "${dirty_jails}" ]; then
-		/bin/sh "${SCRIPTSDIR}/rm.sh" -c "${config}" -r "${APPSDIR}" ${dirty_jails}
+	if [ -n "${dirty_jails}" ]; then
+		/bin/sh "${SCRIPTSDIR}/rm.sh" -c "${config}" -r "${APPSDIR}" "${dirty_jails}"
 	else
 		lib_debug "Nothing to do."
 	fi
