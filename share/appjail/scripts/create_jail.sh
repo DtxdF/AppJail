@@ -135,7 +135,7 @@ main()
 
 	if [ $opt_enter -eq 1 ]; then
 		lib_enter_jail "${jail_name}" "${jail_prg}"
-	elif [ $opt_remove -eq 1 ]; then # This message is stupid if the jail will be removed.
+	elif [ $opt_remove -eq 0 ]; then # This message is stupid if the jail will be removed.
 		echo "#"
 		echo "# The jail is acting as a service. If you want to enter inside it,"
 		echo "# run the following command as root:"
