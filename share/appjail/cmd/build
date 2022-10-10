@@ -25,12 +25,12 @@ build_main()
 	opt_template=0
 	appjail_type="-H"
 
-	while getopts ":THR:d:o:i:j:t:" _o; do
+	while getopts ":THR:d:o:i:j:t:r:" _o; do
 		case "${_o}" in
 			H|T)
 				appjail_type="-${_o}"
 				;;
-			R|d|o)
+			R|d|o|r)
 				opts="${opts} -${_o} \"${OPTARG}\""
 				;;
 			i)
@@ -96,6 +96,9 @@ build_help()
 	echo "                        The extension will be appended."
 	echo "  -t template           Template used by the appjail application. This is not"
 	echo "                        necessarily the same used by the \`appjail jail\` command."
+	echo "  -r file               It is the same as the -R flag, but instead of specifying file"
+	echo "                        by file, -r reads a file line by line with the files or"
+	echo "                        directories to copy."
 	echo "  -i init_script        Init script executed when the appjail is started."
 	echo "  -j jail_name          The jail used by the appjail application."
 	echo "                        See \`appjail help jail\` for more details."
@@ -104,5 +107,5 @@ build_help()
 build_usage()
 {
 	echo "usage: build [-H] [-d dir] [-o output] [-t template] -i init_script -j jail_name"
-	echo "       build [-R path] [-d dir] [-o output] [-t template] -T -i init_script -j jail_name"
+	echo "       build [-R path] [-d dir] [-o output] [-t template] [-r file] -T -i init_script -j jail_name"
 }

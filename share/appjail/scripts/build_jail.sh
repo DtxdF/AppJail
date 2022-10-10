@@ -12,7 +12,7 @@ main()
 	local output config init_script
 	local jail_name template
 	local tempdir
-	local dirs jail_files
+	local dirs jail_files jail_file jail_files_path
 	local opt_huge opt_tiny
 
 	if [ $# -eq 0 ]; then
@@ -23,7 +23,7 @@ main()
 	opt_huge=0
 	opt_tiny=0
 
-	while getopts ":HTR:d:o:c:i:j:t:" _o; do
+	while getopts ":HTR:d:o:r:c:i:j:t:" _o; do
 		case "${_o}" in
 			H)
 				opt_huge=1
@@ -39,6 +39,9 @@ main()
 				;;
 			o)
 				output="${OPTARG}.appjail"
+				;;
+			r)
+				jail_files_path="${OPTARG}"
 				;;
 			c)
 				config="${OPTARG}"
@@ -114,10 +117,24 @@ main()
 		lib_debug "Creating a tiny appjail..."
 		lib_debug "Marking this appjail as tiny: `sysrc -f \"${tempdir}/conf/appjail.conf\" type=tiny`"
 
-		if [ -z "${jail_files}" ]; then
+		if [ -z "${jail_files_path}" -a -z "${jail_files}" ]; then
 			lib_warn "An appjail without files doesn't make much sense unless you are testing something..."
-		else
+		fi
+
+		if [ -n "${jail_files}" ]; then
 			copy_files "${JAILDIR}/${jail_name}" "${tempdir}/jail" "${jail_files}"
+		fi
+
+		if [ -n "${jail_files_path}" ]; then
+			if [ ! -f "${jail_files_path}" ]; then
+				lib_err ${EX_NOINPUT} "The ${jail_files_path} file does not exists."
+			fi
+
+			lib_debug "Reading ${jail_files_path}..."
+
+			while read jail_file; do
+				copy_files "${JAILDIR}/${jail_name}" "${tempdir}/jail" "${jail_file}"
+			done < "${jail_files_path}"
 		fi
 	else
 		lib_debug "Creating a huge appjail..."
@@ -186,6 +203,9 @@ help()
 	echo "                        This directory will be an exact copy of its own tree."
 	echo "                        This flag may be used multiples times."
 	echo "  -o output             Appjail name without the .appjail extension."
+	echo "  -r file               It is the same as the -R flag, but instead of specifying file"
+	echo "                        by file, -r reads a file line by line with the files or"
+	echo "                        directories to copy."
 	echo "  -c config             Path to appjail.conf."
 	echo "  -i init_script        Init script executed when the appjail is started."
 	echo "  -j jail_name          The name of the jail used by the appjail application."
@@ -194,7 +214,7 @@ help()
 
 usage()
 {
-	echo "usage: build_jail.sh [-R path] [-d dir] [-o output] [ -H | -T ] -c config -i init_script -j jail_name -t template"
+	echo "usage: build_jail.sh [-R path] [-d dir] [-o output] [-r file] [ -H | -T ] -c config -i init_script -j jail_name -t template"
 }
 
 main $@
