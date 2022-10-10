@@ -5,13 +5,50 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+#
+# Name:
+#
+#  rcopy (root copy)
+#
+# Description:
+#
+#  Copy the root tree recursively from one or more directories.
+#
 lib_rcopy()
 {
 	local dst src
 
 	dst="$1"; shift
 
+	if [ -z "${dst}" -o $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_rcopy destination directory1 [directory2 ... directoryN]"
+	fi
+
 	for src in $@; do
 		tar -C "${src}" -cf - . | tar -C "${dst}" -xpf -
 	done
+}
+
+#
+# Name:
+#
+#  copy
+#
+# Description:
+#
+#  Copy a file or directory with its tree.
+#
+lib_copy()
+{
+	local root dst src
+
+	root="$1"
+	src="$2"
+	dst="$3"
+
+	if [ -z "${root}" -o -z "${src}" -o -z "${dst}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_copy root source destination"
+	fi
+
+	tar -C "${root}" -cf - "${src}" | tar -C "${dst}" -xpf -
 }

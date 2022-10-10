@@ -13,6 +13,7 @@ build_main()
 	local _o
 	local opts
 	local opt_init_script opt_jail_name opt_template
+	local appjail_type
 
 	if [ $# -eq 0 ]; then
 		build_usage
@@ -22,17 +23,15 @@ build_main()
 	opt_init_script=0
 	opt_jail_name=0
 	opt_template=0
+	appjail_type="-H"
 
-	while getopts ":d:o:i:j:t:" _o; do
+	while getopts ":THR:d:o:i:j:t:" _o; do
 		case "${_o}" in
-			d)
-				opts="${opts} -d \"${OPTARG}\""
+			H|T)
+				appjail_type="-${_o}"
 				;;
-			o)
-				opts="${opts} -o \"${OPTARG}\""
-				;;
-			c)
-				opts="${opts} -c \"${OPTARG}\""
+			R|d|o)
+				opts="${opts} -${_o} \"${OPTARG}\""
 				;;
 			i)
 				opts="${opts} -i \"${OPTARG}\""
@@ -59,7 +58,7 @@ build_main()
 	fi
 	
 	if [ ${opt_template} -eq 0 ]; then
-		opts="${opts} -t ${TEMPLATE_PREBUILD}"
+		opts="${opts} -t \"${TEMPLATE_PREBUILD}\""
 	fi
 
 	. "${LIBDIR}/replace"
@@ -67,7 +66,7 @@ build_main()
 
 	lib_debug "Building..."
 
-	build_jail ${opts} -c "${CONFIG}"
+	build_jail ${appjail_type} ${opts} -c "${CONFIG}"
 }
 
 build_jail()
@@ -85,6 +84,12 @@ build_help()
 	echo "This command is ideal for developing an application between co-workers with the"
 	echo "same environment or for running an application with the advantages of a jail."
 	echo
+	echo "  -H                    Create a huge appjail. This is the default."
+	echo "  -T                    Create a tiny appjail."
+	echo "  -R path               It is only used if you are creating a tiny appjail."
+	echo "                        Copy only this directory or file from jail to appjail's jail."
+	echo "                        May be used multiples times."
+	echo "                        This flag is ignored if you are creating a huge appjail."
 	echo "  -d dir                Copy this directory into the data/ directory of the resulting"
 	echo "                        appjail. This flag may be used multiples times."
 	echo "  -o output             Output name without the .appjail extension."
@@ -98,5 +103,6 @@ build_help()
 
 build_usage()
 {
-	echo "usage: build [-d dir] [-o output] [-t template] -i init_script -j jail_name"
+	echo "usage: build [-H] [-d dir] [-o output] [-t template] -i init_script -j jail_name"
+	echo "       build [-R path] [-d dir] [-o output] [-t template] -T -i init_script -j jail_name"
 }

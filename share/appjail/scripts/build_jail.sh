@@ -12,15 +12,28 @@ main()
 	local output config init_script
 	local jail_name template
 	local tempdir
-	local dirs
+	local dirs jail_files
+	local opt_huge opt_tiny
 
 	if [ $# -eq 0 ]; then
 		help
 		exit 64 # EX_USAGE
 	fi
 
-	while getopts ":d:o:c:i:j:t:" _o; do
+	opt_huge=0
+	opt_tiny=0
+
+	while getopts ":HTR:d:o:c:i:j:t:" _o; do
 		case "${_o}" in
+			H)
+				opt_huge=1
+				;;
+			T)
+				opt_tiny=1
+				;;
+			R)
+				jail_files="${jail_files} ${OPTARG}"
+				;;
 			d)
 				dirs="${dirs} ${OPTARG}"
 				;;
@@ -46,7 +59,7 @@ main()
 		esac
 	done
 
-	if [ -z "${config}" -o -z "${init_script}" -o -z "${jail_name}" -o -z "${template}" ]; then
+	if [ -z "${config}" -o -z "${init_script}" -o -z "${jail_name}" -o -z "${template}" -o ${opt_tiny} -eq ${opt_huge} ]; then
 		usage
 		exit 64 # EX_USAGE
 	fi
@@ -93,13 +106,27 @@ main()
 	mkdir -p "${tempdir}/conf"
 	mkdir -p "${tempdir}/data"
 
-	lib_debug "Mounting ${JAILDIR}/${jail_name} to ${tempdir}/jail"
-	mount_nullfs -o ro "${JAILDIR}/${jail_name}" "${tempdir}/jail"
-
 	# To prevent continuing if a error has ocurred
 	lib_atexit_init
 	lib_atexit_add set -e
-	lib_atexit_add umount "${tempdir}/jail"
+
+	if [ ${opt_tiny} -eq 1 ]; then
+		lib_debug "Creating a tiny appjail..."
+		lib_debug "Marking this appjail as tiny: `sysrc -f \"${tempdir}/conf/appjail.conf\" type=tiny`"
+
+		if [ -z "${jail_files}" ]; then
+			lib_warn "An appjail without files doesn't make much sense unless you are testing something..."
+		else
+			copy_files "${JAILDIR}/${jail_name}" "${tempdir}/jail" "${jail_files}"
+		fi
+	else
+		lib_debug "Creating a huge appjail..."
+		lib_debug "Mounting ${JAILDIR}/${jail_name} to ${tempdir}/jail"
+		mount_nullfs -o ro "${JAILDIR}/${jail_name}" "${tempdir}/jail"
+		lib_atexit_add umount "${tempdir}/jail"
+	fi
+
+	# Clear
 	lib_atexit_add rm -rf "${tempdir}"
 
 	if [ ! -z "${dirs}" ]; then
@@ -123,11 +150,38 @@ main()
 	lib_debug "Jail installer generated: ${output}"
 }
 
+copy_files()
+{
+	local root dst
+	local _f
+
+	root="$1"
+	dst="$2"
+
+	if [ -z "${root}" -o -z "${dst}" ]; then
+		lib_err ${EX_USAGE} "usage: copy_files root dst [file1 file2 ... fileN]"
+	fi
+
+	shift 2
+
+	for _f in $@; do
+		lib_debug "Copying \"${root}/${_f}\" to \"${dst}\"..."
+
+		lib_copy "${root}" "${_f}" "${dst}"
+	done
+}
+
 help()
 {
 	usage
 
 	echo
+	echo "  -H                    Create a huge appjail."
+	echo "  -T                    Create a tiny appjail."
+	echo "  -R path               It is only used if you are creating a tiny appjail."
+	echo "                        Copy only this directory or file from jail to appjail's jail."
+	echo "                        May be used multiples times."
+	echo "                        This flag is ignored if you are creating a huge appjail."
 	echo "  -d dir                Copy the directory to the jail environment."
 	echo "                        This directory will be an exact copy of its own tree."
 	echo "                        This flag may be used multiples times."
@@ -140,7 +194,7 @@ help()
 
 usage()
 {
-	echo "usage: build [-d dir] [-o output] -c config -i init_script -j jail_name -t template"
+	echo "usage: build_jail.sh [-R path] [-d dir] [-o output] [ -H | -T ] -c config -i init_script -j jail_name -t template"
 }
 
 main $@

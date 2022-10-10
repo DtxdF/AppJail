@@ -190,10 +190,12 @@ lib_extract_components()
 
 	lib_debug "Extracting components..."
 
+	_d="${TAR_BINARY} ${TAR_DECOMPRESS_JAIL_ARGS}"
+
 	for component in $@; do
 		_out="${COMPONENTSDIR}/${component}"
 
-		_d="`lib_replace %FILE% \"${_out}\" \"${DECOMPRESS_CMD}\"`"
+		_d="`lib_replace %FILE% \"${_out}\" \"${_d}\"`"
 		_d="`lib_replace %DIRECTORY% \"${_j}\" \"${_d}\"`"
 
 		lib_su ${_d}

@@ -18,13 +18,13 @@ install_main()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":Cn:" _o; do
+	while getopts ":CKTk:n:" _o; do
 		case "${_o}" in
-			C)
-				opts="${opts} -C"
+			C|K|T)
+				opts="${opts} -${_o}"
 				;;
-			n)
-				opts="${opts} -n \"${OPTARG}\""
+			k|n)
+				opts="${opts} -${_o} \"${OPTARG}\""
 				;;
 			*)
 				install_usage
@@ -74,12 +74,21 @@ install_help()
 	echo
 	echo "  -C                            Disallow cache names. This flag is recommendable if you have a fast"
 	echo "                                CPU and a fast storage."
+	echo "  -K                            Don't download components. This is only valid for tiny appjails."
+	echo "  -T                            When the appjail is tiny and this flag is not specified, an error is"
+	echo "                                displayed because all the default components may not be needed for"
+	echo "                                the appjail's jail. When you are sure that the components are"
+	echo "                                correct or you have specified the components to use, you"
+	echo "                                should use this flag."
 	echo "  -n appjail_name               Appjail name. If this flag is used, -C will do nothing. This flag"
 	echo "                                is better than use -C and better than generating a checksum name."
+	echo "  -k component                  Component to be downloaded. This is only valid for tiny appjails. May"
+	echo "                                be used multiples times."
 	echo "  appjail                       Name of the appjail application."
 }
 
 install_usage()
 {
 	echo "usage: install [-C] [-n appjail_name] appjail"
+	echo "       install [-CK] [-n appjail_name] [-k component] -T appjail"
 }
