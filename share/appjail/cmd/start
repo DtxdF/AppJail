@@ -10,7 +10,25 @@ start_desc="Create a jail using a template from an installed appjail."
 
 start_main()
 {
+	local _o
 	local appjail
+	local opts
+	local opt_parameters=0
+	local template
+
+	while getopts ":p:" _o; do
+		case "${_o}" in
+			p)
+				opts="${opts} -p ${OPTARG}"
+				opt_parameters=1
+				;;
+			*)
+				start_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
 
 	appjail="$1"
 
@@ -23,8 +41,15 @@ start_main()
 	
 	. "${LIBDIR}/replace"
 	. "${LIBDIR}/su"
+	. "${LIBDIR}/tempfile"
 
-	start_appjail -s -c "${CONFIG}" -a "${appjail}" -- $@
+	if [ ${opt_parameters} -eq 1 ]; then
+		template="`lib_generate_tempfile`"
+		lib_atexit_add rm -f "${template}"
+		opts="${opts} -t \"${template}\""
+	fi
+
+	start_appjail ${opts} -s -c "${CONFIG}" -a "${appjail}" -- $@
 }
 
 start_appjail()
@@ -41,13 +66,16 @@ start_help()
 	echo
 	echo "${start_desc}"
 	echo
-	echo "This command creates a jail from an installed appjail. After creating the"
-	echo "jail, it executes the *start functions of the jail init script."
+	echo "This command creates a jail from an installed appjail. After creating the jail, it executes the"
+	echo "*start functions of the jail init script."
 	echo
+	echo "  -p             This flag is useful for setting parameters temporarily. If you need to set them"
+	echo "                 permanently, see \`appjail help set\` and if you need a more complex way to edit"
+	echo "                 a template, see \`appjail help edit\`. May be used multiples times."
 	echo "  appjail        Name of the appjail application."
 }
 
 start_usage()
 {
-	echo "usage: start appjail [args]"
+	echo "usage: start [-p key=value] appjail [args]"
 }

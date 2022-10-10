@@ -13,13 +13,16 @@ main()
 	local key value
 	local template
 
-	while getopts ":a:c:" _o; do
+	while getopts ":a:c:t:" _o; do
 		case "${_o}" in
 			a)
 				appjail="${OPTARG}"
 				;;
 			c)
 				config="${OPTARG}"
+				;;
+			t)
+				template="${OPTARG}"
 				;;
 			*)
 				usage
@@ -39,7 +42,9 @@ main()
 	. "${LIBDIR}/log"
 	. "${LIBDIR}/jail"
 
-	template="${APPSDIR}/${appjail}/conf/jail.conf"
+	if [ -z "${template}" ]; then
+		template="${APPSDIR}/${appjail}/conf/jail.conf"
+	fi
 
 	if [ ! -f "${template}" ]; then
 		lib_err ${EX_NOINPUT} "The \`${template}\` template does exists or you don't have permissions to read it."
@@ -58,6 +63,7 @@ help()
 	usage
 
 	echo
+	echo "  -t template       Path to the temporary template."
 	echo "  -a appjail        The name of the appjail."
 	echo "  -c config         Path to the appjail configuration."
 	echo "  keyN=value        The name of the key. Value is the key's value."
@@ -66,7 +72,7 @@ help()
 
 usage()
 {
-	echo "usage: set.sh -a appjail -c config key1=value key2=value ... keyN=value"
+	echo "usage: set.sh [-t template] -a appjail -c config key1=value key2=value ... keyN=value"
 }
 
 main $@
