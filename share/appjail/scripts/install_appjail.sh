@@ -157,7 +157,7 @@ install_appjail()
 	output_dir="$1"
 	appjail="$2"
 
-	if [ -z "${appjail}" ]; then
+	if [ -z "${output_dir}" -o -z "${appjail}" ]; then
 		lib_err ${EX_USAGE} "usage: install_appjail path/to/some/directory path/to/some/appjail"
 	fi
 
