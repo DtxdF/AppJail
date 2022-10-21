@@ -97,6 +97,7 @@ main()
 		output="${jail_name}.appjail"
 	fi
 
+	. "${LIBDIR}/jail_types"
 	. "${LIBDIR}/tempfile"
 	. "${LIBDIR}/copy"
 	. "${LIBDIR}/atexit"
@@ -115,7 +116,7 @@ main()
 
 	if [ ${opt_tiny} -eq 1 ]; then
 		lib_debug "Creating a tiny appjail..."
-		lib_debug "Marking this appjail as tiny: `sysrc -f \"${tempdir}/conf/appjail.conf\" type=tiny`"
+		lib_debug "Marking this appjail as tiny: `sysrc -f \"${tempdir}/conf/appjail.conf\" type=${JAIL_TYPE_TINY}`"
 
 		if [ -z "${jail_files_path}" -a -z "${jail_files}" ]; then
 			lib_warn "An appjail without files doesn't make much sense unless you are testing something..."
