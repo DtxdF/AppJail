@@ -16,8 +16,11 @@ start_main()
 	local opt_parameters=0
 	local template
 
-	while getopts ":p:" _o; do
+	while getopts ":b:p:" _o; do
 		case "${_o}" in
+			b)
+				opts="${opts} -${_o} ${OPTARG}"
+				;;
 			p)
 				opts="${opts} -p ${OPTARG}"
 				opt_parameters=1
@@ -69,6 +72,7 @@ start_help()
 	echo "This command creates a jail from an installed appjail. After creating the jail, it executes the"
 	echo "*start functions of the jail init script."
 	echo
+	echo "  -b base        The base jail to use when this is a thinjail."
 	echo "  -p             This flag is useful for setting parameters temporarily. If you need to set them"
 	echo "                 permanently, see \`appjail help set\` and if you need a more complex way to edit"
 	echo "                 a template, see \`appjail help edit\`. May be used multiples times."
@@ -77,5 +81,5 @@ start_help()
 
 start_usage()
 {
-	echo "usage: start [-p key=value] appjail [args]"
+	echo "usage: start [-b base] [-p key=value] appjail [args]"
 }

@@ -177,18 +177,30 @@ lib_download_components()
 
 lib_extract_components()
 {
-	local component _d _j _out
+	local component _d _j _it _out
 
-	_j="$1"; shift
-	if [ -z "${_j}" -o $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: lib_extract_components jail_path component1 component2 ... componentN"
+	_j="$1"
+	_it="$2"
+
+	shift 2
+
+	if [ -z "${_j}" -o -z "${_it}" -o $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_extract_components jail_path install_type component1 component2 ... componentN"
 	fi
 
 	mkdir -p "${_j}"
 
 	lib_debug "Extracting components..."
 
-	_d="${TAR_BINARY} ${TAR_DECOMPRESS_JAIL_ARGS}"
+	if [ "${_it}" = "${JAIL_TYPE_THICK}" -o "${_it}" = "${JAIL_TYPE_TINY}" ]; then
+		_d="${TAR_BINARY} ${TAR_DECOMPRESS_JAIL_ARGS} ${TAR_DECOMPRESS_ARGS}"
+	elif [ "${_it}" = "${JAIL_TYPE_THIN}" ]; then
+		_d="${TAR_BINARY} ${TAR_DECOMPRESS_THINJAIL_ARGS} ${TAR_DECOMPRESS_JAIL_ARGS} ${TAR_DECOMPRESS_ARGS}"
+	elif [ "${_it}" = "${JAIL_TYPE_THINTINY}" ]; then
+		_d="${TAR_BINARY} ${TAR_DECOMPRESS_THINTINYJAIL_ARGS} ${TAR_DECOMPRESS_JAIL_ARGS} ${TAR_DECOMPRESS_ARGS}"
+	else
+		lib_err ${EX_DATAERR} "Invalid jail type: ${_it}"
+	fi
 
 	for component in $@; do
 		lib_debug "Extracting \"${component}\" component..."

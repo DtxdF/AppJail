@@ -88,6 +88,7 @@ jail_main()
 	. "${LIBDIR}/tempfile"
 	. "${LIBDIR}/su"
 	. "${LIBDIR}/strlen"
+	. "${LIBDIR}/jail_types"
 	. "${LIBDIR}/jail"
 
 	lib_replace_downloadurl
@@ -107,7 +108,7 @@ jail_main()
 			lib_err ${EX_DATAERR} "The \"${JAILDIR}/${jail_name}\" directory already exists."
 		fi
 
-		lib_extract_components "${JAILDIR}/${jail_name}" ${components} || exit $?
+		lib_extract_components "${JAILDIR}/${jail_name}" "${JAIL_TYPE_THICK}" ${components} || exit $?
 	fi
 
 	# chroot

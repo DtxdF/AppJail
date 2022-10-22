@@ -10,7 +10,22 @@ stop_desc="Remove a jail using a template from an installed appjail."
 
 stop_main()
 {
+	local _o
 	local appjail
+	local opts
+
+	while getopts ":T" _o; do
+		case "${_o}" in
+			T)
+				opts="${opts} -${_o}"
+				;;
+			*)
+				stop_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
 
 	appjail="$1"
 
@@ -24,7 +39,7 @@ stop_main()
 	. "${LIBDIR}/replace"
 	. "${LIBDIR}/su"
 
-	stop_appjail -S -c "${CONFIG}" -a "${appjail}" -- $@
+	stop_appjail ${opts} -S -c "${CONFIG}" -a "${appjail}" -- $@
 }
 
 stop_appjail()
@@ -43,10 +58,11 @@ stop_help()
 	echo
 	echo "Before deleting the jail, the *stop functions are executed."
 	echo
+	echo "  -T             When this is a thinjail, this flag must be used."
 	echo "  appjail        Name of the appjail application."
 }
 
 stop_usage()
 {
-	echo "usage: stop appjail [args]"
+	echo "usage: stop [-T] appjail [args]"
 }

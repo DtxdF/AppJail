@@ -18,9 +18,9 @@ install_main()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":CKTk:n:" _o; do
+	while getopts ":CKTtk:n:" _o; do
 		case "${_o}" in
-			C|K|T)
+			C|K|T|t)
 				opts="${opts} -${_o}"
 				;;
 			k|n)
@@ -80,6 +80,7 @@ install_help()
 	echo "                                the appjail's jail. When you are sure that the components are"
 	echo "                                correct or you have specified the components to use, you"
 	echo "                                should use this flag."
+	echo "  -t                            Install as a thinjail."
 	echo "  -n appjail_name               Appjail name. If this flag is used, -C will do nothing. This flag"
 	echo "                                is better than use -C and better than generating a checksum name."
 	echo "  -k component                  Component to be downloaded. This is only valid for tiny appjails. May"
@@ -89,6 +90,6 @@ install_help()
 
 install_usage()
 {
-	echo "usage: install [-C] [-n appjail_name] appjail"
-	echo "       install [-CK] [-n appjail_name] [-k component] -T appjail"
+	echo "usage: install [-Ct] [-n appjail_name] appjail"
+	echo "       install [-CKt] [-n appjail_name] [-k component] -T appjail"
 }

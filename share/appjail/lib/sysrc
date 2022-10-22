@@ -5,31 +5,33 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-JAIL_TYPE_TINY="tiny"
-JAIL_TYPE_HUGE="huge"
-JAIL_TYPE_INVALID="-"
+. "${LIBDIR}/jail_types"
 VALID_JAIL_TYPES="${JAIL_TYPE_TINY} ${JAIL_TYPE_HUGE}"
+VALID_JAIL_USETYPES="${JAIL_TYPE_THIN} ${JAIL_TYPE_THICK}"
 
-lib_jail_gettype()
+lib_jail_get()
 {
-	local _rc _chk _t
+	local _rc _chk _t _k _d _vls
 
 	_rc="$1"
+	_k="$2"
+	_d="$3"
+	shift 3
 
-	if [ -z "${_rc}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_jail_gettype rc_conf"
+	_vls=$@
+
+	if [ -z "${_rc}" -o -z "${_d}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_jail_get rc_conf key default values..."
 	fi
 
 	if [ ! -f "${_rc}" ]; then
-		# For backward compatibility. In previous versions this file does not exists
-		# and the unique way to create an appjail is huge.
-		echo "${JAIL_TYPE_HUGE}"
+		echo "${_d}"
 		return 0
 	fi
 
-	_t="`sysrc -nf "${_rc}" type`"
+	_t="`sysrc -nf "${_rc}" ${_k}`"
 
-	for _chk in ${VALID_JAIL_TYPES}; do
+	for _chk in ${_vls}; do
 		if [ "${_t}" = "${_chk}" ]; then
 			echo "${_t}"
 			return 0
@@ -39,4 +41,34 @@ lib_jail_gettype()
 	# Invalid type
 	echo "${JAIL_TYPE_INVALID}"
 	return 1
+}
+
+lib_jail_gettype()
+{
+	local rc_conf
+
+	rc_conf="$1"
+
+	if [ -z "${rc_conf}" ]; then
+		lib_err ${EX_USAGE} "lib_jail_gettype rc_conf"
+	fi
+
+	lib_jail_get "${rc_conf}" "type" "${JAIL_TYPE_HUGE}" ${VALID_JAIL_TYPES}
+
+	return $?
+}
+
+lib_jail_getusetype()
+{
+	local rc_conf
+
+	rc_conf="$1"
+
+	if [ -z "${rc_conf}" ]; then
+		lib_err ${EX_USAGE} "lib_jail_getusetype rc_conf"
+	fi
+
+	lib_jail_get "${rc_conf}" "use_type" "${JAIL_TYPE_THICK}" ${VALID_JAIL_USETYPES}
+
+	return $?
 }

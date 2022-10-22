@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+JAIL_TYPE_TINY="tiny"
+JAIL_TYPE_HUGE="huge"
+JAIL_TYPE_THICK="thick"
+JAIL_TYPE_THIN="thin"
+JAIL_TYPE_THINTINY="thintiny"
+JAIL_TYPE_INVALID="-"
