@@ -87,6 +87,10 @@ main()
 		lib_err ${EX_NOINPUT} "The ${appjail} appjail does not exists."
 	fi
 
+	if [ ! -f "${APPSDIR}/${appjail}/.${appjail}" ]; then
+		lib_err ${EX_NOINPUT} "${APPSDIR}/${appjail} is dirty!"
+	fi
+
 	default_template="${APPSDIR}/${appjail}/conf/jail.conf"
 	if [ ${opt_stop} -eq 1 ]; then
 		default_template="${default_template}.stop"
