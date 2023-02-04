@@ -1,0 +1,851 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/network"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/tempfile"
+
+expose_desc="Port forwarding from host port to jail port."
+
+expose_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		expose_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		off|on|set|status) _expose_chk_firewall ;;
+		get|list|remove) ;;
+		*) expose_usage; exit ${EX_USAGE} ;;
+	esac
+
+	expose_${entity} "$@"
+}
+
+_expose_chk_firewall()
+{
+	if ! lib_check_ipv4_forwarding; then
+		lib_warn "You must enable IPv4 forwarding between interfaces: sysctl net.inet.ip.forwarding=1"
+	fi
+
+	case "${USE_FIREWALL}" in
+		pf)
+			if [ ! -c "/dev/pf" ]; then
+				lib_err ${EX_UNAVAILABLE} "pf.ko is not loaded. Run \`kldload pf\` to load it."
+			fi
+
+			if ! service pf onestatus > /dev/null 2>&1; then
+				lib_warn "pf not started. Run \`service pf start\` to start it."
+			fi
+
+			if ! pfctl -sn | grep -Eq "^rdr-anchor [\"']appjail-rdr/\*[\"']"; then
+				lib_err ${EX_CONFIG} "The expose command requires appjail-rdr/* anchor to work."
+			fi
+			;;
+		ipfw|ipfilter)
+			lib_err ${EX_UNAVAILABLE} "${USE_FIREWALL}: Not yet implemented!"
+			;;
+		*)
+			lib_err ${EX_CONFIG} "Unknown firewall: ${USE_FIREWALL}"
+			;;
+	esac
+}
+
+expose_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_ignore_unknro=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local nro=
+
+	local flag_enabled=0
+	local flag_ext_if=0
+	local flag_hport=0
+	local flag_jport=0
+	local flag_name=0
+	local flag_network_name=0
+	local flag_nro=0
+	local flag_on_if=0
+	local flag_ports=0
+	local flag_protocol=0
+	local flag_rule=0
+	
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					expose_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				expose_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${nro}" ]; then
+		expose_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_name="$1"; shift
+	_expose_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/expose/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		if [ ${opt_ignore_unknro} -eq 1 ]; then
+			return 0
+		fi
+
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "nro" "enabled" "name" "ports" "protocol" "network_name"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			enabled|ext_if|hport|jport|name|network_name|nro|on_if|ports|protocol|rule) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				nro)
+					value="${nro}"
+					;;
+				ports)
+					local hport jport
+
+					hport=`head -1 -- "${basedir}/hport"`
+					jport=`head -1 -- "${basedir}/jport"`
+
+					if [ "${hport}" -eq "${jport}" ]; then
+						value="${hport}"
+					else
+						value="${hport} -> ${jport}"
+					fi
+					;;
+				rule)
+					keyword="${USE_FIREWALL}-rule"
+					;&
+				*)
+					if [ -f "${basedir}/${keyword}" ]; then
+						value=`head -1 -- "${basedir}/${keyword}"`
+					else
+						value=
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+expose_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_ignore_unknro=0 iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local nro=
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					expose_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				expose_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_expose_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_ignore_unknro} -eq -1 ]; then
+		iflag="-i"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${nro}" ]; then
+		expose_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${pflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	mkdir -p "${JAILDIR}/${jail_name}/conf/boot/expose"
+
+	ls -A "${JAILDIR}/${jail_name}/conf/boot/expose" | sort -n | while IFS= read -r nro; do
+		expose_get ${eflag} ${Hflag} ${Iflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+expose_off()
+{
+	local jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local expose_file="${jail_path}/conf/boot/${USE_FIREWALL}-expose.conf"
+	if [ ! -f "${expose_file}" ]; then
+		lib_err ${EX_CONFIG} -- "${jail_name} is not configured to use expose."
+	fi
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "${jail_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The expose configuration of ${jail_name} is not loaded."
+			fi
+
+			local pf_anchor="appjail-rdr/${jail_name}"
+
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			;;
+	esac
+}
+
+_nat_pf_loaded()
+{
+	local part="$1"
+	if [ -z "${part}" ]; then
+		lib_err ${EX_USAGE} "usage: _nat_pf_loaded part"
+	fi
+
+	pfctl -a "appjail-rdr/${part}" -sn -P 2> /dev/null
+}
+
+expose_on()
+{
+	local jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	local errlevel=0
+
+	local expose_temp
+	expose_temp="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_expose_temp
+	escape_expose_temp=`lib_escape_string "${expose_temp}"`
+
+	lib_atexit_add "rm -f \"${escape_expose_temp}\""
+
+	expose_list -HIpt -- "${jail_name}" nro enabled | while read -r nro enabled
+	do
+		if [ "${enabled}" != "1" ]; then
+			continue
+		fi
+
+		expose_get -In "${nro}" -- "${jail_name}" rule
+	done > "${expose_temp}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local expose_file="${jail_path}/conf/boot/${USE_FIREWALL}-expose.conf"
+	if ! cp -- "${expose_temp}" "${expose_file}"; then
+		lib_err ${EX_IOERR} "Error when copying ${expose_temp} to ${expose_file}."
+	fi
+
+	case "${USE_FIREWALL}" in
+		pf)
+			if ! pfctl -a "appjail-rdr/${jail_name}" -f "${expose_file}"; then
+				lib_err ${EX_SOFTWARE} "An error ocurred while loading the pf rules."
+			fi
+			;;
+	esac
+}
+
+expose_remove()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		expose_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		all|nro) ;;
+		*) expose_usage; exit ${EX_USAGE} ;;
+	esac
+
+	expose_remove_${command} "$@"
+}
+
+expose_remove_all()
+{
+	local basedir
+	local jail_name
+
+	jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/expose"
+
+	rm -rf "${basedir}"
+}
+
+expose_remove_nro()
+{
+	local nro="$1"; shift
+	if lib_check_empty "${nro}"; then
+		expose_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	local jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/expose/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	rm -rf "${basedir}"
+}
+
+expose_set()
+{
+	local _o
+	local errlevel
+	local opt_enabled=
+	local opt_tcp=0
+	local opt_udp=0
+	local ext_if=
+	local network_name=
+	local opt_name=0 name=
+	local nro="auto"
+	local opt_log=0 log_options=
+	local on_if=
+	local ports=
+	local protocol=
+
+	while getopts ":Eetui:k:l:N:n:o:p:" _o; do
+		case "${_o}" in
+			i|k|l|n|o|p)
+				if lib_check_empty "${OPTARG}"; then
+					expose_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			E)
+				opt_enabled=1
+				;;
+			e)
+				opt_enabled=0
+				;;
+			t)
+				opt_tcp=1
+				;;
+			u)
+				opt_udp=1
+				;;
+			i)
+				ext_if="${OPTARG}"
+				;;
+			k)
+				network_name="${OPTARG}"
+				;;
+			N)
+				opt_name=1
+				name="${OPTARG}"
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			l)
+				opt_log=1
+				log_options="${OPTARG}"
+				if [ "${log_options}" = "-" ]; then
+					log_options=
+				fi
+				;;
+			o)
+				on_if="${OPTARG}"
+				;;
+			p)
+				ports="${OPTARG}"
+				;;
+			*)
+				expose_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	if [ -z "${network_name}" ]; then
+		network_name=`expose_get -Iin "${nro}" "${jail_name}" network_name`
+
+		if [ -z "${network_name}" ]; then
+			lib_err ${EX_CONFIG} "The network is not defined in this NRO. Use \`-k\` to fix it."
+		fi
+	fi
+
+	if ! lib_check_jinnet "${jail_name}" "${network_name}"; then
+		lib_err ${EX_CONFIG} -- "${jail_name} is not in ${network_name} network."
+	fi
+
+	local jaddr
+	jaddr=`"${APPJAIL_PROGRAM}" network hosts -Rn "${network_name}" -j "${jail_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	if [ -z "${ext_if}" ]; then
+		ext_if=`expose_get -Iin "${nro}" "${jail_name}" ext_if`
+
+		if [ -z "${ext_if}" ]; then
+			ext_if="${EXT_IF}"
+		fi
+	fi
+
+	if ! lib_check_iface "${ext_if}"; then
+		lib_err ${EX_NOINPUT} -- "${ext_if} interface does not exist."
+	fi
+
+	if [ -z "${on_if}" ]; then
+		on_if=`expose_get -Iin "${nro}" "${jail_name}" on_if`
+
+		if [ -z "${on_if}" ]; then
+			on_if="${ON_IF}"
+		fi
+	fi
+
+	if ! lib_check_iface "${on_if}"; then
+		lib_err ${EX_NOINPUT} -- "${on_if} interface does not exist."
+	fi
+
+	if [ -z "${opt_enabled}" ]; then
+		opt_enabled=`expose_get -Iin "${nro}" "${jail_name}" enabled`
+		opt_enabled="${opt_enabled:-1}"
+	fi
+
+	if [ ${opt_name} -eq 0 -a -z "${name}" ]; then
+		name=`expose_get -Iin "${nro}" "${jail_name}" name`
+	fi
+
+	if [ -z "${ports}" ]; then
+		local _hport _jport
+
+		_hport=`expose_get -Iin "${nro}" "${jail_name}" hport`
+
+		if [ -z "${_hport}" ]; then
+			lib_err ${EX_CONFIG} "The port is not defined in this NRO. Use \`-p\` to fix it."
+		else
+			ports="${_hport}"
+		fi
+
+		_jport=`expose_get -Iin "${nro}" "${jail_name}" jport`
+		if [ -n "${_jport}" ]; then
+			ports="${ports}:${_jport}"
+		fi
+	fi
+
+	if [ ${opt_tcp} -eq 0 -a ${opt_udp} -eq 0 ]; then
+		protocol=`expose_get -Iin "${nro}" "${jail_name}" protocol`
+	fi
+
+	if [ -z "${protocol}" ]; then
+		if [ ${opt_tcp} -eq 1 ]; then
+			protocol="tcp"
+		elif [ ${opt_udp} -eq 1 ]; then
+			protocol="udp"
+		else
+			protocol="tcp"
+		fi
+	fi
+
+	local hport=`echo "${ports}" | awk -F: '{print $1}'`
+	local jport=`echo "${ports}" | awk -F: '{print $2}'`
+	if [ -z "${jport}" ]; then
+		jport="${hport}"
+	fi
+
+	if ! lib_check_port "${hport}"; then
+		local _hport=`lib_network_getservbyname "${hport}" "${protocol}" | grep "PORT=" | cut -d= -f2`
+
+		if [ -z "${_hport}" ]; then
+			lib_err ${EX_DATAERR} "Invalid port: ${hport} (${protocol})"
+		fi
+
+		hport="${_hport}"
+	fi
+
+	if ! lib_check_port "${jport}"; then
+		local _jport=`lib_network_getservbyname "${jport}" "${protocol}" | grep "PORT=" | cut -d= -f2`
+
+		if [ -z "${_jport}" ]; then
+			lib_err ${EX_DATAERR} "Invalid port: ${jport} (${protocol})"
+		fi
+
+		jport="${_jport}"
+	fi
+
+	local raw_rule=
+	case "${USE_FIREWALL}" in
+		pf)
+			if [ ${opt_log} -eq 1 ]; then
+				raw_rule="rdr pass log ${log_options} on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port = ${hport} -> ${jaddr} port ${jport}"
+			else
+				raw_rule="rdr pass on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port = ${hport} -> ${jaddr} port ${jport}"
+			fi
+
+			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
+				lib_err ${EX_DATAERR} "An error occurred while parsing the pf rule: ${raw_rule}"
+			fi
+			;;
+	esac
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/expose"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ "${nro}" = "auto" ]; then
+		nro=`lib_getnro "${basedir}"`
+	else
+		if ! lib_check_number "${nro}"; then
+			lib_err ${EX_DATAERR} "NRO must be a number!"
+		fi
+	fi
+
+	basedir="${basedir}/${nro}"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	printf "%s\n" "${opt_enabled}" > "${basedir}/enabled" || exit ${EX_IOERR} 
+	printf "%s\n" "${name}" > "${basedir}/name" || exit ${EX_IOERR}
+	printf "%s\n" "${raw_rule}" > "${basedir}/${USE_FIREWALL}-rule" || exit ${EX_IOERR}
+	printf "%s\n" "${network_name}" > "${basedir}/network_name" || exit ${EX_IOERR}
+	printf "%s\n" "${hport}" > "${basedir}/hport" || exit ${EX_IOERR}
+	printf "%s\n" "${jport}" > "${basedir}/jport" || exit ${EX_IOERR}
+	printf "%s\n" "${protocol}" > "${basedir}/protocol" || exit ${EX_IOERR}
+	printf "%s\n" "${ext_if}" > "${basedir}/ext_if" || exit ${EX_IOERR}
+	printf "%s\n" "${on_if}" > "${basedir}/on_if" || exit ${EX_IOERR}
+}
+
+expose_status()
+{
+	local jail_name="$1"
+	_expose_chk_jail "${jail_name}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "${jail_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The expose configuration of ${jail_name} is not loaded."
+			fi
+
+			echo -e "${loaded}"
+			;;
+	esac
+}
+
+_expose_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		expose_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+expose_help()
+{
+	cat << EOF
+`expose_usage`
+
+${expose_desc}
+
+Parameters:
+    get                       -- Get information about the current port forwarding configuration for a given target.
+    list                      -- Like \`get\` but for all NROes.
+    off                       -- Disables the current port forwarding rules.
+    on                        -- Enables the current port forwarding rules.
+    remove                    -- Remove all NROes or just a single NRO.
+    set                       -- Set parameters to an existing NRO or create it if it does not exist.
+    status                    -- Show loaded expose rules.
+
+Options for get:
+    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                 in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                        -- Display the name of the columns.
+    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -i                        -- Do not complain when the NRO does not exist.
+    -p                        -- Columnate the list.
+    -t                        -- Tabulate columns and values.
+    -n nro                    -- Operate in this NRO.
+
+Options for list:
+    -e                        -- This option is the opposite in \`Options for get\`.
+    -H                        -- This option is the opposite in \`Options for get\`.
+    -I                        -- This option is the same as in \`Options for get\`.
+    -i                        -- This options is the same as in \`Options for get\`.
+    -p                        -- This option is the opposite in \`Options for get\`.
+    -t                        -- This option is the opposite in \`Options for get\`.
+    -n nro                    -- Operate in this NRO. If not set, operate in all NROes.
+
+Keywords for get and list:
+    enabled                   -- See \`set -e\` and \`set -E\`.
+    name                      -- See \`set -N\`.
+    network_name              -- See \`set -k\`.
+    nro                       -- See \`set -n\`.
+    ports                     -- See \`set -p\`
+    protocol                  -- See \`set -t\` and \`set -u\`.
+    rule                      -- Firewall rule used by the entry.
+
+Parameters for remove:
+    all                       -- Remove all NROes.
+    nro                       -- Remove an NRO.
+
+Options for set:
+    -E                        -- Enable this NRO.
+    -e                        -- Disable this NRO.
+    -t                        -- Default. Use TCP.
+    -u                        -- Use UDP.
+    -i ext_if                 -- The external interface. If not defined, {EXT_IF} is used.
+    -k network_name           -- The network to obtain the IP address of the jail. This option and \`-p\` are not required unless
+				 the NRO (\`-n\`) has no such values.
+    -o on_if                  -- The name or group of the network interface to transmit packets on. If not defined, {ON_IF} is used.
+    -p hport[:jport]          -- The host port and jail port. If jport is not defined, hport will be used. You can
+                                 use the service name instead of a numeric port. See services(5) for details.
+    -N name                   -- The name of this NRO. It is not relevant, it is only for your
+                                 convenience.
+    -n auto|nro               -- The NRO. If set to auto, uses last NRO plus 1. Default: auto.
+    -l - | log_options        -- Enable logging. Not all firewalls support options. At the moment, pf(4) accepts
+                                 options like \`(option1, option2, optionN)\`. Pass - to enable logging, but
+				 without use the options.
+EOF
+}
+
+expose_usage()
+{
+	cat << EOF
+usage: expose get [-eHIpt] -n nro jail_name
+       expose list [-eHIpt] [-n nro] jail_name
+       expose off jail_name
+       expose on jail_name
+       expose remove [all | nro nro] jail_name
+       expose set -k network_name -p hport[:jport] [[-t | -u]] [-Ee] [-i ext_if] [-l [- | log_options]] [-N name] [-n auto | nro] [-o on_if] jail_name
+       expose status jail_name
+EOF
+}

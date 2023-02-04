@@ -1,0 +1,191 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${SCRIPTSDIR}/default_env.sh"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/jail"
+
+main()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: RUN [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
+	fi
+
+	local escape_chars
+	escape_chars='`"\'
+
+	local entrypoint
+	local entrypoint_file="${MAKEJAIL_TEMPDIR}/entrypoint/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${entrypoint_file}" ]; then
+		entrypoint=`head -1 -- "${entrypoint_file}"`
+	else
+		entrypoint="command --"
+	fi
+
+	local workdir
+	local workdir_file="${MAKEJAIL_TEMPDIR}/workdir/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${workdir_file}" ]; then
+		workdir=`head -1 -- "${workdir_file}"`
+	else
+		workdir="/"
+	fi
+
+	local username
+	local username_file="${MAKEJAIL_TEMPDIR}/user/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${username_file}" ]; then
+		username=`head -1 -- "${username_file}"`
+		username=`lib_escape_string "${username}" "" "${escape_chars}"`
+	else
+		username="root"
+	fi
+
+	local env_vars=
+	local env_vars_file="${MAKEJAIL_TEMPDIR}/env/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${env_vars_file}" ]; then
+		env_vars=`head -1 -- "${env_vars_file}"`
+	fi
+
+	# jexec options
+	local noclean=0
+	local juser=
+	local huser=
+
+	# Arguments
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local current_index=0
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		local optarg=
+		case "${arg}" in
+			--juser|--huser)
+				current_index=$((current_index+1))
+				if [ ${current_index} -eq ${total_items} ]; then
+					main # usage
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					main # usage
+				fi
+				;;
+		esac
+
+		case "${arg}" in
+			--noclean)
+				noclean=1
+				;;
+			--huser)
+				huser="${optarg}"
+				;;
+			--juser)
+				juser="${optarg}"
+				;;
+			--)
+				break
+				;;
+			--*)
+				main # usage
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+	current_index=$((current_index-1))
+
+	local jexec_args=
+
+	if [ ${noclean} -eq 1 ]; then
+		jexec_args="-l"
+	fi
+
+	if [ -n "${huser}" ]; then
+		local escape_huser=`lib_escape_string "${huser}" "" "${escape_chars}"`
+
+		jexec_args="${jexec_args} -U \"${escape_huser}\""
+	elif [ -n "${juser}" ]; then
+		local escape_juser=`lib_escape_string "${juser}" "" "${escape_chars}"`
+
+		jexec_args="${jexec_args} -u \"${escape_juser}\""
+	fi
+
+
+	echo "cat << \"EOF\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} env -i ${env_vars} su -m \"${username}\" -c \"sh -s\""
+
+	local workdir_escape_chars
+	workdir_escape_chars='`"\$'
+
+	workdir=`lib_escape_string "${workdir}" "" "${workdir_escape_chars}"`
+	echo "cd -- \"${workdir}\""
+
+	local entrypoint_args=`lib_split_jailparams "${entrypoint}"`
+	local entrypoint_items=`printf "%s\n" "${entrypoint_args}" | wc -l`
+	local entrypoint_index=0
+
+	while [ ${entrypoint_index} -lt ${entrypoint_items} ]; do
+		entrypoint_index=$((entrypoint_index+1))
+
+		local cmd=`printf "%s\n" "${entrypoint_args}" | head -${entrypoint_index} | tail -n 1`
+		if ! lib_check_empty "${cmd}"; then
+			cmd=`lib_escape_string "${cmd}" "" "${escape_chars}"`
+		fi
+
+		echo -n " \"${cmd}\""
+	done
+
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		local cmd=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+
+		if ! lib_check_empty "${cmd}"; then
+			cmd=`lib_escape_string "${cmd}" "" "${escape_chars}"`
+		fi
+
+		echo -n " \"${cmd}\""
+	done
+	echo
+	echo "EOF"
+}
+
+main "$@"

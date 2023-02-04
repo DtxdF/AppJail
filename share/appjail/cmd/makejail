@@ -1,0 +1,1155 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+
+# The root directory of the first Makejail
+MAKEJAIL_ROOTDIR=
+
+# Build args
+MAKEJAIL_BUILD_ARGS=
+
+# Default makejail filename
+DEFAULT_MAKEJAIL_FILE="Makejail"
+
+# Errors
+MAKEJAIL_ERRORS=1
+
+# Verbose
+MAKEJAIL_VERBOSE=0
+
+# Stages dir
+MAKEJAIL_STAGESDIR="stages"
+
+# Current stage
+MAKEJAIL_CURRENT_STAGE="build"
+
+# Stages
+MAKEJAIL_STAGE_BUILD="build"
+MAKEJAIL_STAGE_PRECREATE="precreate"
+MAKEJAIL_STAGE_CREATE="create"
+MAKEJAIL_STAGE_POSTCREATE="postcreate"
+MAKEJAIL_STAGE_PRESTART="prestart"
+MAKEJAIL_STAGE_START="start"
+MAKEJAIL_STAGE_POSTSTART="poststart"
+MAKEJAIL_STAGE_PRECMD="precmd"
+MAKEJAIL_STAGE_CMD="cmd"
+MAKEJAIL_STAGE_POSTCMD="postcmd"
+MAKEJAIL_STAGE_PRESTOP="prestop"
+MAKEJAIL_STAGE_STOP="stop"
+MAKEJAIL_STAGE_POSTSTOP="poststop"
+
+# Init stages
+MAKEJAIL_INIT_STAGES="\
+		${MAKEJAIL_STAGE_PRECREATE} \
+		${MAKEJAIL_STAGE_CREATE} \
+		${MAKEJAIL_STAGE_POSTCREATE} \
+		${MAKEJAIL_STAGE_PRESTART} \
+		${MAKEJAIL_STAGE_START} \
+		${MAKEJAIL_STAGE_POSTSTART} \
+		${MAKEJAIL_STAGE_PRECMD} \
+		${MAKEJAIL_STAGE_CMD} \
+		${MAKEJAIL_STAGE_POSTCMD} \
+		${MAKEJAIL_STAGE_PRESTOP} \
+		${MAKEJAIL_STAGE_STOP} \
+		${MAKEJAIL_STAGE_POSTSTOP}"
+
+# All stages
+MAKEJAIL_STAGES="${MAKEJAIL_STAGE_BUILD} ${MAKEJAIL_INIT_STAGES}"
+
+# Commands
+MAKEJAIL_CMD_ARG="ARG"
+MAKEJAIL_CMD_INCLUDE="INCLUDE"
+MAKEJAIL_CMD_OPTION="OPTION"
+MAKEJAIL_CMD_STAGE="STAGE"
+
+makejail_desc="Build a jail using a Makejail file."
+
+makejail_main()
+{
+	local _o
+	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
+
+	while getopts ":evb:f:j:" _o; do
+		case "${_o}" in
+			b|f|j)
+				if lib_check_empty "${OPTARG}"; then
+					makejail_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				MAKEJAIL_ERRORS=0
+				;;
+			v)
+				MAKEJAIL_VERBOSE=1
+				;;
+			b)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				MAKEJAIL_BUILD_ARGS="${MAKEJAIL_BUILD_ARGS} \"${arg}\""
+				;;
+			f)
+				makejail_file="${OPTARG}"
+				;;
+			j)
+				MAKEJAIL_JAILNAME="${OPTARG}"
+				;;
+			*)
+				makejail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${makejail_file}" ]; then
+		makejail_usage
+		exit ${EX_USAGE}
+	fi
+
+	if [ -z "${MAKEJAIL_JAILNAME}" ]; then
+		MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+	fi
+
+	lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
+
+	makejail_run "${makejail_file}" "$@"
+}
+
+makejail_run()
+{
+	local errlevel=0
+	local makejail_file
+
+	makejail_file="$1"; shift
+	if [ -z "${makejail_file}" ]; then
+		lib_err ${EX_USAGE} "usage: makejail_run makejail_file"
+	fi
+
+	lib_info "Building ${MAKEJAIL_JAILNAME} ..."
+
+	lib_debug "Main Makejail: ${makejail_file}"
+
+	local output
+	output="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_output
+	escape_output=`lib_escape_string "${output}"`
+
+	lib_atexit_add "rm -f \"${escape_output}\""
+
+	MAKEJAIL_TEMPDIR=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_mk_tempdir
+	escape_mk_tempdir=`lib_escape_string "${MAKEJAIL_TEMPDIR}"`
+
+	lib_atexit_add "rm -rf \"${escape_mk_tempdir}\" > /dev/null 2>&1"
+
+	makejail_write "${makejail_file}" > "${output}"
+	
+	# Print the result
+	lib_debug "Buildscript generated:"
+	lib_debug_read "${output}"
+
+	local current_pwd
+	current_pwd=`pwd -P`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local makejail_rootdir
+	makejail_rootdir=`head -1 -- "${MAKEJAIL_ROOTDIR}"`
+
+	(cd -- "${makejail_rootdir}"; env \
+		APPJAIL_CONFIG="${CONFIG}" \
+		APPJAIL_JAILNAME="${MAKEJAIL_JAILNAME}" \
+		APPJAIL_JAILDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}/jail" \
+		APPJAIL_PWD="${current_pwd}" \
+		APPJAIL_ROOTDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}" \
+		APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+			sh -- "${output}" "$@")
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	if [ -d "${JAILDIR}/${MAKEJAIL_JAILNAME}" ]; then
+		# build initscript
+		local initscript
+		initscript=`makejail_makeinitscript`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		# Print the result
+		lib_debug "initscript generated:"
+		lib_debug_read "${initscript}"
+
+		if ! mv -- "${initscript}" "${JAILDIR}/${MAKEJAIL_JAILNAME}/init"; then
+			lib_err ${EX_IOERR} "Error moving ${initscript} as ${JAILDIR}/${MAKEJAIL_JAILNAME}/jail"
+		fi
+	fi
+}
+
+makejail_write()
+{
+	local makejail_file
+
+	makejail_file="$1"
+	if [ -z "${makejail_file}" ]; then
+		lib_err ${EX_USAGE} "usage: makejail_write makejail_file"
+	fi
+
+	local temp_makejail
+	temp_makejail="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_temp_makejail
+	escape_temp_makejail=`lib_escape_string "${temp_makejail}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_makejail}\""
+
+	MAKEJAIL_ROOTDIR="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_mkrootdir
+	escape_mkrootdir=`lib_escape_string "${MAKEJAIL_ROOTDIR}"`
+
+	lib_atexit_add "rm -f \"${escape_mkrootdir}\""
+
+	# Compile all include's files
+	(makejail_include "${makejail_file}") > "${temp_makejail}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	# Replace build args
+	if [ -n "${MAKEJAIL_BUILD_ARGS}" ]; then
+		makejail_build_args "${temp_makejail}" "${MAKEJAIL_BUILD_ARGS}"
+	fi
+
+	# Replace default args and detects if there are required args.
+	lib_replace_macrovars "${temp_makejail}"
+
+	# Replace all escaped %%{...} with %{...}
+	lib_replace_escaped_macrovars "${temp_makejail}"
+
+	# Print the result
+	lib_debug "Makejail generated:"
+	lib_debug_read "${temp_makejail}"
+
+	local priority=0
+	local line
+	while IFS= read -r line; do
+		local cmd=`lib_jailparam_name "${line}" " "`
+		local parameters=`lib_jailparam_value "${line}" " "`
+
+		local _cmd
+		_cmd=`makejail_check_cmd "${cmd}"`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		local stagedir
+		stagedir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_CURRENT_STAGE}"
+
+		if ! mkdir -p "${stagedir}"; then
+			lib_err ${EX_IOERR} "Error creating ${stagedir}"
+		fi
+
+		makejail_run_cmd "${_cmd}" "${parameters}" > "${stagedir}/${priority}.${cmd}"
+
+		priority=$((priority+1))
+	done < "${temp_makejail}"
+	
+	# Configuration and functions
+	_makejail_config
+
+	# Errors
+	if [ ${MAKEJAIL_ERRORS} -eq 1 ]; then
+		echo "set -e"
+	fi
+	
+	# Verbose and debugging
+	if [ ${MAKEJAIL_VERBOSE} -eq 1 ]; then
+		echo "set -xv"
+	fi
+
+	# ARG
+	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_ARG}"
+
+	# An empty argument to force the creation of the jail.
+	echo > "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}/${priority}.${MAKEJAIL_CMD_OPTION}"
+	# OPTION
+	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_OPTION}"
+
+	# build commands
+	ls -A -- "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}" | sort -n | while IFS= read -r cmd
+	do
+		priority=`echo "${cmd}" | cut -d. -f1`
+		cmd=`echo "${cmd}" | cut -d. -f2`
+
+		makejail_write_cmd "${priority}" "${MAKEJAIL_STAGE_BUILD}" "${cmd}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+makejail_build_args()
+{
+	local makejail_file="$1" build_args="$2"
+
+	local errlevel
+
+	local tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_tempdir
+	escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	lib_split_jailparams "${build_args}" | while IFS= read -r build_arg
+	do
+		name=`lib_jailparam_name "${build_arg}" "="`
+		if [ -f "${tempdir}/${name}" ]; then
+			lib_err ${EX_DATAERR} -- "${name}: cannot use a duplicate build argument."
+		else
+			touch -- "${tempdir}/${name}"
+		fi
+
+		value=`lib_jailparam_value "${build_arg}" "="`
+
+		lib_replace_macrovar "${makejail_file}" "${name}" "${value}"
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+makejail_makeinitscript()
+{
+	local errlevel
+
+	local initscript
+	initscript="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_initscript
+	escape_initscript=`lib_escape_string "${initscript}"`
+
+	lib_atexit_add "rm -f \"${escape_initscript}\""
+
+	chmod +x "${initscript}"
+
+	# Configuration and functions
+	_makejail_config >> "${initscript}"
+
+	for stage in ${MAKEJAIL_INIT_STAGES}; do
+		local stagedir
+		stagedir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${stage}"
+
+		if [ ! -d "${stagedir}" ]; then
+			continue
+		fi
+
+		lib_debug "Writing ${stage} stage ..."
+
+		echo "${stage}() {"
+		
+		# ARG
+		makejail_write_cmd - "${stage}" "${MAKEJAIL_CMD_ARG}"
+		
+		ls -A -- "${stagedir}" | sort -n | while IFS= read -r cmd
+		do
+			priority=`echo "${cmd}" | cut -d. -f1`
+			cmd=`echo "${cmd}" | cut -d. -f2`
+
+			makejail_write_cmd "${priority}" "${stage}" "${cmd}"
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				return ${errlevel}
+			fi
+		done
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		echo "}"
+	done >> "${initscript}"
+
+	echo "${initscript}"
+}
+
+_makejail_config()
+{
+	# Configuration and functions
+	cat << EOF
+. "\${APPJAIL_CONFIG}"
+. "\${LIBDIR}/load"
+
+lib_load "\${SCRIPTSDIR}/default_env.sh"
+lib_load "\${LIBDIR}/sysexits"
+lib_load "\${LIBDIR}/atexit"
+lib_load "\${LIBDIR}/log"
+lib_load "\${LIBDIR}/check_func"
+
+lib_atexit_init
+EOF
+}
+
+makejail_write_cmd()
+{
+	local priority="$1" stage="$2" cmd="$3" input="$4"
+	if [ -z "${stage}" -o -z "${cmd}" ]; then
+		lib_err ${EX_USAGE} "usage: makejail_write_cmd [- | priority] stage cmd [input]"
+	fi
+	
+	local errlevel
+	errlevel=0
+
+	local stagedir
+	stagedir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${stage}"
+
+	if [ "${priority}" = "-" ]; then
+		local _cmd=`ls "${stagedir}/"*.${cmd} 2> /dev/null | head -1`
+		if lib_check_empty "${_cmd}"; then
+			return 0
+		fi
+
+		local args_file
+		args_file="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		local escape_args_file
+		escape_args_file=`lib_escape_string "${args_file}"`
+
+		lib_atexit_add "rm -f \"${escape_args_file}\""
+
+		cat -- "${stagedir}/"*.${cmd} > "${args_file}"
+
+		_cmd=`basename -- "${_cmd}"`
+		priority=`echo "${_cmd}" | cut -d. -f1`
+
+		makejail_write_cmd "${priority}" "${stage}" "${cmd}" "${args_file}"
+
+		rm -f -- "${stagedir}/"*.${cmd}
+		
+		return 0
+	fi
+
+	if [ -z "${input}" ]; then
+		input="${stagedir}/${priority}.${cmd}"
+	fi
+
+	if [ `wc -c "${input}" | awk '{print $1}'` -eq 0 ]; then
+		# ignore
+		return 0
+	fi
+
+	local script
+	if [ -x "${MAKEJAIL_WCOMMANDS}/${stage}/${cmd}" ]; then
+		script="${MAKEJAIL_WCOMMANDS}/${stage}/${cmd}"
+	elif [ -x "${MAKEJAIL_WCOMMANDS}/all/${cmd}" ]; then
+		script="${MAKEJAIL_WCOMMANDS}/all/${cmd}"
+	else
+		lib_err ${EX_NOINPUT} -- "${cmd}: command not found."
+	fi
+
+	lib_debug "Running makejail command (write): ${script} (input:${input})"
+
+	env \
+		AJ_CONFIG="${CONFIG}" \
+		MAKEJAIL_CURRENT_STAGE="${MAKEJAIL_CURRENT_STAGE}" \
+		MAKEJAIL_TEMPDIR="${MAKEJAIL_TEMPDIR}" \
+		MAKEJAIL_STAGESDIR="${MAKEJAIL_STAGESDIR}" \
+			"${script}" "${input}"
+	
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	rm -f -- "${input}"
+}
+
+makejail_run_cmd()
+{
+	local cmd="$1" parameters="$2"
+
+	if lib_check_empty "${cmd}"; then
+		lib_err ${EX_DATAERR} "usage: makejail_run_cmd cmd [parameters]"
+	fi
+
+	local errlevel
+	errlevel=0
+
+	lib_debug "Running makejail command (cmd): ${cmd} (args:${parameters})"
+
+	case "${cmd}" in
+		${MAKEJAIL_CMD_STAGE})
+			makejail_change_stage "${parameters}"
+			;;
+		*)
+			env \
+				AJ_CONFIG="${CONFIG}" \
+				MAKEJAIL_CURRENT_STAGE="${MAKEJAIL_CURRENT_STAGE}" \
+				MAKEJAIL_TEMPDIR="${MAKEJAIL_TEMPDIR}" \
+				MAKEJAIL_STAGESDIR="${MAKEJAIL_STAGESDIR}" \
+					"${cmd}" "${parameters}"
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					exit ${errlevel}
+				fi
+			;;
+	esac
+}
+
+makejail_check_cmd()
+{
+	local cmd="$1"
+	if lib_check_empty "${cmd}"; then
+		lib_err ${EX_DATAERR} "Makejail needs a command to run!"
+	fi
+
+	case "${cmd}" in
+		${MAKEJAIL_CMD_STAGE})
+			echo "${MAKEJAIL_CMD_STAGE}"
+			;;
+		*)
+			local script
+
+			if lib_check_ispath "${cmd}"; then
+				lib_err ${EX_DATAERR} "Invalid command: ${cmd}"
+			fi
+
+			if [ -x "${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}" ]; then
+				script="${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}"
+			elif [ -x "${MAKEJAIL_COMMANDS}/all/${cmd}" ]; then
+				script="${MAKEJAIL_COMMANDS}/all/${cmd}"
+			else
+				lib_err ${EX_NOINPUT} -- "${cmd}: command not found."
+			fi
+
+			echo "${script}"
+			;;
+	esac
+}
+
+makejail_include()
+{
+	local makejail_file
+	makejail_file="$1"
+
+	if [ -z "${makejail_file}" ]; then
+		lib_err ${EX_USAGE} "usage: makejail_include makejail_file"
+	fi
+
+	local errlevel
+
+	makejail_file=`makejail_getinclude "${makejail_file}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	makejail_file=`realpath -- "${makejail_file}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	# Avoid possible loops
+	_makejail_check "${makejail_file}"
+	_makejail_add "${makejail_file}"
+
+	local rootdir
+	rootdir=`dirname -- "${makejail_file}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local _rootdir="${rootdir}"
+
+	# The root directory of the first Makejail that will be used later when
+	# running the buildscript.
+	if [ -z "${MAKEJAIL_WRITE_ROOTDIR}" ]; then
+		MAKEJAIL_WRITE_ROOTDIR=1
+		
+		printf "%s\n" "${_rootdir}" > "${MAKEJAIL_ROOTDIR}"
+	fi
+
+	local current_pwd
+	current_pwd=`pwd -P`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	if [ "${current_pwd}" != "${_rootdir}" ]; then
+		cd -- "${_rootdir}"
+		if [ "${MAKEJAIL_CURRENT_STAGE}" = "${MAKEJAIL_STAGE_BUILD}" ]; then
+			# For macrovars.
+			rootdir=`lib_replace_escape_macrovar "${rootdir}"`
+			rootdir=`lib_escape_string "${rootdir}"`
+		
+			printf "%s\n" "RAW cd -- \"${rootdir}\" # Makejail: ${makejail_file}"
+		fi
+	fi
+
+	lib_debug "Including ${makejail_file} ..."
+
+	local line
+	while IFS= read -r line; do
+		if lib_check_empty "${line}"; then
+			continue
+		fi
+
+		if lib_check_comment "${line}"; then
+			continue
+		fi
+
+		# Remove tabs and spaces.
+		line=`printf "%s" "${line}" | sed -Ee 's/^[\t ]*//'`
+
+		local cmd=`lib_jailparam_name "${line}" " "`
+
+		if [ "${cmd}" = "${MAKEJAIL_CMD_INCLUDE}" ]; then
+			local current_stage="${MAKEJAIL_CURRENT_STAGE}"
+
+			local parameters=`lib_jailparam_value "${line}" " "`
+			makejail_include "${parameters}"
+
+			if [ "${current_stage}" != "${MAKEJAIL_CURRENT_STAGE}" ]; then
+				makejail_change_stage "${current_stage}"
+				printf "%s\n" "STAGE ${current_stage}"
+			fi
+
+			current_pwd=`pwd -P`
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				exit ${errlevel}
+			fi
+
+			if [ "${current_pwd}" != "${_rootdir}" ]; then
+				cd -- "${_rootdir}"
+				if [ "${current_stage}" = "${MAKEJAIL_STAGE_BUILD}" ]; then
+					printf "%s\n" "RAW cd -- \"${rootdir}\" # Makejail: ${makejail_file}"
+				fi
+			fi
+		elif [ "${cmd}" = "${MAKEJAIL_CMD_STAGE}" ]; then
+			local parameters=`lib_jailparam_value "${line}" " "`
+
+			makejail_change_stage "${parameters}"
+
+			printf "%s\n" "${line}"
+
+			if [ "${MAKEJAIL_CURRENT_STAGE}" = "${MAKEJAIL_STAGE_BUILD}" ]; then
+				printf "%s\n" "RAW cd -- \"${rootdir}\" # Makejail: ${makejail_file}"
+			fi
+		else
+			printf "%s\n" "${line}"
+		fi
+	done < "${makejail_file}"
+}
+
+_makejail_check()
+{
+	local makejail_file="$1"
+	if [ -z "${makejail_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_check makejail_file"
+	fi
+
+	local errlevel
+
+	if [ -z "${MAKEJAIL_CHK_LIST}" ]; then
+		MAKEJAIL_CHK_LIST="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		local escape_mk_chk_lst
+		escape_mk_chk_lst=`lib_escape_string "${MAKEJAIL_CHK_LIST}"`
+
+		lib_atexit_add "rm -f \"${escape_mk_chk_lst}\""
+	fi
+
+	local match
+	while IFS= read -r match; do
+		if [ "${match}" = "${makejail_file}" ]; then
+			lib_err ${EX_DATAERR} -- "${makejail_file}: Makejail is already included."
+		fi
+	done < "${MAKEJAIL_CHK_LIST}"
+}
+
+_makejail_add()
+{
+	local makejail_file="$1"
+	if [ -z "${makejail_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_add makejail_file"
+	fi
+
+	printf "%s\n" "${makejail_file}" >> "${MAKEJAIL_CHK_LIST}"
+}
+
+makejail_getinclude()
+{
+	local include_file="$1"
+	if lib_check_empty "${include_file}"; then
+		lib_err ${EX_USAGE} "usage: INCLUDE [method+]path [args ...]"
+	fi
+
+	local method=`lib_jailparam_name "${include_file}" "+"`
+	parameters=`lib_jailparam_value "${include_file}" "+"`
+
+	if lib_check_empty "${parameters}"; then
+		parameters="${method}"
+		method="file"
+	fi
+
+	case "${method}" in
+		cmd|git|fetch|file)
+			;;
+		gh|github)
+			method="github"
+			;;
+		gh-ssh|github-ssh)
+			method="github_ssh"
+			;;
+		gl|gitlab)
+			method="gitlab"
+			;;
+		gl-ssh|gitlab-ssh)
+			method="gitlab_ssh"
+			;;
+		*)
+			lib_err ${EX_DATAERR} -- "${method}: Invalid method."
+			;;
+	esac
+
+	lib_debug "Using method:${method} (args:${parameters}) from ${include_file}."
+
+	local errlevel
+	local makejail_file
+
+	makejail_file=`makejail_getinclude_${method} "${parameters}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	printf "%s\n" "${makejail_file}"
+}
+
+makejail_getinclude_cmd()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: INCLUDE cmd+command [args ...]"
+	fi
+
+	local errlevel
+
+	local output
+	output="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_output
+	escape_output=`lib_escape_string "${output}"`
+
+	lib_atexit_add "rm -f \"${escape_output}\""
+	
+	# Arguments
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local current_index=0
+
+	local cmd_args=
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if ! lib_check_empty "${arg}"; then
+			arg=`lib_escape_string "${arg}"`
+		fi
+
+		cmd_args="${cmd_args} \"${arg}\""
+	done
+
+	lib_debug "Running (cmd): ${cmd_args}"
+
+	sh -c "${cmd_args}" > "${output}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error executing \`${cmd_args} \`."
+	fi
+
+	printf "%s\n" "${output}"
+}
+
+makejail_getinclude_fetch()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: INCLUDE fetch+url"
+	fi
+
+	local url=`printf "%s\n" "${args}" | head -1 | tail -n 1`
+	if lib_check_empty "${url}"; then
+		makejail_getinclude_fetch # usage
+	fi
+
+	local errlevel
+
+	local output
+	output="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_output=`lib_escape_string "${output}"`
+	lib_atexit_add "rm -f \"${escape_output}\""
+
+	local escape_url=`lib_escape_string "${url}"`
+	
+	fetch_cmd=`lib_multi_replace "${MAKEJAIL_FETCH_CMD}" o "\"${escape_output}\"" u "\"${escape_url}\""`
+
+	lib_debug "Running (fetch): ${fetch_args}"
+
+	sh -c "${fetch_cmd}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error executing \`${fetch_cmd} \`."
+	fi
+
+	printf "%s\n" "${output}"
+}
+
+makejail_getinclude_file()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: INCLUDE file+makejail_file"
+	fi
+
+	local file=`printf "%s\n" "${args}" | head -1 | tail -n 1`
+	if lib_check_empty "${file}"; then
+		makejail_getinclude_file # usage
+	fi
+
+	if [ ! -f "${file}" ]; then
+		lib_err ${EX_NOINPUT} -- "${file} file does not exist or could not be read."
+	fi
+
+	printf "%s\n" "${file}"
+}
+
+makejail_getinclude_github()
+{
+	makejail_getinclude_git "$1 --baseurl https://github.com/"
+}
+
+makejail_getinclude_github_ssh()
+{
+	makejail_getinclude_git "$1 --baseurl git@github.com:"
+}
+
+makejail_getinclude_gitlab()
+{
+	makejail_getinclude_git "$1 --baseurl https://gitlab.com/"
+}
+
+makejail_getinclude_gitlab_ssh()
+{
+	makejail_getinclude_git "$1 --baseurl git@gitlab.com:"
+}
+
+makejail_getinclude_git()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: INCLUDE git+url [--baseurl url] [--file makejail_filename] [--global | --local [--cachedir directory]]"
+	fi
+
+	# Arguments
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	total_items=$((total_items-1))
+	local current_index=1
+
+	local url=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+	if lib_check_empty "${url}"; then
+		makejail_getinclude_git # usage
+	fi
+
+	# options
+	local makejail_filename="${DEFAULT_MAKEJAIL_FILE}"
+	local global=1
+	local local=0
+	local cachedir=".makejail_local"
+
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		local optarg=
+		case "${arg}" in
+			--baseurl|--cachedir|--file)
+				current_index=$((current_index+1))
+				if [ ${current_index} -eq ${total_items} ]; then
+					makejail_getinclude_git # usage
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					makejail_getinclude_git # usage
+				fi
+				;;
+		esac
+
+		case "${arg}" in
+			--global)
+				global=1
+				;;
+			--local)
+				local=1
+				;;
+			--baseurl)
+				url="${optarg}${url}"
+				;;
+			--cachedir)
+				cachedir="${optarg}"
+				;;
+			--file)
+				makejail_filename="${optarg}"
+				;;
+			--)
+				break
+				;;
+			--*)
+				makejail_getinclude_git # usage
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+	current_index=$((current_index-1))
+
+	if [ ${local} -eq 1 ]; then
+		gitdir="${cachedir}"
+
+		lib_debug "Using local cache directory (git): ${gitdir}"
+	else
+		gitdir="${GLOBAL_GIT_CACHEDIR}"
+
+		lib_debug "Using global cache directory (git): ${gitdir}"
+	fi
+
+	if ! mkdir -p "${gitdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${cachedir}"
+	fi
+
+	_makejail_git_clone "${url}" "${gitdir}" "${makejail_filename}"
+}
+
+_makejail_git_clone()
+{
+	local url="$1" gitdir="$2" mk_file="$3"
+	if [ -z "${url}" -o -z "${gitdir}" -o -z "${mk_file}" ]; then
+		lib_err ${EX_USAGE} "_makejail_git_clone url gitdir mk_file"
+	fi
+
+	if ! which -s "git"; then
+		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
+	fi
+
+	local reponame
+	reponame=`basename -- "${url}"`
+
+	local repodir
+	repodir="${gitdir}/${reponame}"
+
+	if [ ! -d "${repodir}" ]; then
+		lib_debug "Cloning ${url} as ${repodir} ..."
+
+		git clone -q -o origin -- "${url}" "${repodir}" >&2
+	else
+		lib_debug "Updating ${repodir} ..."
+
+		git -C "${repodir}" fetch -q origin >&2 &&
+		git -C "${repodir}" reset -q --hard origin >&2
+	fi
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Failed to get ${url} using git(1)."
+	fi
+
+	if [ ! -f "${repodir}/${mk_file}" ]; then
+		lib_err ${EX_NOINPUT} -- "${mk_file} file does not exist."
+	fi
+
+	printf "%s\n" "${repodir}/${mk_file}"
+}
+
+makejail_change_stage()
+{
+	local stage="$1"
+	if lib_check_empty "${stage}"; then
+		lib_err ${EX_USAGE} -- "usage: STAGE stage"
+	fi
+
+	if ! _makejail_check_stages "${stage}"; then
+		lib_err ${EX_NOINPUT} -- "${stage}: stage not found."
+	fi
+
+	MAKEJAIL_CURRENT_STAGE="${stage}"
+}
+
+_makejail_check_stages()
+{
+	local stage2chk="$1"
+	if [ -z "${stage2chk}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_check_stages stage2chk"
+	fi
+
+	local stage
+	for stage in ${MAKEJAIL_STAGES}; do
+		if [ "${stage}" = "${stage2chk}" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+makejail_help()
+{
+	cat << EOF
+`makejail_usage`
+
+${makejail_desc}
+
+Options:
+    -e                  -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
+    -v                  -- Use \`set -vx\` to display the commands in the buildscript.
+    -b build_arg        -- Arguments that will be replaced when all Makejails are included in a single Makejail.
+    -f makejail         -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
+    -j jail_name        -- Jail name. If not defined, a random string is used.
+EOF
+}
+
+makejail_usage()
+{
+	cat << EOF
+usage: makejail [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] -- [runtime_args ...]
+EOF
+}

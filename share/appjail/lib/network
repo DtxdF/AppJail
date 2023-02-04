@@ -1,0 +1,101 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_network_ifaces()
+{
+	local jail_name="$1"
+
+	if [ -n "${jail_name}" ]; then
+		jexec -l "${jail_name}" ifconfig
+	else
+		ifconfig
+	fi | grep -E '^.+: flags=' | sed -Ee 's/^(.+): flags=.+/\1/'
+}
+
+lib_network_ifacesgrp()
+{
+	local grp="$1"
+
+	if [ -z "${grp}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_ifacesgrp group"
+	fi
+
+	ifconfig -g "${grp}"
+}
+
+lib_network_getbrgmembers()
+{
+	local bridge="$1"
+
+	if [ -z "${bridge}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_getbrgmembers bridge"
+	fi
+
+	ifconfig -- "${bridge}" | grep -Eo 'member: .+ flags=' | sed -Ee 's/member: (.+) flags=/\1/'
+}
+
+lib_network_addrlist()
+{
+	local networkaddr="$1"
+	local cidr="$2"
+
+	if [ -z "${networkaddr}" -o -z "${cidr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_addrlist networkaddr cidr"
+	fi
+
+	"${UTILDIR}/network/network" -l -a "${networkaddr}" -n "${cidr}"
+}
+
+lib_network_getservbyname()
+{
+	local name="$1"
+	local proto="$2"
+
+	if [ -z "${name}" -o -z "${proto}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_getservbyname name proto"
+	fi
+
+	"${UTILDIR}/getservbyname/getservbyname" "${name}" "${proto}"
+}
+
+lib_network_getmtu()
+{
+	local iface="$1"
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_getmtu iface"
+	fi
+
+	mtu=`ifconfig -- "${iface}" | grep -Eo 'mtu [0-9]+' | cut -d' ' -f2`
+
+	if lib_check_empty "${mtu}" || ! lib_check_number "${mtu}"; then
+		lib_err ${EX_SOFTWARE} -- "${iface}: Could not get MTU."
+	fi
+
+	echo "${mtu}"
+}

@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${SCRIPTSDIR}/default_env.sh"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+
+main()
+{
+	local env="$1"
+	if lib_check_empty "${env}"; then
+		lib_err ${EX_USAGE} "usage: ENV name[=value]"
+	fi
+
+	local envdir="${MAKEJAIL_TEMPDIR}/env"
+	if ! mkdir -p "${envdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${envdir}"
+	fi
+
+	if ! lib_check_var "${env}"; then
+		lib_err ${EX_DATAERR} -- "${env}: Invalid environment variable."
+	fi
+
+	local name=`lib_jailparam_name "${env}" "="`
+	local value=`lib_jailparam_value "${env}" "="`
+
+	env="${name}=${value}"
+
+	local escape_chars
+	escape_chars='`"\'
+
+	env=`lib_escape_string "${env}" "" "${escape_chars}"`
+
+	if ! printf "%s " "\"${env}\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
+		lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
+	fi
+}
+
+main "$@"

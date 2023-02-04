@@ -1,0 +1,260 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/zfs"
+
+logs_desc="Read, remove or list the appjail logs."
+
+logs_main()
+{
+	local command="$1"; shift
+
+	if lib_check_empty "${command}"; then
+		command="list"
+	fi
+
+	case "${command}" in
+		list|read|remove|tail) ;;
+		*) logs_usage; exit ${EX_USAGE} ;;
+	esac
+
+	logs_${command} "$@"
+}
+
+logs_list()
+{
+	local _o
+	local file
+	local type entity subtype log
+	local opt_escape=1
+	local opt_columns=1
+	local opt_pretty=1
+
+	while getopts ":eHp" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			p)
+				opt_pretty=0
+				;;
+			*)
+				logs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+	
+	file="$1"
+
+	type=`printf "%s" "${file}" | awk -F/ '{print $1}'`
+	entity=`printf "%s" "${file}" | awk -F/ '{print $2}'`
+	subtype=`printf "%s" "${file}" | awk -F/ '{print $3}'`
+	log=`printf "%s" "${file}" | awk -F/ '{print $4}'`
+
+	if [ -n "${log}" ]; then
+		keywords="LOG"
+
+		if [ ! -f "${LOGDIR}/${type}/${entity}/${subtype}/${log}" ]; then
+			lib_err ${EX_NOINPUT} "Log ${log} not found."
+		fi
+	elif [ -n "${subtype}" ]; then
+		keywords="LOG"
+
+		if [ ! -d "${LOGDIR}/${type}/${entity}/${subtype}" ]; then
+			lib_err ${EX_NOINPUT} "Subtype ${subtype} not found."
+		fi
+	elif [ -n "${entity}" ]; then
+		keywords="SUBTYPE\tLOG"
+
+		if [ ! -d "${LOGDIR}/${type}/${entity}" ]; then
+			lib_err ${EX_NOINPUT} "Entity ${entity} not found."
+		fi
+	elif [ -n "${type}" ]; then
+		keywords="ENTITY\tSUBTYPE\tLOG"
+
+		if [ ! -d "${LOGDIR}/${type}" ]; then
+			lib_err ${EX_NOINPUT} "Type ${type} not found."
+		fi
+	else
+		keywords="TYPE\tENTITY\tSUBTYPE\tLOG"
+
+		if ! lib_zfs_mkroot; then
+			lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+		fi
+
+		if ! lib_zfs_mkdir "${LOGDIR}" "${ZFS_LOGS_NAME}"; then
+			lib_err ${EX_IOERR} "Error creating ${LOGDIR}"
+		fi
+	fi
+
+	if [ -n "${log}" ]; then
+		basename "${LOGDIR}/${type}/${entity}/${subtype}/${log}"
+	elif [ -n "${subtype}" ]; then
+		(cd "${LOGDIR}/${type}/${entity}/${subtype}"; find . -depth 1)
+	elif [ -n "${entity}" ]; then
+		(cd "${LOGDIR}/${type}/${entity}"; find . -depth 2)
+	elif [ -n "${type}" ]; then
+		(cd "${LOGDIR}/${type}"; find . -depth 3)
+	else
+		(cd "${LOGDIR}"; find . -depth 4)
+	fi |\
+		sed -Ee 's#\./##' |\
+		{
+			if [ ${opt_columns} -eq 1 ]; then
+				echo -e "${keywords}"
+			fi
+			while IFS= read -r file; do
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					file=`printf "%s" "${file}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+
+				file=`printf "%s" "${file}" | tr '/' '\t'`
+
+				printf "%s\n" "${file}"
+			done
+		} | \
+			if [ ${opt_pretty} -eq 1 ]; then
+				column -ts $'\t'
+			else
+				cat
+			fi
+}
+
+logs_read()
+{
+	local errlevel=0
+	local file="$1"; shift
+	if lib_check_empty "${file}"; then
+		logs_usage
+		exit ${EX_USAGE}
+	fi
+
+	file=`_logs_get_filename "${file}"`
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	${PAGER:-less} "$@" -- "${file}"
+}
+
+logs_remove()
+{
+	local errlevel=0
+	local file="$1"; shift
+	if lib_check_empty "${file}"; then
+		logs_usage
+		exit ${EX_USAGE}
+	fi
+
+	file=`_logs_get_filename "${file}"`
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+	
+	rm -f "${file}"
+}
+
+logs_tail()
+{
+	local errlevel=0
+	local file="$1"; shift
+	if lib_check_empty "${file}"; then
+		logs_usage
+		exit ${EX_USAGE}
+	fi
+
+	file=`_logs_get_filename "${file}"`
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	tail "$@" -- "${file}"
+}
+
+_logs_get_filename()
+{
+	local file="$1"
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "_logs_get_filename file"
+	fi
+
+	file=`printf "%s" "${file}" | grep -Eo '[^/]+/[^/]+/[^/]+/[^/]+'`
+	if [ `printf "%s" "${file}" | tr '/' '\n' | wc -l` -ne 3 ]; then
+		lib_err ${EX_DATAERR} "The syntax should be \`type/entity/subtype/log\`"
+	fi
+
+	file="${LOGDIR}/${file}"
+	if [ ! -f "${file}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the log: ${file}"
+	fi
+
+	printf "%s" "${file}"
+}
+
+logs_help()
+{
+	cat << EOF
+`logs_usage`
+
+${logs_desc}
+
+Parameters:
+    list          -- Default. By default, if no keywords are provided, it displays
+                     all keywords. Valid keywords: type, entity, subtype, log.
+    read          -- Use the environment variable PAGER or less(1) if it is not
+                     defined to display the contents of a log.
+    remove        -- Remove a log.
+    tail          -- Use tail(1) to display the contents of a log.
+
+Options for list:
+    -e            -- Don't escape tabs.
+    -H            -- Don't display the columns.
+    -p            -- Don't print the table in pretty mode.
+EOF
+}
+
+logs_usage()
+{
+	cat << EOF
+usage: logs list [-eHp] type[/entity[/subtype[/log]]]
+       logs read type/entity/subtype/log [pager_args ...]
+       logs remove type/entity/subtype/log
+       logs tail type/entity/subtype/log [tail_args ...]
+EOF
+}

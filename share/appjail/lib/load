@@ -1,0 +1,71 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_loaded_var()
+{
+	local var="$1"
+	local val
+
+	if [ -z "${var}" ]; then
+		echo "usage: lib_loaded_var var" >&2
+		exit 64 # EX_USAGE
+	fi
+
+	val=`eval echo "\\$${var}"`
+	printf "%s\n" "${val}"
+}
+
+lib_load()
+{
+	local library library_bs
+	local loaded
+
+	library="$1"
+
+	# Since the log library has not yet been loaded, this is necessary.
+	if [ -z "${library}" ]; then
+		echo "usage: lib_load library" >&2
+		exit 64 # EX_USAGE
+	fi
+
+	# mksum is better, but slower.
+	library_bs=`echo "${library}" | sed -E 's/[^a-zA-Z0-9_]+//g'`
+	if [ -z "${library_bs}" ]; then
+		echo "Invalid name \"${library_bs}\"." >&2
+		exit 65 # EX_DATAERR
+	fi
+
+	loaded=`eval echo \\$__lib_${library_bs}_loaded__`
+
+	if [ -z "${loaded}" ]; then
+		setvar __lib_${library_bs}_loaded__ 1
+
+		. "${library}"
+	fi
+}

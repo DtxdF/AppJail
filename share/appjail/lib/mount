@@ -1,26 +1,131 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-lib_check_mount()
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/sysexits"
+lib_load "${LIBDIR}/replace"
+
+lib_list_mountpoints()
 {
+	local mountpoints
+	local total
+	local current_index=2
+	local fs_spec fs_file
+
+	local types="$1"
+
+	if [ -n "${types}" ]; then
+		mount_flags="-t ${types}"
+	fi
+
+	mountpoints=`mount ${mount_flags} | sed -Ee 's/^(.+) on (.+) \(.+/\1\n\2/'`
+
+	total=`printf "%s\n" "${mountpoints}" | wc -l`
+
+	while [ ${current_index} -le ${total} ]; do
+		fs_spec=`printf "%s\n" "${mountpoints}" | head -${current_index} | tail -n 2 | head -1`
+		fs_file=`printf "%s\n" "${mountpoints}" | head -${current_index} | tail -n 2 | tail -1`
+
+		printf "%s\n" "<${fs_spec}> <${fs_file}>"
+
+		current_index=$((current_index+2))
+	done
+}
+
+lib_mountpoint_mounted()
+{
+	local entry
+	local fs_spec fs_file
+	local opt_use_fs_file=1
+	local opt_use_fs_spec=0
+	local opt_strict=0
+	local format="%2 -> %1"
+	local types=
 	local mountpoint
-	local _chk
+	local cmp1 cmp2
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_mountpoint_mounted [-f | -p] [-s] [-F format] [-t [no]type[,type ...]] mountpoint"
+	fi
+
+	while getopts ":fpsF:t:" _o; do
+		case "${_o}" in
+			f)
+				opt_use_fs_file=1
+				opt_use_fs_spec=0
+				;;
+			p)
+				opt_use_fs_spec=1
+				opt_use_fs_file=0
+				;;
+			s)
+				opt_strict=1
+				;;
+			F)
+				format="${OPTARG}"
+				;;
+			t)
+				types="${OPTARG}"
+				;;
+			*)
+				lib_mountpoint_mounted # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
 
 	mountpoint="$1"
-
 	if [ -z "${mountpoint}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_check_mount mountpoint"
+		lib_mountpoint_mounted # usage
 	fi
 
-	_chk="`mount -p | grep \"${mountpoint}\" | awk -F' ' '{print $2}' | grep \"${mountpoint}\" | wc -l | tr -d ' '`"
+	lib_list_mountpoints "${types}" | while IFS= read -r entry; do
+		fs_spec=`printf "%s" "${entry}" | sed -Ee 's/<(.+)> .+/\1/'`
+		fs_file=`printf "%s" "${entry}" | sed -Ee 's/.+ <(.+)>/\1/'`
 
-	if [ "${_chk}" -gt 0 ]; then
-		return 0
-	else
-		return 1
-	fi
+		if [ ${opt_use_fs_file} -eq 1 ]; then
+			cmp1="${fs_file}"
+			cmp2="${fs_spec}"
+		else
+			cmp1="${fs_spec}"
+			cmp2="${fs_file}"
+		fi
+
+		if [ ${opt_strict} -eq 1 ]; then
+			if [ "${cmp1}" = "${mountpoint}" ]; then
+				lib_multi_replace "${format}" 1 "${cmp1}" 2 "${cmp2}"
+				break
+			fi
+		else
+			if printf "%s" "${cmp1}" | grep -qwF "${mountpoint}"; then
+				lib_multi_replace "${format}" 1 "${cmp1}" 2 "${cmp2}"
+			fi
+		fi
+	done
 }

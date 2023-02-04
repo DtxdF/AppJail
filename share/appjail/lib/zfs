@@ -1,0 +1,259 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+
+ZFS_COMPONENTS_NAME="components"
+ZFS_JAILS_NAME="jails"
+ZFS_LOGS_NAME="logs"
+ZFS_NETWORK_NAME="networks"
+ZFS_RELEASE_NAME="releases"
+
+lib_zfs_mkroot()
+{
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		local escape_datadir=`lib_escape_string "${DATADIR}"`
+		local escape_dataset=`lib_escape_string "${ZPOOL}/${ZROOTFS}"`
+
+		sh -c "zfs create -p ${ZOPTS} -o mountpoint=\"${escape_datadir}\" -- \"${escape_dataset}\""
+	else
+		mkdir -p "${DATADIR}"
+	fi
+}
+
+lib_zfs_mkdir()
+{
+	local mountpoint="$1"
+	local name="$2"
+
+	if [ -z "${mountpoint}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_mkdir mountpoint name"
+	fi
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		local escape_mountpoint=`lib_escape_string "${mountpoint}"`
+		local escape_dataset=`lib_escape_string "${ZPOOL}/${ZROOTFS}/${name}"`
+
+		sh -c "zfs create -p ${ZOPTS} -o mountpoint=\"${escape_mountpoint}\" -- \"${escape_dataset}\""
+	else
+		mkdir -p "${mountpoint}"
+	fi
+}
+
+lib_zfs_rrmfs()
+{
+	local _o
+	local opt_force=0 fflag=
+	local opt_all_dependents=0 Rflag=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_rrmfs [-fR] name"
+	fi
+
+	while getopts ":fR" _o; do
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			R)
+				opt_all_dependents=1
+				;;
+			*)
+				lib_zfs_rrmfs # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local name="$1"
+	if [ -z "${name}" ]; then
+		lib_zfs_rrmfs # usage
+	fi
+
+	if [ ${opt_force} -eq 1 ]; then
+		fflag="-f"
+	fi
+
+	if [ ${opt_all_dependents} -eq 1 ]; then
+		Rflag="-R"
+	fi
+
+	zfs destroy ${fflag} ${Rflag} -r -- "${ZPOOL}/${ZROOTFS}/${name}"
+}
+
+lib_zfs_listsnapshots()
+{
+	local name="$1"
+
+	if [ -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_listsnapshots name"
+	fi
+
+	zfs list -H -t snapshot -o name -- "${ZPOOL}/${ZROOTFS}/${name}"
+}
+
+lib_zfs_listfs()
+{
+	local name="$1"
+
+	if [ -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_listfs name"
+	fi
+
+	zfs list -H -t filesystem -r -o name -- "${ZPOOL}/${ZROOTFS}/${name}"
+}
+
+lib_zfs_snapshot()
+{
+	local name="$1"
+	local snapname="$2"
+
+	if [ -z "${name}" -o -z "${snapname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_snapshot name snapname"
+	fi
+
+	zfs snapshot -- "${ZPOOL}/${ZROOTFS}/${name}@${snapname}"
+}
+
+lib_zfs_clone()
+{
+	local snapname="$1"
+	local name="$2"
+
+	if [ -z "${snapname}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_clone snapname name"
+	fi
+
+	zfs clone -p -- "${ZPOOL}/${ZROOTFS}/${snapname}" "${ZPOOL}/${ZROOTFS}/${name}"
+}
+
+lib_zfs_generate_snapname()
+{
+	local snapname=`random_hexstring 48 0 15 | tr -d '\n'`
+	snapname="appjail_copy_${snapname}"
+
+	echo "${snapname}"
+}
+
+lib_zfs_copy()
+{
+	local src="$1" dst="$2" mountpoint="$3"
+
+	if [ -z "${src}" -o -z "${dst}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_copy src dst mountpoint"
+	fi
+
+	local snapname=`lib_zfs_generate_snapname`
+
+	local escape_snapsrc=`lib_escape_string "${ZPOOL}/${ZROOTFS}/${src}@${snapname}"`
+	local escape_snapdst=`lib_escape_string "${ZPOOL}/${ZROOTFS}/${dst}@${snapname}"`
+
+	lib_atexit_add "zfs destroy -r -- \"${escape_snapsrc}\" > /dev/null 2>&1"
+	lib_atexit_add "zfs destroy -r -- \"${escape_snapdst}\" > /dev/null 2>&1"
+
+	zfs snapshot -r -- "${ZPOOL}/${ZROOTFS}/${src}@${snapname}" || return $?
+	zfs send -R -- "${ZPOOL}/${ZROOTFS}/${src}@${snapname}" | zfs recv -o mountpoint="${mountpoint}" -- "${ZPOOL}/${ZROOTFS}/${dst}" || return $?
+
+	zfs destroy -r -- "${ZPOOL}/${ZROOTFS}/${src}@${snapname}" || return $?
+	zfs destroy -r -- "${ZPOOL}/${ZROOTFS}/${dst}@${snapname}" || return $?
+}
+
+lib_zfs_in2copy()
+{
+	local dst="$1" mountpoint="$2"
+
+	if [ -z "${dst}" -o -z "${mountpoint}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_in2copy dst mountpoint"
+	fi
+
+	zfs recv -o mountpoint="${mountpoint}" -- "${ZPOOL}/${ZROOTFS}/${dst}" || return $?
+}
+
+lib_zfs_copy2out()
+{
+	local src="$1"
+
+	if [ -z "${src}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_copy2out src"
+	fi
+
+	local snapname=`lib_zfs_generate_snapname`
+
+	local escape_snap=`lib_escape_string "${ZPOOL}/${ZROOTFS}/${src}@${snapname}"`
+
+	lib_atexit_add "zfs destroy -r -- \"${escape_snap}\" > /dev/null 2>&1"
+
+	zfs snapshot -r -- "${ZPOOL}/${ZROOTFS}/${src}@${snapname}" || return $?
+	zfs send -R -- "${ZPOOL}/${ZROOTFS}/${src}@${snapname}" || return $?
+}
+
+lib_zfs_jail_rename()
+{
+	local old="$1" new="$2"
+
+	if [ -z "${old}" -o -z "${new}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_rename old new"
+	fi
+
+	zfs umount "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${old}" || return $?
+	zfs rename "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${old}" "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${new}" || return $?
+	zfs set mountpoint="${JAILDIR}/${new}" "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${new}" || return $?
+	zfs set mountpoint="${JAILDIR}/${new}/jail" "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${new}/jail" || return $?
+	zfs mount "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${new}" || return $?
+	zfs mount "${ZPOOL}/${ZROOTFS}/${ZFS_JAILS_NAME}/${new}/jail" || return $?
+}
+
+lib_zfs_mklogdir()
+{
+	local type="$1" entity="$2" subtype="$3"
+	if [ -z "${type}" -o -z "${entity}" -o -z "${subtype}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_zfs_mklogdir type entity subtype"
+	fi
+
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${LOGDIR}" "${ZFS_LOGS_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${LOGDIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${LOGDIR}/${type}" "${ZFS_LOGS_NAME}/${type}"; then
+		lib_err ${EX_IOERR} "Error creating ${LOGDIR}/${type}"
+	fi
+
+	if ! lib_zfs_mkdir "${LOGDIR}/${type}/${entity}" "${ZFS_LOGS_NAME}/${type}/${entity}"; then
+		lib_err ${EX_IOERR} "Error creating ${LOGDIR}/${type}/${entity}"
+	fi
+
+	if ! lib_zfs_mkdir "${LOGDIR}/${type}/${entity}/${subtype}" "${ZFS_LOGS_NAME}/${type}/${entity}/${subtype}"; then
+		lib_err ${EX_IOERR} "Error creating ${LOGDIR}/${type}/${entity}/${subtype}"
+	fi
+}

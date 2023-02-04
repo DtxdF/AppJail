@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+
+cpuset_desc="Configure processor sets for jails."
+
+cpuset_main()
+{
+	local jail_name="$1" cpu_list="$2"
+	if lib_check_empty "${jail_name}"; then
+		cpuset_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		exit 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		exit 0
+	fi
+
+	if lib_check_empty "${cpu_list}"; then
+		cpuset_show "${jail_name}"
+	else
+		cpuset_cmd "${jail_name}" "${cpu_list}"
+	fi
+}
+
+cpuset_show()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: cpuset_show jail_name"
+	fi
+
+	cpuset -gj "${jail_name}" | head -1 | cut -d':' -f2- | sed -Ee 's/^ //'
+}
+
+cpuset_cmd()
+{
+	local jail_name="$1" cpu_list="$2"
+	if [ -z "${jail_name}" -o -z "${cpu_list}" ]; then
+		lib_err ${EX_USAGE} "usage: cpuset_cmd jail_name cpu_list"
+	fi
+
+	local new_list
+	new_list=`lib_check_cpulist "${cpu_list}"` || exit $?
+
+	lib_debug "CPU Sets: ${new_list}; Jail: ${jail_name}"
+
+	cpuset -j "${jail_name}" -cl "${new_list}"
+}
+
+cpuset_help()
+{
+	cat << EOF
+${cpuset_desc}
+
+`cpuset_usage`
+EOF
+}
+
+cpuset_usage()
+{
+	cat << EOF
+usage: cpuset jail_name cpu_list
+       cpuset jail_name
+EOF
+}

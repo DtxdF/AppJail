@@ -1,0 +1,444 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+config_desc="Set, get or remove a template parameter for a given jail."
+
+config_main()
+{
+	local _o
+	local opt_all=0
+	local opt_check_only=0
+	local opt_editor=0
+	local opt_get=0
+	local opt_insert=0
+	local opt_ignore_unkvars=0
+	local opt_test_required=0
+	local opt_show_required=0
+	local opt_list_columns=0
+	local opt_show_value=1
+	local opt_show_name=1
+	local opt_add_column=0
+	local opt_all_rows=0
+	local opt_required=0
+	local opt_set=0
+	local opt_remove=0
+	local opt_parameter=0 parameter=
+	local column=0
+	local jail_name=
+	local row=0
+	local template= template_temp escape_temp_template
+	local jailparam_extra jailparam_cmd
+	local errlevel=0 error_reporting=0
+	local current_index=0 total_items
+
+	if [ $# -eq 0 ]; then
+		config_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":AcegIiKklNnoPrsxa:C:j:R:t:" _o; do
+		case "${_o}" in
+			a|C|j|R|t)
+				if lib_check_empty "${OPTARG}"; then
+					config_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			A)
+				opt_all=1
+				;;
+			c)
+				opt_check_only=1
+				;;
+			e)
+				opt_editor=1
+				;;
+			g)
+				opt_get=1
+				;;
+			I)
+				opt_insert=1
+				;;
+			i)
+				opt_ignore_unkvars=1
+				;;
+			K)
+				opt_test_required=1
+				;;
+			k)
+				opt_show_required=1
+				;;
+			l)
+				opt_list_columns=1
+				;;
+			N)
+				opt_show_value=0
+				;;
+			n)
+				opt_show_name=0
+				;;
+			o)
+				opt_add_column=1
+				;;
+			P)
+				opt_all_rows=1
+				;;
+			r)
+				opt_required=1
+				;;
+			s)
+				opt_set=1
+				;;
+			x)
+				opt_remove=1
+				;;
+			a)
+				opt_parameter=1
+				parameter="${OPTARG}"
+				;;
+			C)
+				column="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			R)
+				row="${OPTARG}"
+				;;
+			t)
+				template="${OPTARG}"
+				;;
+			*)
+				config_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ -n "${jail_name}" ]; then
+		if ! lib_check_jailname "${jail_name}"; then
+			lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+		fi
+
+		if [ ! -d "${JAILDIR}/${jail_name}/conf" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`."
+		fi
+
+		template="${JAILDIR}/${jail_name}/conf/template.conf"
+
+		if [ ! -f "${template}" ]; then
+			touch "${template}"
+		fi
+	fi
+
+	if [ -z "${template}" ]; then
+		config_usage
+		exit ${EX_USAGE}
+	fi
+
+	if [ ! -f "${template}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the template \`${template}\`."
+	fi
+
+	if [ ! -r "${template}" -o ! -w "${template}" ]; then
+		lib_err ${EX_NOPERM} "The ${template} template must be readable and writable."
+	fi
+
+	if [ ${opt_editor} -eq 1 ]; then
+		${EDITOR:-ee} "${template}"
+	elif [ ${opt_get} -eq 1 -a ${opt_all} -eq 0 ]; then
+		if [ -z "${parameter}" ]; then
+			config_usage
+			exit ${EX_USAGE}
+		fi
+
+		if [ ${opt_show_name} -eq 0 ]; then
+			jailparam_extra="-n"
+		fi
+
+		if [ ${opt_show_value} -eq 0 ]; then
+			jailparam_extra="-N"
+		fi
+
+		if [ ${opt_ignore_unkvars} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -i"
+		fi
+
+		if [ ${opt_check_only} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -c"
+		fi
+
+		if [ ${opt_all_rows} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -P"
+		fi
+
+		if [ ${opt_list_columns} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -l"
+		fi
+
+		lib_jail_readtemplate "${template}" | lib_get_jailparam ${jailparam_extra} -a "${parameter}" -C "${column}" -R "${row}"
+
+		error_reporting=$?
+	elif [ ${opt_get} -eq 1 -a ${opt_all} -eq 1 ]; then
+		if [ ${opt_list_columns} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -l"
+		fi
+
+		lib_jail_readtemplate "${template}" | lib_get_jailparam ${jailparam_extra} -A
+	elif [ ${opt_test_required} -eq 1 ]; then
+		lib_check_reqparams "${template}"
+
+		error_reporting=$?
+	elif [ ${opt_show_required} -eq 1 ]; then
+		lib_jail_readtemplate "${template}" | lib_get_reqparams
+
+		error_reporting=$?
+	elif [ ${opt_insert} -eq 1 ]; then
+		if [ ${opt_parameter} -eq 0 ]; then
+			config_usage
+			exit ${EX_USAGE}
+		fi
+
+		if [ ${opt_required} -eq 1 ]; then
+			jailparam_extra="-r"
+		fi
+
+		template_temp="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+
+		if ! cat -- "${template}" > "${template_temp}"; then
+			lib_err ${EX_IOERR} "Error writing ${template} to ${template_temp}"
+		fi
+
+		escape_template_temp=`lib_escape_string "${template_temp}"`
+
+		lib_atexit_add "rm -f \"${escape_template_temp}\""
+
+		lib_insert_jailparam \
+			${jailparam_extra} \
+			-a "${parameter}" >> "${template_temp}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "There was an error editing the template."
+		fi
+
+		if ! cat -- "${template_temp}" > "${template}"; then
+			lib_err ${EX_IOERR} "Error writing ${template_temp} to ${template}"
+		fi
+	elif [ ${opt_set} -eq 1 ]; then
+		if [ ${opt_parameter} -eq 0 ]; then
+			config_usage
+			exit ${EX_USAGE}
+		fi
+
+		template_temp="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+
+		escape_template_temp=`lib_escape_string "${template_temp}"`
+
+		lib_atexit_add "rm -f \"${escape_template_temp}\""
+
+		if [ ${opt_required} -eq 1 ]; then
+			jailparam_extra="-r"
+		fi
+
+		if [ ${opt_add_column} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -o"
+		fi
+
+		lib_set_jailparam \
+			${jailparam_extra} \
+			-a "${parameter}" \
+			-C "${column}" \
+			-R "${row}" < "${template}" > "${template_temp}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "There was an error editing the template."
+		fi
+
+		if ! cat -- "${template_temp}" > "${template}"; then
+			lib_err ${EX_IOERR} "Error writing ${template_temp} to ${template}"
+		fi
+	elif [ ${opt_remove} -eq 1 -a ${opt_all} -eq 1 ]; then
+		template_temp="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+
+		escape_template_temp=`lib_escape_string "${template_temp}"`
+
+		lib_atexit_add "rm -f \"${escape_template_temp}\""
+
+		lib_rm_jailparam -A < "${template}" > "${template_temp}"
+
+		if [ $? -ne 0 ]; then
+			lib_err ${EX_SOFTWARE} "There was an error editing the template."
+		fi
+
+		if ! cat -- "${template_temp}" > "${template}"; then
+			lib_err ${EX_IOERR} "Error writing ${template_temp} to ${template}"
+		fi
+	elif [ ${opt_remove} -eq 1 -a ${opt_all} -eq 0 ]; then
+		if [ ${opt_parameter} -eq 0 ]; then
+			config_usage
+			exit ${EX_USAGE}
+		fi
+
+		template_temp="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+
+		escape_template_temp=`lib_escape_string "${template_temp}"`
+
+		lib_atexit_add "rm -f \"${escape_template_temp}\""
+
+		if [ ${opt_ignore_unkvars} -eq 1 ]; then
+			jailparam_extra="-i"
+		fi
+
+		if [ ${opt_all_rows} -eq 1 ]; then
+			jailparam_extra="${jailparam_extra} -P"
+		fi
+
+		lib_rm_jailparam \
+			${jailparam_extra} \
+			-a "${parameter}" \
+			-C "${column}" \
+			-R "${row}" < "${template}" > "${template_temp}"
+
+		error_reporting=$?
+		
+		if [ ${error_reporting} -ne 0 ]; then
+			if [ ${opt_ignore_unkvars} -eq 0 ]; then
+				lib_err ${EX_SOFTWARE} "There was an error editing the template."
+			fi
+		fi
+
+		if ! cat -- "${template_temp}" > "${template}"; then
+			lib_err ${EX_IOERR} "Error writing ${template_temp} to ${template}"
+		fi
+	else
+		config_usage
+		exit ${EX_USAGE}
+	fi
+
+	return ${error_reporting}
+}
+
+config_help()
+{
+	cat << EOF
+`config_usage`
+
+${config_desc}
+
+Parameters:
+    -e                          -- Use EDITOR environment variable to edit the template.
+    -g                          -- Get the value of a parameter.
+    -I                          -- Insert a parameter as a new row.
+    -K                          -- Return success if there is parameters marked as required.
+    -k                          -- Get all parameters marked as required.
+    -s                          -- Set the value of a parameter.
+    -x                          -- Remove a parameter.
+
+Options:
+    -j jail_name                -- Use the template of this jail.
+    -t template                 -- Use this template.
+
+Options for -g, -I, -s and -x:
+    -a parameter[=value]        -- Parameter and its value. The value is ignored by -g and -x.
+
+Options for -g, -s and -x
+    -C column                   -- Index column to edit a specific parameter in a list separated by \`+=\`.
+    -R row                      -- Index row to edit a specific parameter in a list separated by \`,\`.
+
+Options for -g and -x:
+    -A                          -- Dump or remove all parameters.
+    -i                          -- Ignore unknown variables. Using this option together with -x, supresses
+                                   some messages and does not modify the template when an error has occured.
+    -P                          -- 
+
+Options for -g:
+    -c                          -- Check only. Return success if all requested parameters exist.
+    -l                          -- Show only columns as a list.
+    -N                          -- Show only parameter names, not their values.
+    -n                          -- Show only parameter values, not their names.
+    -P                          -- Show all matching parameters, not just one.
+
+Options for -x:
+    -P                          -- Remove all matching parameters, not just one.
+
+Options for -I and -s:
+    -r                          -- Mark the parameter as required.
+
+Options for -s:
+    -o                          -- Insert the value as a new column in the parameter.
+EOF
+}
+
+config_usage()
+{
+	cat << EOF
+usage: config -e [-j jail_name | -t template]
+       config -ga parameter [-cilNnP] [-C column] [-R row]
+       config -gc [-j jail_name | -t template] [-a parameter ...] [-P]
+       config -gl [-j jail_name | -t template] [-a parameter ...] [-P]
+       config -gA [-j jail_name | -t template] [-l]
+       config -K [-j jail_name | -t template]
+       config -k [-j jail_name | -t template]
+       config -s [-j jail_name | -t template] [-a parameter[=value] ...] [-r] [-C column] [-R row]
+       config -so [-j jail_name | -t template] [-a parameter[=value] ...] [-r] [-R row]
+       config -I [-j jail_name | -t template] [-a parameter[=value] ...] [-r]
+       config -x [-j jail_name | -t template] [-A | [-a parameter ...]] [-iP] [-C column] [-R row]
+EOF
+}

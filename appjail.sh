@@ -1,16 +1,39 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CONFIG=etc/appjail/appjail.conf
+APPJAIL_PROGRAM=`realpath "$0"`
+CONFIG="`dirname \`realpath "${APPJAIL_PROGRAM}"\``/etc/appjail/appjail.conf"
 
 main()
 {
-	local cmd _o
+	local _o
 
 	if [ $# -eq 0 ]; then
 		usage
@@ -34,38 +57,100 @@ main()
 	fi
 
 	. "${CONFIG}"
-	. "${LIBDIR}/sysexits"
-	. "${LIBDIR}/atexit"
-	. "${LIBDIR}/log"
 
-	lib_atexit_init
+	if [ -z "${LIBDIR}" ]; then
+		echo "LIBDIR is not defined!"
+		exit 78 # EX_CONFIG
+	fi
 
-	cmd=$1
+	if [ ! -f "${LIBDIR}/load" ]; then
+		echo "AppJail needs the following file: ${LIBDIR}/load"
+		exit 69 # EX_UNAVAILABLE
+	fi
+
+	. "${LIBDIR}/load"
+
+	if [ -z "${SCRIPTSDIR}" ]; then
+		echo "SCRIPTSDIR is not defined!"
+		exit 78 # EX_CONFIG
+	fi
+
+	if [ ! -f "${SCRIPTSDIR}/default_env.sh" ]; then
+		echo "AppJail needs the following file: ${SCRIPTSDIR}/default_env.sh"
+		exit 69 # EX_UNAVAILABLE
+	fi
+
+	# Overwrite config using the environment variables
+	lib_load "${SCRIPTSDIR}/default_env.sh"
+
+	# For convenience, these will be loaded.
+	lib_load "${LIBDIR}/sysexits"
+	lib_load "${LIBDIR}/atexit"
+	lib_load "${LIBDIR}/log"
+	lib_load "${LIBDIR}/check_func"
+	lib_load "${LIBDIR}/zfs"
+
+	lib_init_logtime
+
+	if [ `id -u` -ne 0 ]; then
+		lib_err ${EX_NOPERM} "AppJail is intended to be run as root. Use a tool such as doas(1), sudo(8) or su(1)."
+	fi
+
+	local cmd=$1; shift
 	if [ -z "${cmd}" ]; then
 		usage
 	fi
+	
+	if [ ! -x "${COMMANDS}/${cmd}" ]; then
+		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exist."
+	fi
 
-	if [ -x "${COMMANDS}/${cmd}" ]; then
-		. "${COMMANDS}/${cmd}"
-		. "${LIBDIR}/check_func"
+	lib_load "${COMMANDS}/${cmd}"
+	
+	# logging
+	if [ "${ENABLE_LOGGING_OUTPUT}" != "0" -a -z "${AJ_LOG_SESSION_ID}" ]; then
+		lib_debug "Running: ${SESSION_ID_NAME}"
 
-		if ! lib_check_func "${cmd}_main"; then
-			lib_err ${EX_SOFTWARE} "${cmd}_main function does not exists in the ${cmd} command."
+		local errlevel
+
+		local session_id
+		session_id=`sh -c "${SESSION_ID_NAME}"`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "{SESSION_ID_NAME} exits with a non-zero exit status."
 		fi
 
-		shift && eval ${cmd}_main $@
-	else
-		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exists."
+		if lib_check_ispath "${session_id}"; then
+			lib_err ${EX_DATAERR} -- "${session_id}: invalid log name."
+		fi
+
+		lib_zfs_mklogdir "commands" "${cmd}" "output"
+
+		exec env \
+			AJ_LOG_SESSION_ID="${session_id}" \
+			script -a -t "${SCRIPT_TIME}" -- \
+				"${LOGDIR}/commands/${cmd}/output/${session_id}" \
+				"${APPJAIL_PROGRAM}" \
+				"${cmd}" \
+				"$@"
+
+		exit 0
 	fi
+
+	if ! lib_check_func "${cmd}_main"; then
+		lib_err ${EX_SOFTWARE} "${cmd}_main function does not exist in the ${cmd} command."
+	fi
+
+	lib_atexit_init
+
+	${cmd}_main "$@"
 }
 
 usage()
 {
-	echo "usage: appjail [-c config] cmd [args...]"
-
-	# The constant is necessary because ${LIBDIR}/sysexits
-	# has not been yet loaded.
+	echo "usage: appjail [-c config] cmd [args ...]" >&2
 	exit 64 # EX_USAGE
 }
 
-main $@
+main "$@"

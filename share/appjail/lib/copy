@@ -1,53 +1,212 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#
-# Name:
-#
-#  rcopy (root copy)
-#
-# Description:
-#
-#  Copy the root tree recursively from one or more directories.
-#
-lib_rcopy()
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/replace"
+
+lib_safe_copy_lst()
 {
-	local dst src
-
-	dst="$1"; shift
-
-	if [ -z "${dst}" -o $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: lib_rcopy destination directory1 [directory2 ... directoryN]"
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_safe_copy_lst [-p] -d dstdir -l files_lst -s srcdir"
 	fi
 
-	for src in $@; do
-		tar -C "${src}" -cf - . | tar -C "${dst}" -xpf -
+	local _o
+	local opt_path_traversal=1
+	local dstdir=
+	local files_lst=
+	local srcdir=
+
+	while getopts ":pd:l:s:" _o; do
+		case "${_o}" in
+			p)
+				opt_path_traversal=0
+				;;
+			d)
+				dstdir="${OPTARG}"
+				;;
+			l)
+				files_lst="${OPTARG}"
+				;;
+			s)
+				srcdir="${OPTARG}"
+				;;
+			*)
+				lib_safe_copy_lst # usage
+				;;
+		esac
 	done
+
+	if [ -z "${dstdir}" -o -z "${files_lst}" -o -z "${srcdir}" ]; then
+		lib_safe_copy_lst # usage
+	fi
+
+	if [ ! -d "${dstdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${dstdir}: no such directory."
+	fi
+
+	if [ ! -d "${srcdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${srcdir}: no such directory."
+	fi
+
+	local total_files=`wc -l -- "${files_lst}" | awk '{print $1}'`
+	local current_file=0
+	local tocopy
+
+	local files2copy
+	files2copy="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_files2copy=`lib_escape_string "${files2copy}"`
+
+	lib_atexit_add "rm -f \"${escape_files2copy}\""
+
+	# Check
+	while IFS= read -r tocopy; do
+		current_file=$((current_file+1))
+
+		if lib_check_empty "${tocopy}"; then
+			lib_debug "(${current_file}/${total_files}): Ignoring empty line..."
+			continue
+		fi
+
+		lib_debug "(${current_file}/${total_files}): Checking ${tocopy} ..."
+
+		if [ ! -e "${srcdir}/${tocopy}" ]; then
+			lib_err ${EX_NOINPUT} -- "${tocopy} does not exist."
+		fi
+
+		if [ ${opt_path_traversal} -eq 1 -a "${srcdir}" != "/" ]; then
+			if lib_check_path_traversal_file "${srcdir}" "${tocopy}"; then
+				lib_err ${EX_NOPERM} "Path traversal or invalid path: ${tocopy}"
+			fi
+		fi
+
+		printf "%s\n" "${tocopy}" | sed -Ee 's|^/+||g'
+	done < "${files_lst}" > "${files2copy}"
+
+	total_files=`wc -l -- "${files2copy}" | awk '{print $1}'`
+	current_file=0
+
+	# Copy
+	while IFS= read -r tocopy; do
+		current_file=$((current_file+1))
+
+		# Convert / to .
+		if [ -z "${tocopy}" ]; then
+			tocopy="."
+		fi
+
+		lib_debug "(${current_file}/${total_files}): Copying ${tocopy} ..."
+
+		if ! lib_copy "${srcdir}" "${tocopy}" "${dstdir}"; then
+			lib_err ${EX_IOERR} "Error copying ${tocopy}"
+		fi
+	done < "${files2copy}"
+
+	rm -f "${files2copy}"
 }
 
-#
-# Name:
-#
-#  copy
-#
-# Description:
-#
-#  Copy a file or directory with its tree.
-#
+lib_safe_copy()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_safe_copy [-p] -d dstdir -s srcdir file"
+	fi
+
+	local _o
+	local opt_path_traversal=1
+	local dstdir=
+	local srcdir=
+
+	while getopts ":pd:s:" _o; do
+		case "${_o}" in
+			p)
+				opt_path_traversal=0
+				;;
+			d)
+				dstdir="${OPTARG}"
+				;;
+			s)
+				srcdir="${OPTARG}"
+				;;
+			*)
+				lib_safe_copy # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${dstdir}" -o -z "${srcdir}" ]; then
+		lib_safe_copy # usage
+	fi
+
+	local file="$1"
+	if [ -z "${file}" ]; then
+		lib_safe_copy # usage
+	fi
+
+	if [ ! -d "${dstdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${dstdir}: no such directory."
+	fi
+
+	if [ ! -d "${srcdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${srcdir}: no such directory."
+	fi
+
+	if [ ! -e "${srcdir}/${file}" ]; then
+		lib_err ${EX_NOINPUT} -- "${file} does not exist."
+	fi
+
+	if [ ${opt_path_traversal} -eq 1 -a "${srcdir}" != "/" ]; then
+		if lib_check_path_traversal_file "${srcdir}" "${file}"; then
+			lib_err ${EX_NOPERM} "Path traversal or invalid path: ${file}"
+		fi
+	fi
+
+	file=`printf "%s\n" "${file}" | sed -Ee 's|^/+||g'`
+
+	lib_debug "Copying ${file} ..."
+
+	if ! lib_copy "${srcdir}" "${file}" "${dstdir}"; then
+		lib_err ${EX_IOERR} "Error copying ${file}"
+	fi
+}
+
 lib_copy()
 {
-	local root dst src
+	local root="$1" src="$2" dst="$3"
 
-	root="$1"
-	src="$2"
-	dst="$3"
-
-	if [ -z "${root}" -o -z "${src}" -o -z "${dst}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_copy root source destination"
+	if [ -z "${root}" -o -z "${dst}" -o -z "${src}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_copy root src dst"
 	fi
 
 	tar -C "${root}" -cf - "${src}" | tar -C "${dst}" -xpf -

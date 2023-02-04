@@ -1,29 +1,99 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-start_desc="Create a jail using a template from an installed appjail."
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/kern_modules"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mount"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+lib_load "${LIBDIR}/zfs"
+
+start_desc="Start a stopped jail."
 
 start_main()
 {
 	local _o
-	local appjail
-	local opts
-	local opt_parameters=0
-	local template
+	local opt_run_initscript=1 _opt_run_initscript=0
+	local initscript=
+	local create_args=
+	local start_args=
+	local jail_name=
+	local template= template_temp escape_template_temp
+	local jail_path
+	local line
+	local errlevel=0
+	# Depend
+	local escape_depends depends depend
+	# Jail parameters
+	local jail_param jail_value
 
-	while getopts ":b:p:" _o; do
+	if [ $# -eq 0 ]; then
+		start_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":Ic:i:s:t:" _o; do
 		case "${_o}" in
-			b)
-				opts="${opts} -${_o} ${OPTARG}"
+			c|i|s|t)
+				if lib_check_empty "${OPTARG}"; then
+					start_usage
+					exit ${EX_USAGE}
+				fi
 				;;
-			p)
-				opts="${opts} -p ${OPTARG}"
-				opt_parameters=1
+		esac
+
+		case "${_o}" in
+			I)
+				opt_run_initscript=0
+				_opt_run_initscript=1
+				;;
+			c)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				create_args="${create_args} \"${arg}\""
+				;;
+			i)
+				initscript="${OPTARG}"
+				;;
+			s)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				start_args="${start_args} \"${arg}\""
+				;;
+			t)
+				template="${OPTARG}"
 				;;
 			*)
 				start_usage
@@ -33,53 +103,502 @@ start_main()
 	done
 	shift $((OPTIND-1))
 
-	appjail="$1"
-
-	if [ -z "${appjail}" ]; then
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
 		start_usage
 		exit ${EX_USAGE}
 	fi
 
-	shift
-	
-	. "${LIBDIR}/replace"
-	. "${LIBDIR}/su"
-	. "${LIBDIR}/tempfile"
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
 
-	if [ ${opt_parameters} -eq 1 ]; then
-		template="`lib_generate_tempfile`"
-		lib_atexit_add rm -f "${template}"
-		opts="${opts} -t \"${template}\""
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
 	fi
 
-	start_appjail ${opts} -s -c "${CONFIG}" -a "${appjail}" -- $@
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}/jail" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	if lib_jail_exists "${jail_name}"; then
+		if ! lib_jail_created_by_appjail "${jail_name}"; then
+			lib_warn -- "${jail_name} was not been created by appjail."
+			exit 0
+		fi
+
+		lib_warn -- "${jail_name} is running."
+		exit 0
+	fi
+
+	# Locking ...
+	"${APPJAIL_PROGRAM}" jail mark locked "${jail_name}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	else
+		local escape_ajprog
+		escape_ajprog=`lib_escape_string "${APPJAIL_PROGRAM}"`
+
+		lib_atexit_add "\"${escape_ajprog}\" jail mark unlocked \"${jail_name}\""
+	fi
+
+	lib_info "Starting ${jail_name}..."
+
+	#
+	# Use the enabled parameters as a fallback.
+	#
+	
+	if [ ${_opt_run_initscript} -eq 0 ]; then
+		opt_run_initscript=`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -I`
+		if [ -n "${opt_run_initscript}" ]; then
+			opt_run_initscript=0
+		else
+			opt_run_initscript=1
+		fi
+	fi
+	create_args="${create_args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -c`}"
+	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -i`}"
+	start_args="${start_args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -s`}"
+	template="${template:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -t`}"
+
+	if ! lib_check_empty "${template}"; then
+		if [ ! -f "${template}" ]; then
+			# The -t option has higher precedence.
+			lib_err ${EX_NOINPUT} "Cannot find the template \`${template}\`"
+		fi
+	else
+		# Use jail template
+		template="${jail_path}/conf/template.conf"
+
+		if [ ! -f "${template}" ]; then
+			# Use default template if the jail template does not exist.
+			lib_warn "Cannot find the template \`${template}\`."
+			lib_warn "I'll use \`${DEFAULT_TEMPLATE}\` as the template."
+
+			template="${DEFAULT_TEMPLATE}"
+		fi
+	fi
+
+	if [ ! -f "${jail_path}/conf/config.conf" ]; then
+		lib_err ${EX_SOFTWARE} "The configuration file for this jail does not exist."
+	fi
+
+	lib_debug "Using \`${template}\` as the template."
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		if ! lib_check_empty "${initscript}"; then
+			if [ ! -x "${initscript}" ]; then
+				# The -i option has higher precedence.
+				lib_err ${EX_NOPERM} "Cannot execute \`${initscript}\`: No such file exists or it does not have the execution bit."
+			fi
+		else
+			initscript="${jail_path}/init"
+
+			if [ ! -x "${initscript}" ]; then
+				opt_run_initscript=0
+			fi
+
+			if [ -f "${initscript}" -a ! -x "${initscript}" ]; then
+				lib_warn "Cannot execute \`${initscript}\`: it does not have the execution bit."
+			fi
+		fi
+	fi
+
+	# Check only
+	if ! "${APPJAIL_PROGRAM}" config -Agt "${template}" > /dev/null; then
+		exit ${EX_CONFIG}
+	fi
+
+	lib_debug "Checking for invalid parameters..."
+
+	local param
+	for param in name path; do
+		"${APPJAIL_PROGRAM}" config -gct "${template}" \
+			-a "${param}"
+
+		errlevel=$?
+		if [ ${errlevel} -eq 0 ]; then
+			lib_err ${errlevel} -- "${param}: cannot be used in the template configuration."
+		fi
+	done
+
+	template_temp="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	escape_template_temp=`lib_escape_string "${template_temp}"`
+
+	lib_atexit_add "rm -f \"${escape_template_temp}\""
+
+	lib_debug "Writing \`${template}\` content to \`${template_temp}\` ..."
+
+	if ! cat "${template}" > "${template_temp}"; then
+		lib_err ${EX_IOERR} "Error writing ${template} to ${template_temp}"
+	fi
+
+	lib_debug "Checking for parameters marked as required..."
+
+	if "${APPJAIL_PROGRAM}" config -Kt "${template_temp}"; then
+		lib_warn "There are required parameters that must be set before starting the jail:"
+		"${APPJAIL_PROGRAM}" config -kt "${template_temp}" | cut -c2- | while IFS= read -r param; do
+			lib_warn "    - ${param}"
+		done
+		lib_warn "You can use \`appjail config\` to set the required parameters."
+		exit ${EX_CONFIG}
+	fi
+
+	for jail_param in \
+		exec.consolelog \
+		mount.fstab \
+		host.hostname
+	do
+		if "${APPJAIL_PROGRAM}" config -gPct "${template_temp}" -a "${jail_param}"; then
+			continue
+		fi
+
+		case "${jail_param}" in
+			exec.consolelog)
+				local logname
+				logname=`sh -c "${CONSOLELOG_NAME}"`
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					lib_err ${errlevel} "{CONSOLELOG_NAME} exits with a non-zero exit status."
+				fi
+
+				if lib_check_ispath "${logname}"; then
+					lib_err ${EX_DATAERR} -- "${logname}: invalid log name."
+				fi
+
+				lib_zfs_mklogdir "jails" "${jail_name}" "console"
+
+				lib_debug "Running: ${CONSOLELOG_NAME}"
+
+				jail_value="${LOGDIR}/jails/${jail_name}/console/${logname}"
+				;;
+			mount.fstab)
+				"${APPJAIL_PROGRAM}" fstab jail "${jail_name}" compile
+
+				jail_value="${jail_path}/conf/fstab"
+				;;
+			host.hostname)
+				jail_value="${jail_name}${HOST_DOMAIN}"
+				;;
+		esac
+
+		jail_value=`lib_escape_string "${jail_value}"`
+		echo "${jail_param}: \"${jail_value}\"" >> "${template_temp}"
+
+		lib_debug -- "${jail_param}: ${jail_value}"
+	done
+
+	local escape_jail_path=`lib_escape_string "${jail_path}/jail"`
+	echo "path: \"${escape_jail_path}\"" >> "${template_temp}"
+
+	lib_debug "Path: ${jail_path}/jail"
+
+	# It is not necessary since the start command starts the jails.
+	"${APPJAIL_PROGRAM}" config -xPit "${template_temp}" -a 'depend'
+
+	# To control the start of all jails dependencies.
+	APPJAIL_START_DEPEND="${APPJAIL_START_DEPEND:-1}"
+	if [ "${APPJAIL_START_DEPEND}" = "1" ]; then
+		"${SCRIPTSDIR}/get_depends.sh" \
+			-a "${APPJAIL_PROGRAM}" \
+			-c "${CONFIG}" \
+			-t "${template}" \
+			-- "${jail_name}" |\
+		while IFS= read -r depend; do
+			# It is controlled below
+			if [ "${jail_name}" = "${depend}" ]; then
+				continue
+			fi
+
+			env \
+				APPJAIL_START_DEPEND=0 \
+				"${APPJAIL_PROGRAM}" start -- "${depend}"
+			errlevel=$?
+
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "The ${depend} jail could not be started."
+			fi
+		done
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+	fi
+
+	lib_debug "Compiling template to \`${jail_path}/conf/jail.conf\` ..."
+	if ! lib_template2jail_conf "${jail_name}" "${template_temp}" > "${jail_path}/conf/jail.conf"; then
+		lib_err ${EX_IOERR} "Error while compiling the template."
+	fi
+
+	# jail.conf
+	lib_debug "jail.conf generated:"
+	lib_debug_read "${jail_path}/conf/jail.conf"
+
+	# config.conf
+	lib_debug "Inspecting config.conf:"
+	lib_debug_read "${jail_path}/conf/config.conf"
+
+	start_jail "${jail_name}"
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		# *create functions
+		env \
+			APPJAIL_CONFIG="${CONFIG}" \
+			APPJAIL_JAILDIR="${jail_path}/jail" \
+			APPJAIL_JAILNAME="${jail_name}" \
+			APPJAIL_ROOTDIR="${jail_path}" \
+			APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+				"${SCRIPTSDIR}/run_jail.sh" -cf "${CONFIG}" -a "${create_args}" -- "${initscript}"
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "An error has occurred while executing the *create functions in the initscript."
+		fi
+	fi
+
+	lib_debug "Creating..."
+
+	local fifo_filename
+	fifo_filename=`lib_generate_fifo` || exit $?
+
+	local escape_fifo_filename=`lib_escape_string "${fifo_filename}"`
+	lib_atexit_add "rm -f \"${escape_fifo_filename}\""
+
+	local jail_pid cat_pid
+
+	jail -c -f "${jail_path}/conf/jail.conf" "${jail_name}" > "${fifo_filename}" 2>&1 &
+	jail_pid=$!
+
+	cat < "${fifo_filename}" >&2 &
+	cat_pid=$!
+
+	wait ${jail_pid}
+
+	errlevel=$?
+	
+	kill ${cat_pid} > /dev/null 2>&1
+
+	rm -f "${fifo_filename}"
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_warn "An error has occurred while starting ${jail_name} jail."
+		lib_warn "The ${jail_name} jail will be stopped..."
+		
+		stop_safe -- "${jail_name}"
+
+		lib_err ${errlevel} "An error has occurred while starting ${jail_name} jail."
+	fi
+
+	if [ ${opt_run_initscript} -eq 0 ]; then
+		exit 0
+	fi
+
+	# *start functions
+	env \
+		APPJAIL_CONFIG="${CONFIG}" \
+		APPJAIL_JAILDIR="${jail_path}/jail" \
+		APPJAIL_JAILNAME="${jail_name}" \
+		APPJAIL_ROOTDIR="${jail_path}" \
+		APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+			"${SCRIPTSDIR}/run_jail.sh" -sf "${CONFIG}" -a "${start_args}" -- "${initscript}"
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_warn "An error has occurred while executing the *start functions in the initscript."
+		lib_warn "The ${jail_name} jail will be stopped..."
+
+		stop_safe -- "${jail_name}"
+	fi
 }
 
-start_appjail()
+stop_safe()
 {
-	lib_debug "Starting..."
+	local _o
+	local jail_name
+	local opt_run_initscript=1
+	local initscript
+	local errlevel=0
 
-	lib_su /bin/sh "${SCRIPTSDIR}/service.sh" $@
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: stop_safe [-I | -i initscript] jail_name"
+	fi
+
+	while getopts ":Ii:" _o; do
+		case "${_o}" in
+			I)
+				opt_run_initscript=0
+				;;
+			i)
+				initscript="${OPTARG}"
+				;;
+			*)
+				stop_safe # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		stop_safe # usage
+	fi
+
+	lib_warn "Running some counterparts in unattended mode..."
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		env \
+			APPJAIL_START_SHRED=1 \
+			"${APPJAIL_PROGRAM}" stop -i "${initscript}" -- "${jail_name}"
+		errlevel=$?
+	else
+		env \
+			APPJAIL_START_SHRED=1 \
+			"${APPJAIL_PROGRAM}" stop -I -- "${jail_name}"
+		errlevel=$?
+	fi
+
+	if [ ${errlevel} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_warn "Failed to stop ${jail_name} jail."
+
+	if [ ${opt_run_initscript} -eq 0 ]; then
+		return ${errlevel}
+	fi
+
+	lib_warn "Trying again without executing the initscript..."
+
+	env \
+		APPJAIL_START_SHRED=1 \
+		"${APPJAIL_PROGRAM}" stop -I -- "${jail_name}"
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Failed to stop ${jail_name} jail without executing the initscript."
+	fi
+}
+
+start_jail()
+{
+	local errlevel=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "start_jail jail_name"
+	fi
+
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		start_jail # usage
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local jail_type
+
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THIN})
+			lib_debug "Preparing a thinjail..."
+
+			local conf_keys="osarch osversion release_name"
+			local conf_key conf_value
+			# From config.conf
+			local osarch osversion release_name
+
+			for conf_key in ${conf_keys}; do
+				conf_value=`"${APPJAIL_PROGRAM}" config -gnit "${jail_path}/conf/config.conf" -a "${conf_key}"`
+
+				if lib_check_empty "${conf_value}"; then
+					lib_err ${EX_CONFIG} -- "${conf_key} is empty or not defined in the configuration file!"
+				fi
+
+				setvar ${conf_key} "${conf_value}"
+			done
+
+			local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}/release"
+			if [ ! -d "${releasedir}" ]; then
+				lib_err ${EX_SOFTWARE} "The release directory (${releasedir}) does not exist."
+			fi
+
+			local basedir="${jail_path}/jail/.appjail"
+			if [ ! -d "${basedir}" ]; then
+				lib_err ${EX_SOFTWARE} "The base directory (${basedir}) does not exist."
+			fi
+
+			local tflag=
+			if [ "${ENABLE_ZFS}" != 0 ]; then
+				tflag="-t nozfs"
+			fi
+
+			local mounted=`lib_mountpoint_mounted ${tflag} -s "${basedir}"`
+			if [ -n "${mounted}" ]; then
+				lib_err ${EX_NOPERM} "The base directory (${basedir}) has a mounted file system: ${mounted}"
+			fi
+
+			lib_debug "Checking for mounted file systems in \`${jail_path}/jail\` ..."
+
+			mounted=`lib_mountpoint_mounted -F "%2 -> %1" ${tflag} "${jail_path}/jail"`
+			if [ -n "${mounted}" ]; then
+				lib_warn "The jail directory (${jail_path}/jail) has one or more mounted file systems:"
+				printf "%s\n" "${mounted}" | while IFS= read -r line; do
+					lib_warn "    - ${line}"
+				done
+			fi
+
+			lib_debug "Mounting: mount_nullfs -o ro \"${releasedir}\" \"${basedir}\""
+
+			if ! mount_nullfs -o ro "${releasedir}" "${basedir}"; then
+				lib_err ${EX_SOFTWARE} "Error mounting \`${releasedir}\` in \`${basedir}\`"
+			fi
+			;;
+		${JAIL_TYPE_DEBOOTSTRAP})
+			lib_debug "Preparing a linuxjail..."
+
+			# linux modules
+			lib_modules_linuxmods
+			;;
+	esac
 }
 
 start_help()
 {
-	start_usage
+	cat << EOF
+`start_usage`
 
-	echo
-	echo "${start_desc}"
-	echo
-	echo "This command creates a jail from an installed appjail. After creating the jail, it executes the"
-	echo "*start functions of the jail init script."
-	echo
-	echo "  -b base        The base jail to use when this is a thinjail."
-	echo "  -p             This flag is useful for setting parameters temporarily. If you need to set them"
-	echo "                 permanently, see \`appjail help set\` and if you need a more complex way to edit"
-	echo "                 a template, see \`appjail help edit\`. May be used multiples times."
-	echo "  appjail        Name of the appjail application."
+${start_desc}
+
+Parameters:
+    -I                        -- Start jail but don't run the initscript.
+    -i initscript             -- Use a custom initscript.
+
+Options:
+    -t template               -- Use a custom template.
+
+Options for -i:
+    -c parameter=value        -- Parameters for *create functions.
+    -s parameter=value        -- Parameters for *start functions.
+EOF
 }
 
 start_usage()
 {
-	echo "usage: start [-b base] [-p key=value] appjail [args]"
+	cat << EOF
+usage: start [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...] [-t template] jail
+       start [-I] [-t template] jail
+EOF
 }

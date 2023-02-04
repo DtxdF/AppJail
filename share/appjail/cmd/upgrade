@@ -1,0 +1,379 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/jail_types"
+lib_load "${LIBDIR}/random"
+
+upgrade_desc="Upgrade a jail or a release."
+
+upgrade_main()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		upgrade_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		jail|release) ;;
+		*) upgrade_usage; exit ${EX_USAGE} ;;
+	esac
+
+	upgrade_${command} "$@"
+}
+
+upgrade_jail()
+{
+	local _o
+	local opt_force=0
+	local opt_install=0
+	local opt_upgrade=0
+	local new_version=
+	# freebsd-update(8) args
+	local freebsd_update_args=
+	# misc
+	local jail_name
+	local jail_path basedir
+	local jail_type
+	local currently_running
+	local errlevel=0
+
+	while getopts ":fiun:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					upgrade_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			i)
+				opt_install=1
+				;;
+			u)
+				opt_upgrade=1
+				;;
+			n)
+				new_version="${OPTARG}"
+				;;
+			*)
+				upgrade_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		upgrade_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ${opt_force} -eq 1 ]; then
+		freebsd_update_args="-F"
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	jail_path="${JAILDIR}/${jail_name}"
+	basedir="${jail_path}/jail"
+
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`."
+	fi
+
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	if [ "${jail_type}" != "${JAIL_TYPE_THICK}" ]; then
+		lib_err ${EX_NOPERM} "${jail_name} is not a thickjail."
+	fi
+
+	currently_running=`chroot "${basedir}" freebsd-version`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	if [ ${opt_install} -eq 1 ]; then
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${basedir}" \
+			install
+	elif [ ${opt_upgrade} -eq 1 ]; then
+		if [ -z "${new_version}" ]; then
+			upgrade_usage
+			exit ${EX_USAGE}
+		fi
+
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${basedir}" \
+			--currently-running "${currently_running}" \
+			-r "${new_version}" \
+			upgrade
+	else
+		upgrade_usage
+		exit ${EX_USAGE}
+	fi
+
+	# Update freebsd_version every time a command ends using the current freebsd version.
+	currently_running=`chroot "${basedir}" freebsd-version | grep -Eo '[0-9]+\.[0-9]+-[a-zA-Z0-9]+'`
+
+	touch "${jail_path}/conf/config.conf" &&
+	"${APPJAIL_PROGRAM}" config -st "${jail_path}/conf/config.conf" -a "osversion=${currently_running}"
+}
+
+upgrade_release()
+{
+	local _o
+	local opt_force=0
+	local opt_ignore_invalid_version=0
+	local opt_install=0
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local opt_upgrade=0 new_version=
+	local freebsd_version="${FREEBSD_VERSION}"
+	# freebsd-update(8) args
+	local freebsd_update_args=
+	# misc
+	local release_name="${DEFAULT_RELEASE}"
+	local basedir new_basedir
+	local currently_running
+	local errlevel=0
+
+	while getopts ":fIiua:n:v:" _o; do
+		case "${_o}" in
+			a|n|v)
+				if lib_check_empty "${OPTARG}"; then
+					upgrade_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			I)
+				opt_ignore_invalid_version=1
+				;;
+			i)
+				opt_install=1
+				;;
+			u)
+				opt_upgrade=1
+				;;
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			n)
+				new_version="${OPTARG}"
+				;;
+			v)
+				freebsd_version="${OPTARG}"
+				;;
+			*)
+				upgrade_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -gt 0 ]; then
+		release_name="$1"
+
+		if lib_check_empty "${release_name}"; then
+			upgrade_usage
+			exit ${EX_USAGE}
+		fi
+	fi
+
+	if [ ${opt_force} -eq 1 ]; then
+		freebsd_update_args="-F"
+	fi
+
+	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
+
+	if [ -z "${new_version}" ]; then
+		upgrade_usage
+		exit ${Ex_USAGE}
+	fi
+
+	if [ ${opt_ignore_invalid_version} -eq 0 ]; then
+		if ! printf "%s\n" "${new_version}" | grep -Eq '^[0-9]+\.[0-9]+-[a-zA-Z0-9]+$'; then
+			lib_err ${EX_DATAERR} "Invalid version: ${new_version}"
+		fi
+	fi
+
+	new_basedir="${RELEASEDIR}/${freebsd_arch}/${new_version}/${release_name}"
+
+	if [ ${opt_install} -eq 1 ]; then
+		if [ ! -d "${new_basedir}/release" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the \`${new_basedir}/release\` directory."
+		fi
+
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${new_basedir}/release" \
+			install
+	elif [ ${opt_upgrade} -eq 1 ]; then
+		# dirty
+		if [ -f "${new_basedir}/.upgrade_copy" ]; then
+			lib_warn -- "${new_basedir} is dirty. Removing..."
+			if ! "${APPJAIL_PROGRAM}" fetch destroy -a "${freebsd_arch}" -v "${new_version}" -- "${release_name}"; then
+				lib_err ${EX_SOFTWARE} "There was a problem destroying the dirty release \`${release_name}\`. You must remove it using \`appjail fetch destroy\`."
+			fi
+		fi
+
+		basedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}/release"
+
+		if [ ! -d "${basedir}" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the release directory (${basedir})."
+		fi
+
+		if [ ! -d "${new_basedir}/release" ]; then
+			if [ "${ENABLE_ZFS}" != "0" ]; then
+				if ! lib_zfs_mkdir "${RELEASEDIR}" "${ZFS_RELEASE_NAME}"; then
+					lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}"
+				fi
+
+				if ! lib_zfs_mkdir "${RELEASEDIR}/${freebsd_arch}/${new_version}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${new_version}"; then
+					lib_err ${EX_IOERR} "Error creating ${releasedir}"
+				fi
+
+				local dataset_src="${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"
+				local dataset_dst="${ZFS_RELEASE_NAME}/${freebsd_arch}/${new_version}/${release_name}"
+
+				lib_debug "Copying (zfs): ${dataset_src} to ${dataset_dst}"
+
+				if ! lib_zfs_copy "${dataset_src}" "${dataset_dst}" "${new_basedir}"; then
+					lib_err ${EX_IOERR} "Error copying ${dataset_src} to ${dataset_dst}"
+				fi
+			else
+				if ! mkdir -p "${new_basedir}/release"; then
+					lib_err ${EX_IOERR} "Error creating ${new_basedir}/release"
+				fi
+
+				if ! touch "${new_basedir}/.upgrade_copy"; then
+					lib_err ${EX_SOFTWARE} "Error creating ${new_basedir}/.upgrade_copy"
+				fi
+
+				lib_debug "Copying: cp -a \"${basedir}/\" \"${new_basedir}/release\""
+
+				if ! cp -a "${basedir}/" "${new_basedir}/release"; then
+					lib_err ${EX_SOFTWARE} "Error copying ${basedir} to ${new_basedir}/release"
+				fi
+
+				rm -f "${new_basedir}/.upgrade_copy"
+			fi
+		fi
+
+		currently_running=`chroot "${new_basedir}/release" freebsd-version`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${new_basedir}/release" \
+			--currently-running "${currently_running}" \
+			-r "${new_version}" \
+			upgrade
+	else
+		upgrade_usage
+		exit ${EX_USAGE}
+	fi
+}
+
+upgrade_help()
+{
+	cat << EOF
+`upgrade_usage`
+
+${upgrade_desc}
+
+Parameters:
+    jail                      -- Upgrade a jail.
+    release                   -- Upgrade a release. Default: ${DEFAULT_RELEASE}
+
+Options:
+    -f                        -- See \`-F\` in freebsd-update(8).
+    -i                        -- See \`install\` in freebsd-update(8).
+    -u                        -- See \`upgrade\` in freebsd-update(8).
+    -n new_version            -- Specify the new release to which freebsd-update(8)
+                                 should upgrade. Also, this option is used to know
+				 the directory of the new release.
+
+Options for release:
+    -I                        -- Ignore invalid versions. A valid version is valid if its syntax is valid.
+    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
+    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+EOF
+}
+
+upgrade_usage()
+{
+	cat << EOF
+usage: upgrade jail -i [-f] jail_name
+       upgrade jail -u -n new_version [-f] jail_name
+       upgrade release -i -n new_version [-If] [-a freebsd_arch] [-v freebsd_version] [release_name]
+       upgrade release -u -n new_version [-If] [-a freebsd_arch] [-v freebsd_version] [release_name]
+EOF
+}

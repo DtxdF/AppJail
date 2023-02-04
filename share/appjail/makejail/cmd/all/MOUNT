@@ -1,0 +1,183 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${SCRIPTSDIR}/default_env.sh"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/jail"
+
+# Constants
+MOUNT_OPTION_DEVICE=1
+MOUNT_OPTION_MOUNTPOINT=2
+MOUNT_OPTION_TYPE=3
+MOUNT_OPTION_OPTIONS=4
+MOUNT_OPTION_DUMP=5
+MOUNT_OPTION_PASS=6
+
+main()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err - "usage: MOUNT --nopersist device mountpoint [type] [options] [dump] [pass]"
+		lib_err - "       MOUNT [--nomount] [--nro [auto | nro]] device mountpoint [type] [options] [dump] [dump]"
+		exit ${EX_USAGE}
+	fi
+	
+	# options
+	local automount=1
+	local persist=1
+	local nro="auto"
+
+	# mount options
+	local device=
+	local mountpoint=
+	local type="nullfs"
+	local options="rw"
+	local dump=0
+	local pass=0
+
+	# Arguments
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local current_index=0
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		local optarg=
+		case "${arg}" in
+			--nro)
+				current_index=$((current_index+1))
+				if [ ${current_index} -eq ${total_items} ]; then
+					main # usage
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					main # usage
+				fi
+				;;
+		esac
+
+		case "${arg}" in
+			--nomount)
+				automount=0
+				;;
+			--nopersist)
+				persist=0
+				;;
+			--nro)
+				nro="${optarg}"
+				;;
+			--)
+				break
+				;;
+			--*)
+				main # usage
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+	current_index=$((current_index-1))
+
+	local escape_chars
+	escape_chars='`"\'
+
+	local option=0
+	while [ ${current_index} -lt ${total_items} ]; do 
+		option=$((option+1))
+		current_index=$((current_index+1))
+
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+
+		if lib_check_empty "${arg}"; then
+			lib_err ${EX_DATAERR} "An empty field cannot be used in MOUNT."
+		fi
+
+		if [ ${option} -eq ${MOUNT_OPTION_DEVICE} ]; then
+			device="${arg}"
+		elif [ ${option} -eq ${MOUNT_OPTION_MOUNTPOINT} ]; then
+			mountpoint="${arg}"
+		elif [ ${option} -eq ${MOUNT_OPTION_TYPE} ]; then
+			type="${arg}"
+		elif [ ${option} -eq ${MOUNT_OPTION_OPTIONS} ]; then
+			options="${arg}"
+		elif [ ${option} -eq ${MOUNT_OPTION_DUMP} ]; then
+			dump="${arg}"
+		elif [ ${option} -eq ${MOUNT_OPTION_PASS} ]; then
+			pass="${arg}"
+		else
+			break
+		fi
+	done
+
+	if [ -z "${device}" -o -z "${mountpoint}" ]; then
+		main # usage
+	fi
+
+	if ! lib_check_number "${dump}"; then
+		lib_err ${EX_DATAERR} "DUMP must be a number!"
+	fi
+
+	if ! lib_check_number "${pass}"; then
+		lib_err ${EX_DATAERR} "PASS must be a number!"
+	fi
+
+	device=`lib_escape_string "${device}" "" "${escape_chars}"`
+	mountpoint=`lib_escape_string "${mountpoint}" "" "${escape_chars}"`
+	type=`lib_escape_string "${type}" "" "${escape_chars}"`
+	options=`lib_escape_string "${options}" "" "${escape_chars}"`
+
+	if [ ${persist} -eq 1 ]; then
+		nro=`lib_escape_string "${nro}" "" "${escape_chars}"`
+		dump=`lib_escape_string "${dump}" "" "${escape_chars}"`
+		pass=`lib_escape_string "${pass}" "" "${escape_chars}"`
+
+		echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" set -n \"${nro}\" -d \"${device}\" -m \"${mountpoint}\" -t \"${type}\" -o \"${options}\" -D \"${dump}\" -P \"${pass}\" -p"
+		if [ ${automount} -eq 1 ]; then
+			echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" compile"
+			echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" mount -a"
+		fi
+	else
+		echo "mount -t \"${type}\" -o \"${options}\" -- \"${device}\" \"\${APPJAIL_JAILDIR}/${mountpoint}\""
+	fi
+}
+
+main "$@"

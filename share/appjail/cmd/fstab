@@ -1,0 +1,943 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/mount"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/tempfile"
+
+FSTAB_DEFAULT_FSFREQ="0"
+FSTAB_DEFAULT_FSMNTOPS="rw"
+FSTAB_DEFAULT_FSPASSNO="0"
+FSTAB_DEFAULT_FSVFSTYPE="nullfs"
+
+fstab_desc="Static information about the file systems of a jail."
+
+fstab_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		all|jail) ;;
+		*) fstab_usage; exit ${EX_USAGE} ;;
+	esac
+
+	fstab_${entity} "$@"
+}
+
+fstab_all()
+{
+	local opt_failsafe=0
+	local errlevel=0
+	local jail_name
+
+	while getopts ":e" _o; do
+		case "${_o}" in
+			e)
+				opt_failsafe=1
+				;;
+			*)
+				fstab_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	"${APPJAIL_PROGRAM}" jail list -HIpt name | while IFS= read -r jail_name
+	do
+		lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+		
+		lib_debug "fstab args: $@"
+
+		(fstab_jail "${jail_name}" "$@")
+
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			if [ ${opt_failsafe} -eq 1 ]; then
+				lib_err ${errlevel} "Stop caused by a non-zero value."
+			fi
+		fi
+	done
+}
+
+fstab_jail()
+{
+	local command
+	local jail_name
+	local jail_path
+	local fstab_path
+
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	command="$1"; shift
+	if lib_check_empty "${command}"; then
+		command="list"
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	fstab_path="${jail_path}/conf/boot/fstab"
+	if ! mkdir -p "${fstab_path}"; then
+		lib_err ${EX_IOERR} "Error creating ${fstab_path}"
+	fi
+
+	case "${command}" in
+		compile|get|list|mount|mounted|remove|set|umount) ;;
+		*) fstab_usage; exit ${EX_USAGE} ;;
+	esac
+
+	fstab_${command} "${jail_name}" "$@"
+}
+
+fstab_compile()
+{
+	local jail_path
+	local fstab fstab_temp
+	local nro enabled
+	local jail_name
+	local keyword
+	local errlevel=0
+	# fstab options
+	local fs_spec fs_file fs_vfstype fs_mntops fs_freq fs_passno
+
+	jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	fstab="${jail_path}/conf/fstab"
+
+	fstab_temp="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_fstab_temp
+	escape_fstab_temp=`lib_escape_string "${fstab_temp}"`
+
+	lib_atexit_add "rm -f \"${escape_fstab_temp}\""
+
+	fstab_list "${jail_name}" -HIpt nro enabled | while read -r nro enabled; do
+		if [ "${enabled}" != "1" ]; then
+			continue
+		fi
+
+		fs_spec=`fstab_get "${jail_name}" -In "${nro}" device`
+		fs_file=`fstab_get "${jail_name}" -In "${nro}" mountpoint`
+		fs_vfstype=`fstab_get "${jail_name}" -In "${nro}" type`
+		fs_mntops=`fstab_get "${jail_name}" -In "${nro}" options`
+		fs_freq=`fstab_get "${jail_name}" -In "${nro}" dump`
+		fs_passno=`fstab_get "${jail_name}" -In "${nro}" pass`
+
+		fs_spec=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_spec}"`
+		fs_file="${jail_path}/jail/${fs_file}"
+		fs_file=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_file}"`
+
+		if ! printf "%s\t%s\t%s\t%s\t%s\t%s\n" "${fs_spec}" "${fs_file}" "${fs_vfstype}" "${fs_mntops}" "${fs_freq}" "${fs_passno}" >> "${fstab_temp}"; then
+			lib_err ${EX_IOERR} "Error writing in ${fstab_temp}"
+		fi
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	if ! cat "${fstab_temp}" > "${fstab}"; then
+		lib_err ${EX_IOERR} "Error writing ${fstab_temp} to ${fstab}"
+	fi
+}
+
+fstab_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_ignore_unknro=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local nro
+	local keyword
+	local files= file2read content
+	local columns=
+	
+	local flag_enabled=0
+	local flag_dump=0
+	local flag_device=0
+	local flag_mountpoint=0
+	local flag_nro=0
+	local flag_name=0
+	local flag_options=0
+	local flag_pass=0
+	local flag_type=0
+
+	local jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					fstab_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				fstab_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${nro}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/fstab/${nro}"
+
+	if [ ! -d "${basedir}" ]; then
+		if [ ${opt_ignore_unknro} -eq 1 ]; then
+			return 0
+		fi
+
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "nro" "enabled" "name" "device" "mountpoint" "type" "options" "dump" "pass"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue # ignore
+		fi
+
+		case "${keyword}" in
+			device|dump|enabled|mountpoint|name|options|pass|type)
+				file2read=`fstab_keyword2file "${keyword}"`
+				;;
+			nro)
+				file2read="nro"
+				;;
+			*)
+				lib_warn -- "${keyword}: keyword not found."
+				continue
+				;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		if [ -z "${columns}" ]; then
+			columns="${keyword}"
+		else
+			columns="${columns} ${keyword}"
+		fi
+
+		files="${files} ${file2read}"
+	done
+
+	columns=`echo "${columns}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		for file2read in ${files}; do
+			content=
+			case "${file2read}" in
+				nro)
+					content="${nro}"
+					;;
+				*)
+					if [ ! -f "${basedir}/${file2read}" ]; then
+						if [ ${opt_empty} -eq 1 ]; then
+							content="${empty_separator}"
+						else
+							content="-"
+						fi
+					else
+						content=`cat "${basedir}/${file2read}"`
+
+						if lib_check_empty "${content}"; then
+							if [ ${opt_empty} -eq 1 ]; then
+								content="${empty_separator}"
+							else
+								content="-"
+							fi
+						fi
+					fi
+					;;
+			esac
+
+			if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+				content=`printf "%s" "${content}" | sed -Ee 's/\t/<TAB>/g'`
+			fi
+
+			printf "%s${sep}" "${content}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+fstab_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_ignore_unknro=0 iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local nro=
+
+	local jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					fstab_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				fstab_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_ignore_unknro} -eq 1 ]; then
+		iflag="-i"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${nro}" ]; then
+		fstab_get "${jail_name}" ${eflag} ${Hflag} ${Iflag} ${iflag} ${pflag} ${tflag} -n "${nro}" -- "$@"
+		return $?
+	fi
+
+	ls -A "${JAILDIR}/${jail_name}/conf/boot/fstab" | sort -n | while IFS= read -r nro; do
+		fstab_get "${jail_name}" ${eflag} ${Hflag} ${Iflag} ${tflag} -n "${nro}" -- "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+fstab_mount()
+{
+
+	_fstab_mount "mount" "$@"
+}
+
+fstab_mounted()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+
+	lib_mountpoint_mounted -F '%2 -> %1' -- "${jail_path}/jail"
+}
+
+fstab_remove()
+{
+	local jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		all|nro) ;;
+		*) fstab_usage; exit ${EX_USAGE} ;;
+	esac
+
+	fstab_remove_${command} "${jail_name}" "$@"
+}
+
+fstab_remove_all()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	local basedir="${JAILDIR}/${jail_name}/conf/boot/fstab"
+
+	rm -rf "${basedir}"
+}
+
+fstab_remove_nro()
+{
+	local jail_name
+	local nro
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	nro="$1"; shift
+	if lib_check_empty "${nro}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/fstab/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	rm -rf "${basedir}"
+}
+
+fstab_set()
+{
+	local _o
+	local opt_enabled=
+	local opt_path_traversal=1
+	local opt_name=0 name=
+	local nro="auto"
+	local jail_name
+	# fstab options
+	local fs_spec= fs_file= fs_vfstype= fs_mntops= fs_freq= fs_passno=
+	# misc
+	local jail_path
+	local fstab_path
+	local basedir
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+
+	# At least an option must be provided.
+	if [ $# -eq 0 ]; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":EepD:d:m:N:n:o:P:t:" _o; do
+		case "${_o}" in
+			D|d|m|n|o|P|t)
+				if lib_check_empty "${OPTARG}"; then
+					fstab_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			E)
+				opt_enabled=0
+				;;
+			e)
+				opt_enabled=1
+				;;
+			p)
+				opt_path_traversal=0
+				;;
+			D)
+				fs_freq="${OPTARG}"
+				;;
+			d)
+				fs_spec="${OPTARG}"
+				;;
+			m)
+				fs_file="${OPTARG}"
+				;;
+			N)
+				opt_name=1
+				name="${OPTARG}"
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			o)
+				fs_mntops="${OPTARG}"
+				;;
+			P)
+				fs_passno="${OPTARG}"
+				;;
+			t)
+				fs_vfstype="${OPTARG}"
+				;;
+			*)
+				fstab_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ ${opt_name} -eq 0 -a -z "${name}" ]; then
+		name=`fstab_get "${jail_name}" -Iin "${nro}" name`
+	fi
+
+	if [ -z "${fs_spec}" ]; then
+		fs_spec=`fstab_get "${jail_name}" -Iin "${nro}" device`
+	fi
+
+	if lib_check_empty "${fs_spec}"; then
+		lib_err ${EX_CONFIG} "The device is not defined in this NRO. Use \`-d\` to fix it."
+	fi
+
+	if [ -z "${fs_file}" ]; then
+		fs_file=`fstab_get "${jail_name}" -Iin "${nro}" mountpoint`
+	fi
+
+	if lib_check_empty "${fs_file}"; then
+		lib_err ${EX_CONFIG} "The mountpoint is not set in this NRO. Use \`-m\` to fix it."
+	fi
+
+	if [ ${opt_path_traversal} -eq 1 ]; then
+		if [ ! -d "${jail_path}/jail/${fs_file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${jail_path}/jail/${fs_file}: Not a directory or does not exist."
+		fi
+
+		if lib_check_path_traversal_file "${jail_path}/jail" "${fs_file}"; then
+			lib_err ${EX_NOPERM} "Path traversal or invalid path detected: (${jail_path}/jail :: ${jail_path}/jail/${fs_file})"
+		fi
+	fi
+
+	if [ -z "${fs_vfstype}" ]; then
+		fs_vfstype=`fstab_get "${jail_name}" -Iin "${nro}" type`
+		fs_vfstype="${fs_vfstype:-${FSTAB_DEFAULT_FSVFSTYPE}}"
+	fi
+
+	if [ -z "${fs_mntops}" ]; then
+		fs_mntops=`fstab_get "${jail_name}" -Iin "${nro}" options`
+		fs_mntops="${fs_mntops:-${FSTAB_DEFAULT_FSMNTOPS}}"
+	fi
+
+	if [ -z "${fs_freq}" ]; then
+		fs_freq=`fstab_get "${jail_name}" -Iin "${nro}" dump`
+		fs_freq="${fs_freq:-${FSTAB_DEFAULT_FSFREQ}}"
+	fi
+
+	if ! lib_check_number "${fs_freq}"; then
+		lib_err ${EX_DATAERR} "DUMP must be a number!"
+	fi
+
+	if [ -z "${fs_passno}" ]; then
+		fs_passno=`fstab_get "${jail_name}" -Iin "${nro}" pass`
+		fs_passno="${fs_passno:-${FSTAB_DEFAULT_FSPASSNO}}"
+	fi
+
+	if ! lib_check_number "${fs_passno}"; then
+		lib_err ${EX_DATAERR} "PASS must be a number!"
+	fi
+
+	if [ -z "${opt_enabled}" ]; then
+		opt_enabled=`fstab_get "${jail_name}" -Iin "${nro}" enabled`
+		opt_enabled="${opt_enabled:-1}"
+	fi
+
+	if ! printf "%s" "${opt_enabled}" | grep -Eq '^[01]$'; then
+		lib_err ${EX_DATAERR} "Enabled has an incorrect value!"
+	fi
+
+	fstab_path="${jail_path}/conf/boot/fstab"
+	if ! mkdir -p "${fstab_path}"; then
+		lib_err ${EX_IOERR} "Error creating ${fstab_path}"
+	fi
+
+	if [ "${nro}" = "auto" ]; then
+		nro=`lib_getnro "${fstab_path}"`
+	else
+		if ! lib_check_number "${nro}"; then
+			lib_err ${EX_DATAERR} "NRO must be a number!"
+		fi
+	fi
+
+	basedir="${fstab_path}/${nro}"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	printf "%s\n" "${opt_enabled}" > "${basedir}/enabled" || exit ${EX_IOERR}
+	printf "%s\n" "${name}" > "${basedir}/name" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_spec}" > "${basedir}/fs_spec" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_file}" > "${basedir}/fs_file" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_vfstype}" > "${basedir}/fs_vfstype" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_mntops}" > "${basedir}/fs_mntops" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_freq}" > "${basedir}/fs_freq" || exit ${EX_IOERR}
+	printf "%s\n" "${fs_passno}" > "${basedir}/fs_passno" || exit ${EX_IOERR}
+}
+
+fstab_umount()
+{
+	_fstab_mount "umount" "$@"
+}
+
+_fstab_mount()
+{
+	local jail_path
+	local fstab
+	local command
+	local jail_name
+
+	command="$1"; shift
+	if [ -z "${command}" ]; then
+		lib_err ${EX_USAGE} "_fstab_mount [mount | umount] jail_name mount_args ..."
+	fi
+
+	case "${command}" in
+		mount|umount) ;;
+		*) _fstab_mount ;;
+	esac
+
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		fstab_usage
+		exit ${EX_USAGE}
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}/jail" ]; then
+		lib_err ${EX_NOINPUT} "No such directory \`${jail_path}/jail\`"
+	fi
+
+	fstab="${jail_path}/conf/fstab"
+	if [ ! -f "${fstab}" ]; then
+		lib_err ${EX_NOINPUT} "No such fstab (${fstab}) file exists or could not be read."
+	fi
+
+	(cd -- "${jail_path}/jail"; "${command}" -F "${fstab}" "$@")
+}
+
+fstab_keyword2file()
+{
+	local file2read=
+	local keyword
+
+	if [ -z "${keyword}" ]; then
+		lib_err ${EX_USAGE} "fstab_keyword2file keyword"
+	fi
+	
+	case "${keyword}" in
+			enabled)
+				file2read="enabled"
+				;;
+			dump)
+				file2read="fs_freq"
+				;;
+			device)
+				file2read="fs_spec"
+				;;
+			mountpoint)
+				file2read="fs_file"
+				;;
+			name)
+				file2read="name"
+				;;
+			options)
+				file2read="fs_mntops"
+				;;
+			pass)
+				file2read="fs_passno"
+				;;
+			type)
+				file2read="fs_vfstype"
+				;;
+	esac
+
+	echo "${file2read}"
+}
+
+fstab_help()
+{
+cat << EOF
+`fstab_usage`
+
+${fstab_desc}
+
+Parameters:
+    all                  -- Operate in all jails.
+    jail                 -- Operate in a jail.
+
+Parameters for all and jail:
+    compile              -- Compile all enabled NROes and save them as {JAILDIR}/{jail_name}/conf/fstab.
+    get                  -- Get information about the current fstab.
+    list                 -- Like \`get\` but for all NROes.
+    mount                -- Wrapper for mount(8) but with the -F flag set to {JAILDIR}/{jail_name}/conf/fstab.
+    mounted              -- Displays the mounted file systems.
+    remove               -- Remove all NROes or just a single NRO.
+    set                  -- Set parameters to an existing NRO or create it if it does not exist.
+    umount               -- Wrapper for umount(8) but with the -F flag set to {JAILDIR}/{jail_name}/conf/fstab.
+
+Parameters for remove:
+    all                  -- Remove all NROes.
+    nro                  -- Remove an NRO.
+
+Options for all:
+    -e                   -- Exits when a command returns a non-zero value.
+
+Options for get:
+    -e                   -- This option is not required when using -p. The \\t character is used to delimit columns,
+                            in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                   -- Display the name of the columns.
+    -I                   -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                   -- Columnate the list.
+    -t                   -- Tabulate columns and values.
+    -n nro               -- Operate in this NRO.
+
+Options for list:
+    -e                   -- This option is the opposite in \`Options for get\`.
+    -H                   -- This option is the opposite in \`Options for get\`.
+    -I                   -- This option is the same as in \`Options for get\`.
+    -p                   -- This option is the opposite in \`Options for get\`.
+    -t                   -- This option is the opposite in \`Options for get\`.
+    -n nro               -- Operate in this NRO. If not set, operate in all NROes.
+
+Keywords for get and list:
+    enabled              -- See \`set -E\` and \`set -e\`.
+    nro                  -- See \`set -n\`.
+    name                 -- See \`set -N\`.
+    device               -- See \`set -d\`.
+    mountpoint           -- See \`set -m\`.
+    type                 -- See \`set -t\`.
+    options              -- See \`set -o\`.
+    dump                 -- See \`set -D\`.
+    pass                 -- See \`set -P\`.
+
+Options for set:
+    -E                   -- Enable this NRO.
+    -e                   -- Disable this NRO.
+    -p                   -- By default the mountpoint is checked against a path traversal check.
+                            This is not a security measure, it is just for convenience so as not
+			    to mount in a non-existent directory or mount outside the jail
+			    directory. This option disable it.
+    -D dump              -- Default: ${FSTAB_DEFAULT_FSFREQ}. The fifth field, (fs_freq). See fstab(5).
+    -d device            -- The first field, (fs_spec). See fstab(5). This option and mountpoint are not
+                            required unless the NRO (\`-n\`) has no such values.
+    -m mountpoint        -- The second field, (fs_file). See fstab(5).
+    -N name              -- The name of this NRO. It is not relevant, it is only for your
+                            convenience.
+    -n auto|nro          -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
+                            {JAILDIR}/{jail_name}/conf/boot/fstab.
+    -o options           -- Default: ${FSTAB_DEFAULT_FSMNTOPS}. The fourth field, (fs_mntops). See fstab(5).
+    -P pass              -- Default: ${FSTAB_DEFAULT_FSPASSNO}. The sixth field, (fs_passno). See fstab(5).
+    -t type              -- Default: ${FSTAB_DEFAULT_FSVFSTYPE}. The third field, (fs_vfstype). See fstab(5).
+EOF
+}
+
+fstab_usage()
+{
+	cat << EOF
+usage: [all -e | jail jail_name] compile
+       [all -e | jail jail_name] get [-eHIpt] -n nro [keyword ...]
+       [all -e | jail jail_name] list [-eHIpt] [-n nro] [keyword ...]
+       [all -e | jail jail_name] mounted
+       [all -e | jail jail_name] mount args ...
+       [all -e | jail jail_name] remove [all | nro nro ...]
+       [all -e | jail jail_name] set -d device -m mountpoint [-Eep] [-D dump] [-N name] [-n auto | nro] [-o options] [-P pass] [-t type]
+       [all -e | jail jail_name] umount args ...
+EOF
+}

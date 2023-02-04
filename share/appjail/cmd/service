@@ -1,0 +1,140 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+
+service_desc="control (start/stop/etc.) or list system services within a jail."
+
+service_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		service_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		all|jail) ;;
+		*) service_usage; exit ${EX_USAGE} ;;
+	esac
+
+	service_${entity} "$@"
+}
+
+service_all()
+{
+	local _o
+	local opt_failsafe=0
+	local input_file="/dev/null"
+	local jail_name
+	local errlevel=0
+
+	if [ $# -eq 0 ]; then
+		service_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":ei:" _o; do
+		case "${_o}" in
+			e)
+				opt_failsafe=1
+				;;
+			i)
+				input_file="${OPTARG}"
+				;;
+			*)
+				service_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	"${APPJAIL_PROGRAM}" jail list -HIpt name | while IFS= read -r jail_name
+	do
+		lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+		
+		lib_debug "service(8) args: $@"
+
+		(service_jail "${jail_name}" "$@" < "${input_file}")
+
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			if [ ${opt_failsafe} -eq 1 ]; then
+				lib_err ${errlevel} "Stop caused by a non-zero value."
+			fi
+		fi
+	done
+}
+
+service_jail()
+{
+	local jail_name
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		service_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	"${APPJAIL_PROGRAM}" cmd jexec "${jail_name}" service "$@"
+}
+
+service_help()
+{
+	cat << EOF
+`service_usage`
+
+${service_desc}
+
+Parameters:
+    all         -- Run service(8) in all jails.
+    jail        -- Run service(8) in a jail.
+
+Options for all:
+    -e          -- Exits when a command returns a non-zero value.     
+EOF
+}
+
+service_usage()
+{
+	cat << EOF
+usage: service all -e -- service_args ...
+       service jail jail_name service_args ...
+EOF
+}

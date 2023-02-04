@@ -1,0 +1,944 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+
+limits_desc="Display and update resource limits database for jails."
+
+limits_main()
+{
+	if ! lib_check_racct; then
+		lib_err ${EX_UNAVAILABLE} "You must enable RACCT and reboot: echo \"kern.racct.enable=1\" > /boot/loader.conf && reboot"
+	fi
+
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		get|list|off|on|remove|set|stats) ;;
+		*) limits_usage; exit ${EX_USAGE} ;;
+	esac
+
+	limits_${entity} "$@"
+}
+
+limits_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_ignore_unknro=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local nro=
+
+	local flag_enabled=0
+        local flag_loaded=0
+        local flag_name=0
+        local flag_nro=0
+        local flag_per=0
+        local flag_resource=0
+        local flag_rule=0
+	local flag_action=0
+	
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					limits
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				limits_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${nro}" ]; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/limits/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		if [ ${opt_ignore_unknro} -eq 1 ]; then
+			return 0
+		fi
+
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "nro" "enabled" "name" "rule" "loaded"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			action|enabled|loaded|name|nro|per|resource|rule) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				nro)
+					value="${nro}"
+					;;
+				loaded)
+					local basedir="${JAILDIR}/${jail_name}/conf/boot/limits/${nro}"
+					local resource= action= per=
+
+					if [ -f "${basedir}/resource" ]; then
+						resource=`head -1 "${basedir}/resource"`
+					fi
+
+					if [ -f "${basedir}/action" ]; then
+						action=`head -1 "${basedir}/action"`
+					fi
+
+					if [ -f "${basedir}/per" ]; then
+						per=`head -1 "${basedir}/per"`
+					fi
+
+					if [ -n "${resource}" -a -n "${action}" -a -n "${per}" ]; then
+						value=`rctl -h "jail:${jail_name}:${resource}:${action}=/${per}" 2> /dev/null`
+					elif [ -n "${resource}" -a -n "${action}" ]; then
+						value=`rctl -h "jail:${jail_name}:${resource}:${action}" 2> /dev/null`
+					else
+						value=
+					fi
+					;;
+				*)
+					if [ ! -f "${basedir}/${keyword}" ]; then
+						value=
+					else
+						value=`head -1 "${basedir}/${keyword}"`
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+limits_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_ignore_unknro=0 iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local nro=
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					limits_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				limits_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_ignore_unknro} -eq 1 ]; then
+		iflag="-i"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${nro}" ]; then
+		limits_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${pflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	mkdir -p "${JAILDIR}/${jail_name}/conf/boot/limits"
+
+	ls -A "${JAILDIR}/${jail_name}/conf/boot/limits" | sort -n | while IFS= read -r nro; do
+		limits_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+limits_off()
+{
+	_limits_on_off "off" "$1"
+}
+
+limits_on()
+{
+	local errlevel=0
+	local jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+
+	local limits_temp
+	limits_temp=`lib_generate_tempfile`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_limits_temp=`lib_escape_string "${limits_temp}"`
+
+	lib_atexit_add "rm -f \"${escape_limits_temp}\""
+
+	limits_list -H -- "${jail_name}" nro enabled | while read -r nro enabled; do
+		if [ "${enabled}" != "1" ]; then
+			continue
+		fi
+
+		rule=`limits_get -In "${nro}" "${jail_name}" rule`
+
+		if lib_check_empty "${rule}"; then
+			lib_err ${EX_CONFIG} "There is not defined rule to use in nro:${nro}."
+		fi
+
+		rule="jail:${jail_name}:${rule}"
+
+		if ! printf "%s\n" "${rule}" >> "${limits_temp}"; then
+			lib_err ${EX_IOERR} "Error writing in ${limits_temp}"
+		fi
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local limits_file="${jail_path}/conf/boot/rctl.conf"
+	if ! cp -- "${limits_temp}" "${limits_file}"; then
+		lib_err ${EX_IOERR} "Error when copying ${limits_temp} to ${limits_file}."
+	fi
+
+	_limits_on_off "on" "${jail_name}"
+}
+
+_limits_on_off()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "_limits_on_off [off | on] jail_name"
+	fi
+
+	local cmd rctl_cmd
+
+	cmd="$1"
+	case "${cmd}" in
+		off)
+			rctl_cmd="-r"
+			;;
+		on)
+			rctl_cmd="-a"
+			;;
+		*)
+			_limits_on_off # usage
+			exit ${EX_USAGE}
+	esac
+
+	local jail_name="$2"
+	if lib_check_empty "${jail_name}"; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	local rctl_conf="${JAILDIR}/${jail_name}/conf/boot/rctl.conf"
+	if [ ! -f "${rctl_conf}" ]; then
+		lib_err ${EX_NOINPUT} -- "${jail_name} is not configured to use limits."
+	fi
+
+	local rule
+	while IFS= read -r rule; do
+		if ! rctl ${rctl_cmd} "${rule}"; then
+			lib_err ${EX_SOFTWARE} "limits ${cmd}: An error ocurred while executing the rctl rule: ${rule}"
+		fi
+	done < "${rctl_conf}"
+}
+
+limits_remove()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		all|keyword|nro) ;;
+		*) limits_usage; exit ${EX_USAGE} ;;
+	esac
+
+	limits_remove_${command} "$@"
+}
+
+limits_remove_all()
+{
+	local basedir
+	local jail_name
+
+	jail_name="$1"
+	_limits_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/limits"
+
+	rm -rf "${basedir}"
+}
+
+limits_remove_keyword()
+{
+	local _o
+	local jail_name
+	local nro=
+	local keyword
+	local basedir
+	local keyword_file=
+
+	while getopts ":n:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					limits_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			n)
+				nro="${OPTARG}"
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	if [ $# -eq 0 ]; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	if [ -z "${nro}" ]; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/limits/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	local keyword_file
+	for keyword in "$@"; do
+		case "${keyword}" in
+			action|enabled|name|per|resource|rule) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ ! -f "${basedir}/${keyword_file}" ]; then
+			lib_warn -- "${keyword}: keyword does not exist."
+		fi
+
+		if ! rm -f "${basedir}/${keyword_file}"; then
+			lib_warn -- "${keyword}: failed to remove."
+		fi
+	done
+}
+
+limits_remove_nro()
+{
+	local nro="$1"; shift
+	if lib_check_empty "${nro}"; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	local jail_name="$1"
+	_limits_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/limits/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	rm -rf "${basedir}"
+}
+
+limits_set()
+{
+	local _o
+	local opt_enabled=
+	local opt_name=0 name=
+	local nro="auto"
+
+	while getopts ":EeN:n:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					limits_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			E)
+				opt_enabled=1
+				;;
+			e)
+				opt_enabled=0
+				;;
+			N)
+				opt_name=1
+				name="${OPTARG}"
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				limits_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	local rctl_rule="$1"; shift
+	if lib_check_empty "${rctl_rule}"; then
+		rctl_rule=`limits_get -Iin "${nro}" "${jail_name}" rule`
+
+		if [ -z "${rctl_rule}" ]; then
+			lib_err ${EX_CONFIG} "The rctl rule is not set in this NRO."
+		fi
+	fi
+
+	if ! lib_check_rctl_rule "${rctl_rule}"; then
+		lib_err ${EX_DATAERR} "Invalid syntax: resource:action=amount[/per]"
+	fi
+
+	local _rctl_rule=`echo "${rctl_rule}" | sed -Ee 's/([a-z]+):([a-z]+)=[0-9]+[KkMmGgTtPpEe]\/([a-z]+)/\1 \2 \3/' -e 's/([a-z]+):([a-z]+)=.+/\1 \2/'`
+
+	local resource action per
+
+	resource=`echo "${_rctl_rule}" | cut -d' ' -f1`
+	if ! lib_check_rctl_resource "${resource}"; then
+		lib_err ${EX_NOINPUT} "rctl resource \`${resource}\` does not exist."
+	fi
+
+	action=`echo "${_rctl_rule}" | cut -d' ' -f2`
+	if ! lib_check_rctl_action "${action}"; then
+		# Validate sig*
+		if ! lib_check_signal "${action}"; then
+			lib_err ${EX_NOINPUT} "rctl action \`${action}\` does not exist."
+		fi
+	fi
+
+	if [ "${action}" = "deny" ]; then
+		case "${resource}" in
+			cputime|wallclock|readbps|writebps|readiops|writeiops)
+				lib_err ${EX_DATAERR} "${action} action cannot be used with ${resource} resource."
+				;;
+			*)
+				;;
+		esac
+	elif [ "${action}" = "throttle" ]; then
+		case "${resource}" in
+			readbps|writebps|readiops|writeiops)
+				;;
+			*)
+				lib_err ${EX_DATAERR} "${action} only support readbps, writebps, readiops and writeiops."
+				;;
+		esac
+	fi
+	
+	if [ `echo "${_rctl_rule}" | wc -w` -eq 3 ]; then
+		per=`echo "${_rctl_rule}" | cut -d' ' -f3`
+
+		if ! lib_check_rctl_subject "${per}"; then
+			lib_err ${EX_NOINPUT} "rctl subject \`${per}\` does not exist."
+		fi
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/limits"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ "${nro}" = "auto" ]; then
+		nro=`lib_getnro "${basedir}"`
+	else
+		if ! lib_check_number "${nro}"; then
+			lib_err ${EX_DATAERR} "NRO must be a number!"
+		fi
+	fi
+
+	basedir="${basedir}/${nro}"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ -z "${opt_enabled}" ]; then
+		opt_enabled=`limits_get -In "${nro}" "${jail_name}" enabled`
+		opt_enabled="${opt_enabled:-1}"
+	fi
+
+	if [ ${opt_name} -eq 0 -a -z "${name}" ]; then
+		name=`limits_get -In "${nro}" "${jail_name}" name`
+	fi
+
+	printf "%s\n" "${action}" > "${basedir}/action" || exit ${EX_IOERR}
+	printf "%s\n" "${name}" > "${basedir}/name" || exit ${EX_IOERR}
+	printf "%s\n" "${opt_enabled}" > "${basedir}/enabled" || exit ${EX_IOERR} 
+	printf "%s\n" "${per}" > "${basedir}/per" || exit ${EX_IOERR}
+	printf "%s\n" "${rctl_rule}" > "${basedir}/rule" || exit ${EX_IOERR}
+	printf "%s\n" "${resource}" > "${basedir}/resource" || exit ${EX_IOERR}
+}
+
+limits_stats()
+{
+	local _o
+	local opt_escape=1
+	local opt_columns=1
+	local opt_empty=0
+	local opt_pretty=1
+	local opt_tabulate=1
+	
+	while getopts ":eHIptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					limits
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			*)
+				limits_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_limits_chk_jail "${jail_name}"
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		return 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		return 0
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "maxproc" "cputime" "pcpu" "vmemoryuse" "readiops" "writeiops"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		if ! lib_check_rctl_resource "${keyword}"; then
+			lib_warn -- "${keyword}: keyword not found."
+			continue
+		fi
+
+		if [ -n "`lib_loaded_var "flag_limits_${keyword}"`" ]; then
+			continue
+		fi
+
+		setvar flag_limits_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -F "${keyword}=" | cut -d= -f2-`
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+_limits_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		limits_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+limits_help()
+{
+	cat << EOF
+`limits_usage`
+
+${limits_desc}
+
+Parameters:
+    get                       -- Get information about the current limits configuration for a given target.
+    list                      -- Like \`get\` but for all NROes.
+    off                       -- Disables the current limits rules.
+    on                        -- Enables the current port forwarding rules.
+    remove                    -- Remove all NROes or just a single NRO.
+    set                       -- Set parameters to an existing NRO or create it if it does not exist.
+    stats                     -- Display resource utilization for a given target.
+
+Options for get:
+    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                 in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                        -- Display the name of the columns.
+    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                        -- Columnate the list.
+    -t                        -- Tabulate columns and values.
+    -n nro                    -- Operate in this NRO.
+
+Options for list and stats:
+    -e                        -- This option is the opposite in \`Options for get\`.
+    -H                        -- This option is the opposite in \`Options for get\`.
+    -I                        -- This option is the same as in \`Options for get\`.
+    -p                        -- This option is the opposite in \`Options for get\`.
+    -t                        -- This option is the opposite in \`Options for get\`.
+    -n nro                    -- Operate in this NRO. If not set, operate in all NROes.
+
+Keywords for get and list:
+    enabled                   -- See \`set -E\` and \`set -e\`.
+    loaded                    -- The currently loaded rctl rule.
+    name                      -- See \`set -N\`.
+    nro                       -- See \`set -n\`.
+    per                       -- See \`RULE SYNTAX\` in \`rctl(8)\`.
+    resource                  -- See \`RESOURCES\` in \`rctl((8)\`.
+    rule                      -- The rule to be loaded.
+    action                    -- See \`ACTIONS\` in \`rctl(8)\`.
+
+Keywords for stats:
+    cputime
+    datasize
+    stacksize
+    coredumpsize
+    memoryuse
+    memorylocked
+    maxproc
+    openfiles
+    vmemoryuse
+    pseudoterminals
+    swapuse
+    nthr
+    msgqqueued
+    msgqsize
+    nmsgq
+    nsem
+    nsemop
+    nshm
+    shmsize
+    wallclock
+    pcpu
+    readbps
+    writebps
+    readiops
+    writeiops
+
+    See \`RESOURCES\` in \`rctl(8)\` for more details.
+
+Parameters for remove:
+    all                       -- Remove all NROes.
+    nro                       -- Remove an NRO.
+
+Options for set:
+    -E                        -- Enable this NRO.
+    -e                        -- Disable this NRO.
+    -N name                   -- The name of this NRO. It is not relevant, it is only for your
+                                 convenience.
+    -n auto|nro               -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
+                                 {JAILDIR}/{jail_name}/conf/boot/limits.
+EOF
+}
+
+limits_usage()
+{
+	cat << EOF
+usage: limits get [-eHIpt] -n nro jail_name [keyword ...]
+       limits list [eHIpt] [-n nro] jail_name [keyword ...]
+       limits off jail_name
+       limits on jail_name
+       limits remove [all | keyword -n nro keyword ... | nro nro] jail_name
+       limits set [-Ee] [-N name] [-n auto | nro] jail_name resource:action[=amount[/per]]
+       limits stats [-eHIpt] jail_name [keyword ...]
+EOF
+}

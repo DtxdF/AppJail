@@ -1,0 +1,1583 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/kern_modules"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+DEFAULT_NETWORK_GRPBRG="appjail_bridge"
+DEFAULT_NETWORK_GRPEPR="appjail_epair"
+
+NETWORK_ATTACH_TYPE_EPAIR="epair"
+NETWORK_ATTACH_TYPE_IFACE="iface"
+NETWORK_DEFAULT_ATTACH_TYPE="${NETWORK_ATTACH_TYPE_EPAIR}"
+
+NETWORK_GENERIC_BRG="bridge"
+NETWORK_GENERIC_EPR="epair"
+NETWORK_GENERIC_LO="lo"
+
+
+network_desc="Create, remove or manage virtual networks (IPv4 only) for jails."
+
+network_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		add|assign|get|hosts|list|remove|reserve) ;;
+		attach|detach|plug|unplug) _network_load_modules ;;
+		*) network_usage; exit ${EX_USAGE} ;;
+	esac
+
+	network_${entity} "$@"
+}
+
+_network_load_modules()
+{
+	# modules used by if_bridge(4) and if_epair(4)
+	lib_modules_load "if_bridge"
+	lib_modules_load "bridgestp"
+	lib_modules_load "if_epair"
+}
+
+network_add()
+{
+	local _o
+	local opt_overlap=1
+	local network_name
+	local netaddr
+	local network_description
+	local errlevel=0
+
+	while getopts ":Od:" _o; do
+		case "${_o}" in
+			d)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			O)
+				opt_overlap=0;
+				;;
+			d)
+				network_description="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	network_name="$1"; netaddr="$2"; shift 2
+
+	if lib_check_empty "${network_name}" || lib_check_empty "${netaddr}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_networkname "${network_name}"; then
+		lib_err ${EX_DATAERR} "Invalid network name: ${network_name}"
+	fi
+
+	if [ -d "${NETWORKDIR}/${network_name}" ]; then
+		lib_err ${EX_CANTCREAT} "The ${network_name} network is already created."
+	fi
+
+	if lib_check_ifacelen "${network_name}"; then
+		lib_err ${EX_DATAERR} -- "${network_name}: network name too long."
+	fi
+
+	local address=`lib_jailparam_name "${netaddr}" /`
+	local cidr=`lib_jailparam_value "${netaddr}" /`
+
+	if lib_check_empty "${address}" || ! lib_check_ipv4addr "${address}"; then
+		lib_err ${EX_DATAERR} "Bad IPv4 address: ${address}"
+	fi
+
+	if lib_check_empty "${cidr}" || ! lib_check_number "${cidr}"; then
+		lib_err ${EX_DATAERR} "The CIDR is invalid!"
+	fi
+
+	if [ ${cidr} -lt 0 -o ${cidr} -gt 30 ]; then
+		lib_err ${EX_DATAERR} "The CIDR is invalid. Valid ranges are 0-30."
+	fi
+
+	local network_conf
+	network_conf=`lib_generate_tempfile`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	local escape_network_conf=`lib_escape_string "${network_conf}"`
+
+	lib_atexit_add "rm -f \"${escape_network_conf}\""
+
+	if ! "${SHAREDIR}/util/network/network" -c -a "${address}" -n ${cidr} > "${network_conf}"; then
+		lib_err ${EX_IOERR} "Error creating the ${network_name} network in ${NETWORKDIR}/${network_name}/network.conf"
+	fi
+
+	if [ ${opt_overlap} -eq 1 ]; then
+		local network_address=`grep '^NETWORK=' "${network_conf}" | cut -d= -f2-`
+		local network_cidr=`grep '^CIDR=' "${network_conf}" | cut -d= -f2-`
+
+		network_list -ptHI network cidr name | while IFS= read -r line; do
+			cmp_network=`echo "${line}" | cut -d' ' -f1`
+			cmp_cidr=`echo "${line}" | cut -d' ' -f2`
+			cmp_name=`echo "${line}" | cut -d' ' -f3-`
+
+			if lib_check_overlapnet "${network_address}" "${network_cidr}" "${cmp_network}" "${cmp_cidr}"; then
+				lib_err ${EX_CANTCREAT} "${network_name} (${network_address}/${network_cidr}) overlaps ${cmp_name} (${cmp_network}/${cmp_cidr})"
+			fi
+		done
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+	fi
+
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${NETWORKDIR}" "${ZFS_NETWORK_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${JAILDIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${NETWORKDIR}/${network_name}" "${ZFS_NETWORK_NAME}/${network_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${NETWORKDIR}/${network_name}"
+	fi
+
+	local network_minaddr=`grep '^MINADDR=' "${network_conf}" | cut -d= -f2-`
+	local network_gateway="${network_minaddr}"
+
+	printf "NAME=%s\n" "${network_name}" >> "${network_conf}"
+	printf "DESCRIPTION=%s\n" "${network_description}" >> "${network_conf}"
+	printf "GATEWAY=%s\n" "${network_gateway}" >> "${network_conf}"
+
+	if [ ${ENABLE_DEBUG} != "0" ]; then
+		lib_debug "Network information:"
+
+		local netinfo
+		while IFS= read -r netinfo; do
+			lib_debug "    - ${netinfo}"
+		done < "${network_conf}"
+	fi
+
+	mv "${network_conf}" "${NETWORKDIR}/${network_name}/network.conf"
+
+	lib_debug "Done."
+}
+
+network_assign()
+{
+	local _o
+	local opt_default=0
+	local address="auto"
+	local ether_name=
+	local jail_name=
+	local network_name=
+	local errlevel=0
+
+	while getopts ":da:e:j:n:" _o; do
+		case "${_o}" in
+			a|e|j|n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			d)
+				opt_default=1
+				;;
+			a)
+				address="${OPTARG}"
+				;;
+			e)
+				ether_name="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	
+	if [ -z "${ether_name}" -o -z "${jail_name}" -o -z "${network_name}" ]; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_network "${network_name}"
+	_network_chk_ether "${network_name}" "ea_${ether_name}"
+	_network_chk_basicjail "${jail_name}"
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		return 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		return 0
+	fi
+
+	local jail_path
+	jail_path="${JAILDIR}/${jail_name}"
+
+	local jail_type
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THICK}|${JAIL_TYPE_THIN}) ;;
+		*) lib_err ${EX_SOFTWARE} -- "The network assigment can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+	esac
+
+	if ! lib_check_iface "eb_${ether_name}" "${jail_name}"; then
+		lib_err ${EX_NOINPUT} "The ${ether_name} epair does not exist in ${jail_name}."
+	fi
+
+	local network_netmask=`network_get -I -- "${network_name}" netmask`
+	local network_broadcast=`network_get -I -- "${network_name}" broadcast`
+
+	address=`network_reserve -j "${jail_name}" -n "${network_name}" -a "${address}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	jexec -l "${jail_name}" \
+		ifconfig "eb_${ether_name}" \
+			inet "${address}" \
+			netmask "${network_netmask}" \
+			broadcast "${network_broadcast}" up || exit $?
+
+	if [ ${opt_default} -eq 1 ]; then
+		local network_gateway=`network_get -I -- "${network_name}" gateway`
+
+		jexec -l "${jail_name}" \
+			route add default "${network_gateway}" >&2
+		sysrc -j "${jail_name}" defaultrouter="${network_gateway}" >&2
+	fi
+}
+
+network_attach()
+{
+	local _o
+	# options
+	local bridge="${SHARED_BRIDGE}"
+	# misc
+	local errlevel
+
+	while getopts ":b:" _o; do
+		case "${_o}" in
+			b)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			b)
+				bridge="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -eq 0 ]; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	if lib_check_ifacelen "${bridge}"; then
+		lib_err ${EX_DATAERR} -- "${bridge}: Bridge name too long."
+	fi
+
+	_network_create_bridge "${bridge}"
+
+	local mtu="${DEFAULT_MTU}" first_mtu=
+	local interface type
+	for interface in "$@"; do
+		if lib_check_empty "${interface}"; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		type=`lib_jailparam_name "${interface}" :`
+		interface=`lib_jailparam_value "${interface}" :`
+
+		if lib_check_empty "${interface}"; then
+			interface="${type}"
+			type="${NETWORK_DEFAULT_ATTACH_TYPE}"
+		fi
+
+		if lib_check_empty "${interface}"; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		if ! lib_check_interfacename "${interface}"; then
+			lib_err ${EX_DATAERR} -- "${interface}: Invalid interface name."
+		fi
+
+		case "${type}" in
+			${NETWORK_ATTACH_TYPE_EPAIR})
+				_network_create_epair "s" "${interface}" "${mtu}"
+
+				_network_addm "${bridge}" "sa_${interface}"
+				;;
+			${NETWORK_ATTACH_TYPE_IFACE})
+				if lib_check_ifacelen "${interface}"; then
+					lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+				fi
+
+				if ! lib_check_iface "${interface}"; then
+					lib_err ${EX_NOINPUT} -- "${interface}: interface does not exist."
+				fi
+
+				mtu=`lib_network_getmtu "${interface}"`
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					exit ${errlevel}
+				fi
+
+				if [ -n "${first_mtu}" ]; then
+					if [ ${mtu} -ne ${first_mtu} ]; then
+						lib_err ${EX_DATAERR} -- "${interface}: all members must have the same MTU. See \`if_bridge(4)\`."
+					fi
+				fi
+
+				_network_addm "${bridge}" "${interface}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+
+		if [ -z "${first_mtu}" ]; then
+			first_mtu="${mtu}"
+		fi
+	done
+
+	lib_debug "Done."
+}
+
+_network_addm()
+{
+	local bridge="$1" ether_name="$2"
+	if [ -z "${bridge}" -o -z "${ether_name}" ]; then
+		lib_err ${EX_USAGE} "_network_addm bridge ether_name"
+	fi
+
+	if ! lib_check_brgmember "${bridge}" "${ether_name}"; then
+		if lib_check_ifacegrp "${ether_name}" "${NETWORK_GENERIC_LO}"; then
+			lib_err ${EX_DATAERR} -- "${ether_name}: cannot be added because it is in group \`${NETWORK_GENERIC_LO}\`."
+		fi
+
+		lib_debug "Adding ${ether_name} as a member of ${bridge} ..."
+		ifconfig -- "${bridge}" addm "${ether_name}" || exit $?
+	else
+		lib_debug "${ether_name}: already a member of ${bridge}."
+	fi
+}
+
+_network_create_bridge()
+{
+	local bridge="$1"
+	if [ -z "${bridge}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge"
+	fi
+
+	if ! lib_check_iface "${bridge}"; then
+		ifconfig bridge create name "${bridge}" || exit $?
+		ifconfig -- "${bridge}" up || exit $?
+	else
+		if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
+			lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
+		fi
+	fi
+
+	lib_debug -- "${bridge}: bridge already created."
+}
+
+_network_create_epair()
+{
+	local prefix="$1" name="$2" mtu="$3"
+	if [ -z "${prefix}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_create_epair prefix name [mtu]"
+	fi
+
+	if lib_check_etherlen "${name}"; then
+		lib_err ${EX_DATAERR} -- "${name}: Ether name too long."
+	fi
+
+	local errlevel
+	local a_epair b_epair
+	local a_created=0 b_created=0
+
+	a_epair="${prefix}a_${name}"
+	b_epair="${prefix}b_${name}"
+
+	if lib_check_iface "${a_epair}"; then
+		if ! lib_check_ifacegrp "${a_epair}" "${NETWORK_GENERIC_EPR}"; then
+			lib_err ${EX_CONFIG} "The ${a_epair} epair exists but is not in the \`${NETWORK_GENERIC_EPR}\` group."
+		fi
+
+		a_created=1
+	fi
+
+	if lib_check_iface "${b_epair}"; then
+		b_created=1
+	fi
+
+	if [ ${a_created} -eq 0 -a ${b_created} -eq 0 ]; then
+		epair=`ifconfig epair create`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		lib_debug "Renaming epair ${epair%a}[ab] to ${prefix}[ab]_${name} ..."
+		ifconfig ${epair} name "${a_epair}" || exit $?
+		ifconfig ${epair%a}b name "${b_epair}" || exit $?
+
+		if [ -n "${mtu}" ]; then
+			lib_debug "Setting MTU (${mtu}) to ${prefix}[ab]_${name} ..."
+			ifconfig "${a_epair}" mtu "${mtu}" || exit $?
+			ifconfig "${b_epair}" mtu "${mtu}" || exit $?
+		fi
+
+		lib_debug "Marking ${prefix}[ab]_${name} \"up\""
+		ifconfig "${a_epair}" up || exit $?
+		ifconfig "${b_epair}" up || exit $?
+	elif [ ${a_created} -eq 0 -a ${b_created} -eq 1 ]; then
+		lib_err ${EX_DATAERR} -- "${a_epair}: interface does not exist."
+	else
+		lib_debug "${name}: epair already created."
+	fi
+}
+
+network_detach()
+{
+	local _o
+	# options
+	local opt_destroy_bridge=0
+	local opt_destroy_members=0
+	local opt_force=0
+	local opt_ignore=0
+	local bridge="${SHARED_BRIDGE}"
+	# misc
+	local errlevel
+
+	while getopts ":Ddfib:" _o; do
+		case "${_o}" in
+			b)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			D)
+				opt_destroy_bridge=1
+				;;
+			d)
+				opt_destroy_members=1
+				;;
+			f)
+				opt_force=1
+				;;
+			i)
+				opt_ignore=1
+				;;
+			b)
+				bridge="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if ! lib_check_iface "${bridge}"; then
+		lib_err ${EX_NOINPUT} -- "${bridge}: bridge does not exist."
+	fi
+
+	if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
+		lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
+	fi
+
+	local interface
+	for interface in "$@"; do
+		if lib_check_empty "${interface}"; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		type=`lib_jailparam_name "${interface}" :`
+		interface=`lib_jailparam_value "${interface}" :`
+
+		if lib_check_empty "${interface}"; then
+			interface="${type}"
+			type="${NETWORK_DEFAULT_ATTACH_TYPE}"
+		fi
+
+		if lib_check_empty "${interface}"; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		if ! lib_check_interfacename "${interface}"; then
+			lib_err ${EX_DATAERR} -- "${interface}: Invalid interface name."
+		fi
+
+		case "${type}" in
+			${NETWORK_ATTACH_TYPE_EPAIR})
+				interface="sa_${interface}"
+				;;
+			${NETWORK_ATTACH_TYPE_IFACE})
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+
+		if ! lib_check_iface "${interface}"; then
+			lib_err ${EX_NOINPUT} -- "${interface}: interface does not exist."
+		fi
+
+		if ! lib_check_brgmember "${bridge}" "${interface}"; then
+			if [ ${opt_force} -eq 1 -a ${opt_destroy_members} -eq 0 ]; then
+				# An error may occur because the interface is not a member of the bridge.
+				continue
+			elif [ ${opt_force} -eq 1 -a ${opt_destroy_members} -eq 1 ]; then
+				# Continue ...
+			elif [ ${opt_ignore} -eq 0 ]; then
+				lib_err ${EX_NOINPUT} "The ${interface} epair is not a member of the ${bridge} bridge."
+			else
+				continue
+			fi
+		fi
+
+		if [ ${opt_destroy_members} -eq 1 ]; then
+			if ! lib_check_ifacegrp "${interface}" "${NETWORK_GENERIC_EPR}"; then
+				continue
+			fi
+			
+			ifconfig -- "${interface}" destroy || exit $?
+		else
+			ifconfig -- "${bridge}" deletem "${interface}" || exit $?
+		fi
+	done
+
+	if [ ${opt_destroy_bridge} -eq 1 ]; then
+		ifconfig -- "${bridge}" destroy || exit $?
+	fi
+}
+
+network_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local network_name
+
+	local flag_address=0
+	local flag_addresses=0
+	local flag_broadcast=0
+	local flag_cidr=0
+	local flag_description=0
+	local flag_gateway=0
+	local flag_maxaddr=0
+	local flag_minaddr=0
+	local flag_name=0
+	local flag_netmask=0
+	local flag_network=0
+	local flag_wildcard=0
+	
+	while getopts ":eHIpt" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	network_name="$1"; shift
+
+	if lib_check_empty "${network_name}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_basicnet "${network_name}"
+
+	local network_conf="${NETWORKDIR}/${network_name}/network.conf"
+
+	if [ ! -f "${network_conf}" ]; then
+		lib_err ${EX_SOFTWARE} "The network configuration file (${network_conf}) does not exist."
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "name" "network" "cidr" "broadcast" "gateway" "minaddr" "maxaddr" "addresses" "description"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			address|addresses|broadcast|cidr|description|gateway|maxaddr|minaddr|name|netmask|network|wildcard) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	keywords=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${keywords}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=`grep "^${keyword}=" "${network_conf}" | cut -d= -f2-`
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+network_hosts()
+{
+	local _o
+	local opt_available=0
+	local opt_duplicated=0
+	local opt_show_networks=0
+	local opt_show_networkname=0
+	local opt_hostname=0
+	local opt_addrlist=0
+	local opt_names=0
+	local opt_host_reserved=0
+	local opt_reserved=0
+	local jail_name=
+	local network_name=
+
+	while getopts ":adEeHlNRrj:n:" _o; do
+		case "${_o}" in
+			j|n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				opt_available=1
+				;;
+			d)
+				opt_duplicated=1
+				;;
+			E)
+				opt_show_networkname=1
+				;;
+			e)
+				opt_show_networks=1
+				;;
+			H)
+				opt_hostname=$((opt_hostname+1))
+				opt_names=0
+				;;
+			l)
+				opt_addrlist=1
+				;;
+			N)
+				opt_names=1
+				opt_hostname=0
+				;;
+			R)
+				opt_host_reserved=1
+				;;
+			r)
+				opt_reserved=1
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ ${opt_available} -eq 1 ]; then
+		_chk_network_name "${network_name}"
+
+		local fifo_filename
+		fifo_filename=`lib_generate_fifo`
+
+		local escape_fifo_filename=`lib_escape_string "${fifo_filename}"`
+		lib_atexit_add "rm -f \"${escape_fifo_filename}\""
+
+		network_hosts -ln "${network_name}" > "${fifo_filename}" &
+		network_hosts -rn "${network_name}" | sed -Ee 's/\./\\./g' | sed -Ee 's/(.+)/^\1$/' | grep -Evf - "${fifo_filename}"
+
+		rm -f "${fifo_filename}"
+	elif [ ${opt_duplicated} -eq 1 ]; then
+		_chk_network_name "${network_name}"
+
+		network_hosts -rn "${network_name}" | uniq -dc
+	elif [ ${opt_show_networks} -eq 1 ]; then
+		if [ -z "${jail_name}" ]; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		local jail_path="${JAILDIR}/${jail_name}"
+		if [ ! -d "${jail_path}" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+		fi
+
+		local networkdir="${jail_path}/conf/boot/network"
+		if [ ! -d "${networkdir}" ]; then
+			lib_err ${EX_CONFIG} -- "${jail_name} does not have an assigned IPv4 address."
+		fi
+
+		ls -A "${networkdir}" | while IFS= read -r reserved_addr_file
+		do
+			network_name=`printf "%s" "${reserved_addr_file}" | cut -d. -f2-`
+
+			printf "%s\n" "${network_name}"
+		done
+	elif [ ${opt_addrlist} -eq 1 ]; then
+		_chk_network_name "${network_name}"
+
+		local network_address=`network_get -I -- "${network_name}" network`
+		local network_cidr=`network_get -I -- "${network_name}" cidr`
+
+		lib_network_addrlist "${network_address}" "${network_cidr}"
+	elif [ ${opt_host_reserved} -eq 1 ]; then
+		if [ -z "${jail_name}" ]; then
+			network_usage
+			exit ${EX_USAGE}
+		fi
+
+		local jail_path="${JAILDIR}/${jail_name}"
+		if [ ! -d "${jail_path}" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+		fi
+
+		local networkdir="${jail_path}/conf/boot/network"
+		if [ ! -d "${networkdir}" ]; then
+			lib_err ${EX_CONFIG} -- "${jail_name} does not have an assigned IPv4 address."
+		fi
+
+		if [ -n "${network_name}" ]; then
+			_chk_network_name "${network_name}"
+
+			local reserved_addr_file="${networkdir}/reserved.${network_name}"
+			if [ ! -f "${reserved_addr_file}" ]; then
+				lib_err ${EX_CONFIG} -- "${jail_name} does not have an assigned IPv4 address for ${network_name} network."
+			fi
+
+			head -1 -- "${reserved_addr_file}"
+		else
+			ls -A "${networkdir}" | while IFS= read -r reserved_addr_file
+			do
+				network_name=`printf "%s" "${reserved_addr_file}" | cut -d. -f2-`
+				reserved_addr=`head -1 -- "${networkdir}/${reserved_addr_file}"`
+
+				if [ ${opt_show_networkname} -eq 1 ]; then
+					printf "%s\t%s\n" "${reserved_addr}" "${network_name}"
+				else
+					printf "%s\n" "${reserved_addr}"
+				fi
+			done
+		fi
+	elif [ ${opt_reserved} -eq 1 ]; then
+		_chk_network_name "${network_name}"
+
+		local network_gateway=`network_get -I -- "${network_name}" gateway`
+		local network_broadcast=`network_get -I -- "${network_name}" broadcast`
+		local network_address=`network_get -I -- "${network_name}" network`
+		local network_cidr=`network_get -I -- "${network_name}" cidr`
+
+		# network
+		if [ ${opt_names} -eq 1 ]; then
+			printf "%s\t%s\n" "${network_gateway}" "Default gateway"
+		elif [ ${opt_hostname} -ge 1 ]; then
+			printf "%s\t%s\n" "${network_gateway}" "${network_name}${HOST_DOMAIN}"
+		else
+			printf "%s\n" "${network_gateway}"
+		fi
+
+		# hosts
+		"${APPJAIL_PROGRAM}" jail list -HIpt name | while IFS= read -r jail_name
+		do
+			networkdir="${JAILDIR}/${jail_name}/conf/boot/network"
+			reserved_addr_file="${networkdir}/reserved.${network_name}"
+			if [ ! -f "${reserved_addr_file}" ]; then
+				continue
+			fi
+
+			reserved_addr=`head -1 "${reserved_addr_file}"`
+
+			if [ ${opt_names} -eq 1 ]; then
+				printf "%s\t%s\n" "${reserved_addr}" "${jail_name}"
+			elif [ ${opt_hostname} -eq 1 ]; then
+				jail_hostname=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail_name}" hostname`
+				if lib_check_empty "${jail_hostname}"; then
+					jail_hostname="${jail_name}${HOST_DOMAIN}"
+				fi
+
+				printf "%s\t%s\n" "${reserved_addr}" "${jail_hostname}"
+			elif [ ${opt_hostname} -ge 2 ]; then
+				printf "%s\t%s\n" "${reserved_addr}" "${jail_name}.${network_name}${HOST_DOMAIN}"
+			else
+				printf "%s\n" "${reserved_addr}"
+			fi
+		done | sort -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n
+
+		# broadcast
+		if [ ${opt_names} -eq 1 ]; then
+			printf "%s\t%s\n" "${network_broadcast}" "Broadcast"
+		elif [ ${opt_hostname} -ge 1 ]; then
+			# ignore
+		else
+			printf "%s\n" "${network_broadcast}"
+		fi
+	else
+		network_usage
+		exit ${EX_USAGE}
+	fi
+}
+
+_chk_network_name()
+{
+	local network_name="$1"
+	if [ -z "${network_name}" ]; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_basicnet "${network_name}"
+}
+
+network_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local network_name=
+
+	while getopts ":eHIptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${network_name}" ]; then
+		network_get ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -- "${network_name}" "$@"
+		return $?
+	fi
+
+	if [ ! -d "${NETWORKDIR}" ]; then
+		return
+	fi
+
+	ls -A -- "${NETWORKDIR}" | while IFS= read -r network_name; do
+		network_get ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${network_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+network_plug()
+{
+	local _o
+	local ether_description=
+	local ether_name=
+	local network_name=
+
+	while getopts ":d:e:n:" _o; do
+		case "${_o}" in
+			d|e|n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			d)
+				ether_description="${OPTARG}"
+				;;
+			e)
+				ether_name="${OPTARG}"
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ -z "${ether_name}" -o -z "${network_name}" ]; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_basicnet "${network_name}"
+
+	if lib_check_etherlen "${ether_name}"; then
+		lib_err ${EX_DATAERR} -- "${ether_name}: Ether name too long."
+	fi
+
+	if ! lib_check_interfacename "${ether_name}"; then
+		lib_err ${EX_DATAERR} -- "${ether_name}: Invalid interface name."
+	fi
+
+	_network_create_bridge "${network_name}"
+
+	if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPBRG}"; then
+		local network_gateway=`network_get -I -- "${network_name}" gateway`
+		local network_netmask=`network_get -I -- "${network_name}" netmask`
+		local network_broadcast=`network_get -I -- "${network_name}" broadcast`
+		local network_descr=`network_get -I -- "${network_name}" description | sed -Ee 's/^ //g'`
+
+		lib_debug "Setting parameters: address:${network_gateway} netmask:${network_netmask} broadcast:${network_broadcast} descr:${network_descr}"
+		ifconfig -- "${network_name}" \
+			inet "${network_gateway}" \
+			netmask "${network_netmask}" \
+			broadcast "${network_broadcast}" \
+			description "${network_descr}" || exit $?
+
+		lib_debug "Adding ${DEFAULT_NETWORK_GRPBRG} group to ${network_name} ..."
+		ifconfig -- "${network_name}" group "${DEFAULT_NETWORK_GRPBRG}" || exit $?
+	fi
+
+	_network_create_epair "e" "${ether_name}"
+
+	if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPEPR}"; then
+		# Group
+		lib_debug "Adding ${DEFAULT_NETWORK_GRPEPR} group to ea_${ether_name}"
+		ifconfig "ea_${ether_name}" group "${DEFAULT_NETWORK_GRPEPR}" || exit $?
+
+		# Description
+		if [ -n "${ether_description}" ]; then
+			lib_debug "e[ab]_${ether_name} description is \`${ether_description}\`"
+			ifconfig "ea_${ether_name}" description "${ether_description}" || exit $?
+		fi
+	fi
+
+	# Add the interface to the bridge.
+	_network_addm "${network_name}" "ea_${ether_name}"
+
+	lib_debug "Done."
+}
+
+network_remove()
+{
+	local _o
+	local opt_destroy=0
+	local opt_force=0
+
+	while getopts ":df" _o; do
+		case "${_o}" in
+			d)
+				opt_destroy=1
+				;;
+			f)
+				opt_force=1
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_basicnet "${network_name}"
+
+	if lib_check_iface "${network_name}"; then
+		if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPBRG}"; then
+			lib_err ${EX_NOPERM} "You cannot remove an interface that is not in the ${DEFAULT_NETWORK_GRPBRG} group."
+		fi
+
+		if [ -n "`lib_network_getbrgmembers "${network_name}" | head -1`" -a ${opt_force} -eq 0 ]; then
+			lib_err ${EX_NOPERM} "The ${network_name} bridge has members. Use -f to forcibly remove it."
+		fi
+
+		lib_debug "Removing ${network_name} bridge ..."
+
+		ifconfig "${network_name}" destroy || exit $?
+	fi
+
+	if [ ${opt_destroy} -eq 1 ]; then
+		lib_debug "Removing ${network_name} forever!"
+
+		if [ ${ENABLE_ZFS} != "0" ]; then
+			if ! lib_zfs_rrmfs "${ZFS_NETWORK_NAME}/${network_name}"; then
+				lib_err ${EX_IOERR} "Error destroying ${ZFS_NETWORK_NAME}/${network_name}"
+			fi
+		fi
+
+		rm -rf "${NETWORKDIR}/${network_name}"
+	fi
+}
+
+network_reserve()
+{
+	local _o
+	local address="auto"
+	local jail_name=
+	local network_name=
+
+	while getopts ":a:j:n:" _o; do
+		case "${_o}" in
+			a|j|n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				address="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	if [ -z "${jail_name}" -o -z "${network_name}" ]; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_basicnet "${network_name}"
+	_network_chk_basicjail "${jail_name}"
+
+	local network_cidr=`network_get -I -- "${network_name}" cidr`
+	local network_address=`network_get -I -- "${network_name}" network`
+	local jail_path="${JAILDIR}/${jail_name}"
+	local networkdir="${jail_path}/conf/boot/network"
+	local reserved_addr="${networkdir}/reserved.${network_name}"
+
+	if [ "${address}" = "auto" -o "${address}" = "forceauto" ]; then
+		if [ "${address}" != "forceauto" -a -f "${reserved_addr}" ]; then
+			address=`head -1 "${reserved_addr}"`
+		fi
+
+		# If the user changes the network, it is necessary to obtain a new IPv4 address.
+		if [ "${address}" = "auto" -o "${address}" = "forceauto" ] || ! lib_check_testnet "${address}" "${network_address}" "${network_cidr}"; then
+			local available_addr=`network_hosts -an "${network_name}" | head -1`
+
+			if lib_check_empty "${available_addr}"; then
+				lib_err ${EX_UNAVAILABLE} "There is no IPv4 addresses available on the ${network_name} network."
+			fi
+
+			address="${available_addr}"
+		fi
+	else
+		local _address=
+		if [ -f "${reserved_addr}" ]; then
+			_address=`head -1 "${reserved_addr}"`
+		fi
+
+		if [ -z "${_address}" ] || [ "${address}" != "${_address}" ]; then
+			if ! lib_check_ipv4addr "${address}"; then
+				lib_err ${EX_DATAERR} "Bad IPv4 address: ${address}"
+			fi
+
+			if ! lib_check_testnet "${address}" "${network_address}" "${network_cidr}"; then
+				lib_err ${EX_DATAERR} "IPv4 address ${address} is not in ${network_address}/${network_cidr}."
+			fi
+
+			local escape_address=`echo "${address}" | sed -Ee 's/\./\\./g' | sed -Ee 's/(.+)/^\1$/'`
+
+			if network_hosts -r -n "${network_name}" | grep -Eq "${escape_address}"; then
+				lib_err ${EX_UNAVAILABLE} "The IPv4 address ${address} is already reserved."
+			fi
+		fi
+	fi
+
+	if ! mkdir -p "${networkdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${networkdir}"
+	fi
+
+	if ! echo "${address}" | tee "${reserved_addr}"; then
+		lib_err ${EX_IOERR} "Error writing ${reserved_addr}"
+	fi
+}
+
+network_unplug()
+{
+	local network_name="$1"
+	local ether_name="$2"
+
+	if lib_check_empty "${network_name}" || lib_check_empty "${ether_name}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	_network_chk_network "${network_name}"
+
+	ether_name="ea_${ether_name}"
+
+	_network_chk_ether "${network_name}" "${ether_name}"
+
+	ifconfig -- "${ether_name}" destroy || exit $?
+}
+
+_network_chk_network()
+{
+	local network_name="$1"
+
+	if [ -z "${network_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_chk_network network_name"
+	fi
+
+	_network_chk_basicnet "${network_name}"
+	
+	if ! lib_check_iface "${network_name}"; then
+		lib_err ${EX_NOINPUT} "The ${network_name} network does not exist."
+	fi
+
+	if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPBRG}"; then
+		lib_err ${EX_CONFIG} "The ${network_name} bridge exists but is not in the \`${DEFAULT_NETWORK_GRPBRG}\` group."
+	fi
+}
+
+_network_chk_basicnet()
+{
+	local network_name="$1"
+
+	if [ -z "${network_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_chk_basicnet network_name"
+	fi
+
+	if lib_check_ifacelen "${network_name}"; then
+		lib_err ${EX_DATAERR} -- "${network_name}: Network name too long."
+	fi
+
+	if ! lib_check_networkname "${network_name}"; then
+		lib_err ${EX_DATAERR} -- "${network_name}: Invalid network name"
+	fi
+
+	if [ ! -d "${NETWORKDIR}/${network_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the network \`${network_name}\`"
+	fi
+}
+
+_network_chk_ether()
+{
+	local network_name="$1" ether_name="$2" group="$3"
+	if [ -z "${network_name}" -o -z "${ether_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_chk_ether network_name ether_name"
+	fi
+
+	if ! lib_check_interfacename "${ether_name}"; then
+		lib_err ${EX_DATAERR} -- "${ether_name}: Invalid interface name."
+	fi
+
+	if ! lib_check_iface "${ether_name}"; then
+		lib_err ${EX_NOINPUT} "The ${ether_name} epair does not exist."
+	fi
+
+	group="${group:-${DEFAULT_NETWORK_GRPEPR}}"
+	if ! lib_check_ifacegrp "${ether_name}" "${group}"; then
+		lib_err ${EX_CONFIG} "The ${ether_name} epair exists but is not in the \`${group}\` group."
+	fi
+
+	if ! lib_check_brgmember "${network_name}" "${ether_name}"; then
+		lib_err ${EX_NOINPUT} "The ${ether_name} epair is not a member of the ${network_name} bridge."
+	fi
+}
+
+_network_chk_basicjail()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _network_chk_basicjail jail_name"
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+network_help()
+{
+	cat << EOF
+`network_usage`
+
+${network_desc}
+
+Parameters:
+    add                             -- Add a new network.
+    assign                          -- Assign a non-reserved IP address to a jail and its e-pair within it.
+    attach                          -- Attach an interface to a bridge.
+    detach                          -- Detach an interface from a bridge.
+    get                             -- Get keywords from a specific network.
+    hosts                           -- List the addresses of a network.
+    list                            -- List the networks.
+    plug                            -- Create a new e-pair and adds it as a member of a bridge. It also creates the bridge
+                                       if it does not exist.
+    remove                          -- Destroy a bridge.
+    reserve                         -- Assign a non-reserved IP address to a jail.
+    unplug                          -- Destroy an e-pair.
+
+Options for add:
+    -O                              -- By default, before adding the network, an overlay test is run to check if there is a
+                                       network that might cause problems with a common range. The test can be slow, but it
+			               avoids some problems. If you are sure that a network does not overlap another network,
+			               you can disable the test with this option.
+    -d description                  -- Network description.
+
+Options for assign:
+    -d                              -- Mark network_name as the default route.
+
+Options for assign and reserve:
+    -a auto|forceauto|address       -- IP address to use. Use \`auto\` to use an available IP address. Use \`forceauto\` even
+                                       when the jail has an IP address assigned and you want to obtain a non-specific IP
+				       address.
+    -j jail_name                    -- Jail to assign the IP address.
+    -n network_name                 -- Network name.
+
+Options for assign:
+    -e ether_name                   -- Name of the e-pair.
+
+Options for attach and detach:
+    \`attach\` is a much more generic version of \`plug\` and is intended for environments that need isolation between jails and for
+    environments that do not use NAT to provide connections to the external network. Both \`attach\` and \`detach\` accept an
+    interface using a syntax such as \`type:interface\`.
+
+    Valid types are: ${NETWORK_ATTACH_TYPE_EPAIR}, ${NETWORK_ATTACH_TYPE_IFACE}. If \`type\` is not specified, \`${NETWORK_DEFAULT_ATTACH_TYPE}\` will be used.
+    If \`epair\` is specified, \`attach\` or \`detach\` will create an interface \`if_epair(4)\` using a name such as s[ab]_<interface>.
+    If \`iface\` is specified, an existing interface is added to a bridge member.
+
+    -b bridge                       -- Bridge name. If the bridge does not exist, \`attach\` will create it. Default: ${SHARED_BRIDGE}
+
+Options for detach:
+    -D                              -- Destroy the bridge.
+    -d                              -- Destroy the specified bridge members instead of removing them from the bridge. This option does not destroy
+                                       interfaces that are not in the ${NETWORK_GENERIC_EPR} group, they are simply ignored.
+    -f                              -- When using with \`-d\` it destroys an ${NETWORK_GENERIC_EPR} interface that is not a member of the bridge.
+    -i                              -- Does not display an error when a specified interface is not a member of the specified bridge.
+
+Options for get:
+    -e                              -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                       in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                              -- Display the name of the columns.
+    -I                              -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                              -- Columnate the list.
+    -t                              -- Tabulate columns and values.
+
+Parameters for hosts:
+    -a                              -- List only available IP adddresses.
+    -d                              -- Check for duplicate IP addresses.
+    -e                              -- Show the names of the networks to which this jails belongs.
+    -l                              -- List all IP addresses.
+    -R                              -- Show assigned IP addresses.
+    -r                              -- List only reserved IP addresses.
+
+Options for hosts -a, -d, -l, -R and -r:
+    -n network_name                 -- Operate in this network.
+
+Options for hosts -e and -R:
+    -j jail_name                    -- The name of the target jail.
+
+Options for hosts -R:
+    -E                              -- Show the network name of the IP address of the jail.
+
+Options for hosts -r:
+    -H                              -- Display the host name of the IP address owner.
+                                       Use twice to concatenate name + network + {HOST_DOMAIN}.
+    -N                              -- Display the owner of the IP address.
+
+Options for list:
+    -e                              -- This option is the opposite in \`Options for get\`.
+    -H                              -- This option is the opposite in \`Options for get\`.
+    -I                              -- This option is the same as in \`Options for get\`.
+    -p                              -- This option is the opposite in \`Options for get\`.
+    -t                              -- This option is the opposite in \`Options for get\`.
+    -n network_name                 -- Operate in this network. If not set operate in all networks.
+
+Keywords for get and list:
+    address                         -- Address used in \`network add\`.
+    addresses                       -- Total number of hosts.
+    broadcast                       -- Broadcast address.
+    cidr                            -- Network prefix.
+    description                     -- Network description.
+    gateway                         -- Router address used by the bridge.
+    maxaddr                         -- Last host of this network.
+    minaddr                         -- First host of this network.
+    name                            -- Network name.
+    netmask                         -- Network mask of this network.
+    network                         -- Network address.
+    wildcard                        -- Network mask with its bits inverted.
+
+Options for plug:
+    -e ether_name                   -- Name of the new e-pair.
+    -d description                  -- e-pair description.
+    -n network_name                 -- Bridge to add the e-pair as a new member.
+
+Options for remove:
+    -d                              -- Destroy completely the network, not just destroy the bridge.
+    -f                              -- If the bridge has members, the bridge cannot be destroy, this option force
+                                       the destruction of the bridge.
+EOF
+}
+
+network_usage()
+{
+	cat << EOF
+usage: network add [-O] [-d description] network_name network_address/cidr
+       network assign -e ether_name -j jail_name -n network_name [-d] [-a auto|forceauto|address]
+       network attach [-b bridge] [[epair|iface]:]interface ...
+       network detach [-Ddi] [-b bridge] [[epair|iface]:]interface ...
+       network get [-eHIpt] network_name [keyword ...]
+       network hosts -a -n network_name
+       network hosts -d -n network_name
+       network hosts -e -j jail_name
+       network hosts -l -n network_name
+       network hosts -R -j jail_name [-E] [-n network_name]
+       network hosts -r -n network_name [-HN]
+       network list [-eHIpt] [-n network_name] [keyword ...]
+       network plug -e ether_name -n network_name [-d description]
+       network remove [-df] network_name
+       network reserve -j jail_name -n network_name [-a auto|forceauto|address]
+       network unplug network_name ether_name
+EOF
+}

@@ -1,0 +1,373 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+startup_desc="Unattended command to start jails and other related things."
+
+startup_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		startup_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		restart|start|stop) ;;
+		*) startup_usage; exit ${EX_USAGE} ;;
+	esac
+
+	local errlevel
+
+	STARTUP_STARTUPLOG_NAME=`sh -c "${STARTUPLOG_NAME}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "{STARTUPLOG_NAME} exits with a non-zero exit status."
+	fi
+
+	if lib_check_ispath "${STARTUP_STARTUPLOG_NAME}"; then
+		lib_err ${EX_DATAERR} -- "${STARTUP_STARTUPLOG_NAME}: invalid log name."
+	fi
+
+	startup_${entity} "$@"
+}
+
+startup_restart()
+{
+	startup_stop "$@" &&
+	startup_start "$@"
+}
+
+startup_start()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		startup_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jails|nat) ;;
+		*) startup_usage; exit ${EX_USAGE} ;;
+	esac
+
+	startup_start_${entity} "$@"
+}
+
+startup_start_jails()
+{
+	local tmpdir
+	tmpdir=`_startup_get_jails "DOWN"` || exit $?
+
+	local current=1 total
+
+	total=`find "${tmpdir}" -type f | xargs wc -l | tail -n1 | awk '{print $1}'`
+
+	ls -A -- "${tmpdir}" | sort -n | while IFS= read -r priority
+	do
+		jails="${tmpdir}/${priority}"
+
+		while IFS= read -r jail_name; do
+			lib_zfs_mklogdir "jails" "${jail_name}" "startup-start"
+
+			logname="jails/${jail_name}/startup-start/${STARTUP_STARTUPLOG_NAME}"
+
+			lib_debug "Starting ${jail_name}; Log ${logname}; Priority ${priority}; Current ${current}; Total ${total};"
+
+			logname="${LOGDIR}/${logname}"
+
+			if [ ${USE_PARALLEL} -eq 0 ]; then
+				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1
+			else
+				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1 &
+			fi
+
+			current=$((current+1))
+		done < "${jails}"
+
+		if [ ${USE_PARALLEL} -eq 1 ]; then
+			lib_debug "Wait (Priority: ${priority})..."
+			wait
+		fi
+
+		lib_debug "Done (Priority: ${priority})."
+	done
+}
+
+startup_start_nat()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		startup_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		networks) ;;
+		*) startup_usage; exit ${EX_USAGE} ;;
+	esac
+
+	startup_start_nat_${entity} "$@"
+}
+
+startup_start_nat_networks()
+{
+	local networks
+	networks=`lib_generate_tempfile` || exit $?
+
+	local escape_networks
+	escape_networks=`lib_escape_string "${networks}"`
+
+	lib_atexit_add "rm -f \"${escape_networks}\""
+
+	_startup_get_nat_networks > "${networks}"
+
+	local total current
+
+	current=1
+	total=`cat -- "${networks}" | wc -l`
+	total=$((total+0))
+
+	local network_name
+	while IFS= read -r network_name; do
+		lib_zfs_mklogdir "nat" "${network_name}" "startup-start"
+
+		local logname
+		logname="nat/${network_name}/startup-start/${STARTUP_STARTUPLOG_NAME}"
+
+		lib_debug "Starting (${current}/${total}) ${network_name} :: ${logname}"
+
+		logname="${LOGDIR}/${logname}"
+
+		if [ ${USE_PARALLEL_NATNET} -eq 0 ]; then
+			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1
+		else
+			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1 &
+		fi
+
+		current=$((current+1))
+	done < "${networks}" 
+
+	if [ ${USE_PARALLEL_NATNET} -eq 1 -a ${total} -gt 0 ]; then
+		lib_debug "Wait..."
+		wait
+	fi
+}
+
+_startup_get_nat_networks()
+{
+	"${APPJAIL_PROGRAM}" nat list network -HIpt name | while IFS= read -r network_name
+	do
+		boot=`"${APPJAIL_PROGRAM}" nat get network -I -- "${network_name}" boot`
+		
+		if [ "${boot}" != "1" ]; then
+			continue
+		fi
+
+		printf "%s\n" "${network_name}"
+	done
+}
+
+startup_stop()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		startup_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jails|nat) ;;
+		*) startup_usage; exit ${EX_USAGE} ;;
+	esac
+
+	startup_stop_${entity} "$@"
+}
+
+startup_stop_jails()
+{
+	local tmpdir
+	tmpdir=`_startup_get_jails "UP"` || exit $?
+
+	local current=1 total
+
+	total=`find "${tmpdir}" -type f | xargs wc -l | tail -n1 | awk '{print $1}'`
+
+	ls -A -- "${tmpdir}" | sort -n | tail -r | while IFS= read -r priority
+	do
+		jails="${tmpdir}/${priority}"
+
+		while IFS= read -r jail_name; do
+			lib_zfs_mklogdir "jails" "${jail_name}" "startup-stop"
+
+			logname="jails/${jail_name}/startup-stop/${STARTUP_STARTUPLOG_NAME}"
+
+			lib_debug "Stopping ${jail_name}; Log ${logname}; Priority ${priority}; Current ${current}; Total ${total};"
+
+			logname="${LOGDIR}/${logname}"
+
+			if [ ${USE_PARALLEL} -eq 0 ]; then
+				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1
+			else
+				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1 &
+			fi
+
+			current=$((current+1))
+		done < "${jails}"
+
+		if [ ${USE_PARALLEL} -eq 1 ]; then
+			lib_debug "Wait (Priority: ${priority})..."
+			wait
+		fi
+
+		lib_debug "Done (Priority: ${priority})."
+	done
+}
+
+_startup_get_jails()
+{
+	local status="$1"
+	status="${status:-UP}"
+
+	local tempdir
+	tempdir=`lib_generate_tempdir` || exit $?
+
+	local escape_tempdir
+	escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	"${APPJAIL_PROGRAM}" jail list -HIpt boot priority status name | while read -r boot priority current_status jail_name
+	do
+		if [ "${boot}" != "1" ]; then
+			continue
+		fi
+
+		if [ "${current_status}" != "${status}" ]; then
+			continue
+		fi
+
+		printf "%s\n" "${jail_name}" >> "${tempdir}/${priority}"
+	done
+
+	printf "%s\n" "${tempdir}"
+}
+
+startup_stop_nat()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		startup_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		networks) ;;
+		*) startup_usage; exit ${EX_USAGE} ;;
+	esac
+
+	startup_stop_nat_${entity} "$@"
+}
+
+startup_stop_nat_networks()
+{
+	local networks
+	networks=`lib_generate_tempfile` || exit $?
+
+	local escape_networks
+	escape_networks=`lib_escape_string "${networks}"`
+
+	lib_atexit_add "rm -f \"${escape_networks}\""
+
+	_startup_get_nat_networks | tail -r > "${networks}"
+
+	local total current
+
+	current=1
+	total=`cat -- "${networks}" | wc -l`
+	total=$((total+0))
+
+	local network_name
+	while IFS= read -r network_name; do
+		lib_zfs_mklogdir "nat" "${network_name}" "startup-stop"
+
+		local logname
+		logname="nat/${network_name}/startup-stop/${STARTUP_STARTUPLOG_NAME}"
+
+		lib_debug "Stopping (${current}/${total}) ${network_name} :: ${logname}"
+
+		logname="${LOGDIR}/${logname}"
+
+		if [ ${USE_PARALLEL_NATNET} -eq 0 ]; then
+			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1
+		else
+			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1 &
+		fi
+
+		current=$((current+1))
+	done < "${networks}"
+
+	if [ ${USE_PARALLEL_NATNET} -eq 1 -a ${total} -gt 0 ]; then
+		lib_debug "Wait..."
+		wait
+	fi
+}
+
+startup_help()
+{
+	cat << EOF
+`startup_usage`
+
+${startup_desc}
+
+Parameters:
+    restart         -- Execute stop and start.
+    start           -- Start the targets that have the boot flag.
+    stop            -- Stop the targets that have the boot flag in reverse order.
+
+Parameters for start and stop:
+    jails           -- The priority number affects the order in which the jails start. Each jail has a
+                       priority (an arbitrary number), where \`0\` is defined as the highest priority.
+		       If two or more jails have the same priority number, they start in the order
+		       they appear.
+    nat             -- Start or stop NAT for targets that have the boot flag.
+
+Parameters for start nat and stop nat:
+    networks        -- Start or stop the NAT for networks.
+EOF
+}
+
+startup_usage()
+{
+	cat << EOF
+usage: startup [restart|start|stop] jails
+       startup [restart|start|stop] nat networks
+EOF
+}

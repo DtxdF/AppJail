@@ -1,0 +1,200 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/tempfile"
+
+DEFAULT_KEYS_PREFIX="_LIB_KEYS_GRP_"
+
+lib_keys_mk()
+{
+	local group="$1"
+	if [ -z "${group}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_mk group"
+	fi
+
+	local group_key
+	group_key="${DEFAULT_KEYS_PREFIX}${group}"
+
+	local groupdir
+	groupdir=`lib_loaded_var "${group_key}"`
+
+	if [ -n "${groupdir}" ]; then
+		return 0
+	fi
+
+	local tempdir
+	tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_tempdir
+	escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	setvar ${DEFAULT_KEYS_PREFIX}${group} "${tempdir}"
+}
+
+lib_keys_set()
+{
+	local group="$1" subgroup="$2" key="$3" value="$4"
+	if [ -z "${group}" -o -z "${key}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_set group subgroup key [value]"
+	fi
+
+	local group_key
+	group_key="${DEFAULT_KEYS_PREFIX}${group}"
+
+	local groupdir
+	groupdir=`lib_loaded_var "${group_key}"`
+
+	if [ -z "${groupdir}" ]; then
+		lib_keys_mk "${group}"
+		groupdir=`lib_loaded_var "${group_key}"`
+	fi
+
+	local subgroupdir
+	subgroupdir="${groupdir}/${subgroup}"
+	
+	mkdir -p -- "${subgroupdir}" || exit $?
+
+	printf "%s\n" "${value}" > "${subgroupdir}/${key}" || exit $?
+}
+
+lib_keys_append()
+{
+	local group="$1" key="$2" value="$3"
+	if [ -z "${group}" -o -z "${key}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_append group key [value]"
+	fi
+
+	local group_key
+	group_key="${DEFAULT_KEYS_PREFIX}${group}"
+
+	local groupdir
+	groupdir=`lib_loaded_var "${group_key}"`
+
+	local nro
+	if [ -z "${groupdir}" ]; then
+		nro=0
+	else
+		nro=`lib_getnro "${groupdir}"`
+	fi
+
+	lib_keys_set "${group}" "${nro}" "${key}" "${value}"
+
+	echo "${nro}"
+}
+
+lib_keys_list()
+{
+	local group="$1" subgroup="$2"
+	if [ -z "${group}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_set group [subgroup]"
+	fi
+
+	local groupdir
+	groupdir=`lib_keys_getgroupdir "${group}"` || exit $?
+
+	local keysdir="${groupdir}"
+	if [ -n "${subgroup}" ]; then
+		keysdir="${keysdir}/${subgroup}"
+	fi
+
+	if [ ! -d "${keysdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${keysdir}: directory not found."
+	fi
+
+	ls -A -- "${keysdir}"
+}
+
+lib_keys_get()
+{
+	local group="$1" subgroup="$2" key="$3"
+	if [ -z "${group}" -o -z "${subgroup}" -o -z "${key}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_set group subgroup key"
+	fi
+
+	local groupdir
+	groupdir=`lib_keys_getgroupdir "${group}"` || exit $?
+
+	local keyfile
+	keyfile="${groupdir}/${subgroup}/${key}"
+
+	if [ ! -f "${keyfile}" ]; then
+		lib_err ${EX_NOINPUT} -- "${key}: key not found."
+	fi
+
+	cat -- "${keyfile}" || exit $?
+}
+
+lib_keys_check()
+{
+	local group="$1" entity="$2"
+	if [ -z "${group}" -o -z "${entity}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_check group entity"
+	fi
+
+	local groupdir
+	groupdir=`lib_keys_getgroupdir "${group}"` || exit $?
+
+	local entityfile
+	entityfile="${groupdir}/${entity}"
+
+	if [ ! -e "${entityfile}" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+lib_keys_getgroupdir()
+{
+	local group="$1"
+	if [ -z "${group}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_keys_getgroupdir group"
+	fi
+
+	local group_key
+	group_key="${DEFAULT_KEYS_PREFIX}${group}"
+
+	local groupdir
+	groupdir=`lib_loaded_var "${group_key}"`
+
+	if [ -z "${groupdir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${group}: group not found."
+	fi
+
+	printf "%s\n" "${groupdir}"
+}

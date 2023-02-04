@@ -1,0 +1,217 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/jail_types"
+lib_load "${LIBDIR}/random"
+
+update_desc="Update a thick jail or a release."
+
+update_main()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		update_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		jail|release) ;;
+		*) update_usage; exit ${EX_USAGE} ;;
+	esac
+
+	update_${command} "$@"
+}
+
+update_jail()
+{
+	local _o
+	local opt_force=0
+
+	while getopts ":f" _o; do
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+		esac
+	done
+
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		update_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/jail"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`."
+	fi
+
+	local jail_type
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	if [ "${jail_type}" != "${JAIL_TYPE_THICK}" ]; then
+		lib_err ${EX_NOPERM} "${jail_name} is not a thickjail."
+	fi
+
+	if [ ${opt_force} -eq 1 ]; then
+		freebsd_update_args="-F"
+	fi
+
+	currently_running=`chroot "${basedir}" freebsd-version`
+
+	freebsd-update \
+		${freebsd_update_args} \
+		-f "${FREEBSD_UPDATE_CONF}" \
+		--not-running-from-cron \
+		-b "${basedir}" \
+		--currently-running "${currently_running}" \
+		fetch install
+}
+
+update_release()
+{
+	local _o
+	local opt_force=0
+	local opt_jail=0
+	local opt_release=0
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local release_name="${DEFAULT_RELEASE}"
+	local freebsd_version="${FREEBSD_VERSION}"
+	# freebsd-update(8) args
+	local freebsd_update_args= basedir currently_running
+
+	while getopts ":fjra:v:" _o; do
+		case "${_o}" in
+			a|v)
+				if lib_check_empty "${OPTARG}"; then
+					update_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			j)
+				opt_jail=1
+				;;
+			r)
+				opt_release=1
+				;;
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			v)
+				freebsd_version="${OPTARG}"
+				;;
+			*)
+				update_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -gt 0 ]; then
+		release_name="$1"
+
+		if lib_check_empty "${release_name}"; then
+			update_usage
+			exit ${EX_USAGE}
+		fi
+	fi
+
+	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
+
+	basedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}/release"
+
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the release directory (${basedir})."
+	fi
+
+	if [ ${opt_force} -eq 1 ]; then
+		freebsd_update_args="-F"
+	fi
+
+	currently_running=`chroot "${basedir}" freebsd-version`
+
+	freebsd-update \
+		${freebsd_update_args} \
+		-f "${FREEBSD_UPDATE_CONF}" \
+		--not-running-from-cron \
+		-b "${basedir}" \
+		--currently-running "${currently_running}" \
+		fetch install
+}
+
+update_help()
+{
+	cat << EOF
+`update_usage`
+
+${update_desc}
+
+Parameters:
+    jail                      -- Update a jail.
+    release                   -- Update a release. Default: ${DEFAULT_RELEASE}
+
+Options:
+    -f                        -- See \`-F\` in freebsd-update(8).
+
+Options for release:
+    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
+    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+EOF
+}
+
+update_usage()
+{
+	cat << EOF
+usage: update jail [-f] jail_name
+       update release [-f] [-a freebsd_arch] [-v freebsd_version] [release_name]
+EOF
+}

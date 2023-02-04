@@ -1,23 +1,86 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-stop_desc="Remove a jail using a template from an installed appjail."
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mount"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+stop_desc="Stop a running jail."
 
 stop_main()
 {
 	local _o
-	local appjail
-	local opts
+	local opt_force=0
+	local opt_run_initscript=1 _opt_run_initscript=0
+	local initscript=
+	local args=
+	local jail_name
+	local jail_path
+	local errlevel=0
+	local jail_stop_args="-r"
 
-	while getopts ":T" _o; do
+	if [ $# -eq 0 ]; then
+		stop_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":fIi:p:" _o; do
 		case "${_o}" in
-			T)
-				opts="${opts} -${_o}"
+			i|p)
+				if lib_check_empty "${OPTARG}"; then
+					stop_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			I)
+				opt_run_initscript=0
+				_opt_run_initscript=1
+				;;
+			i)
+				initscript="${OPTARG}"
+				;;
+			p)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				args="${args} \"${arg}\""
 				;;
 			*)
 				stop_usage
@@ -27,42 +90,220 @@ stop_main()
 	done
 	shift $((OPTIND-1))
 
-	appjail="$1"
-
-	if [ -z "${appjail}" ]; then
+	jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
 		stop_usage
 		exit ${EX_USAGE}
 	fi
 
-	shift
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
 
-	. "${LIBDIR}/replace"
-	. "${LIBDIR}/su"
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
 
-	stop_appjail ${opts} -S -c "${CONFIG}" -a "${appjail}" -- $@
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+
+		# In the case that a jail cannot be started, some things
+		# may remain and the user may not want them (such as a
+		# mounted base file system).
+		APPJAIL_START_SHRED="${APPJAIL_START_SHRED:-0}"
+		if [ "${APPJAIL_START_SHRED}" = "1" ]; then
+			stop_jail "${jail_name}"
+		fi
+
+		return 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		return 0
+	fi
+
+	if [ ! -f "${jail_path}/conf/config.conf" ]; then
+		lib_err ${EX_SOFTWARE} "The configuration file for this jail does not exist."
+	fi
+	
+	#
+	# Use the enabled parameters as a fallback.
+	#
+	
+	if [ ${_opt_run_initscript} -eq 0 ]; then
+		opt_run_initscript=`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -I`
+		if [ -n "${opt_run_initscript}" ]; then
+			opt_run_initscript=0
+		else
+			opt_run_initscript=1
+		fi
+	fi
+
+	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -i`}"
+	args="${args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -p`}"
+	
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		if [ -n "${initscript}" ]; then
+			if [ ! -x "${initscript}" ]; then
+				# The -i option has higher precedence.
+				lib_err ${EX_NOPERM} "Cannot execute \`${initscript}\`: No such file exists or it does not have the execution bit."
+			fi
+		else
+			initscript="${jail_path}/init"
+
+			if [ ! -x "${initscript}" ]; then
+				opt_run_initscript=0
+			fi
+
+			if [ -f "${initscript}" -a ! -x "${initscript}" ]; then
+				lib_warn "Cannot execute \`${initscript}\`: it does not have the execution bit."
+			fi
+		fi
+	fi
+
+	if [ ! -f "${jail_path}/conf/jail.conf" ]; then
+		lib_err ${EX_SOFTWARE} "Unable to find jail.conf."
+	fi
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		# *stop functions
+		env \
+			APPJAIL_CONFIG="${CONFIG}" \
+			APPJAIL_JAILDIR="${jail_path}/jail" \
+			APPJAIL_JAILNAME="${jail_name}" \
+			APPJAIL_ROOTDIR="${jail_path}" \
+			APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+				"${SCRIPTSDIR}/run_jail.sh" -Sf "${CONFIG}" -a "${args}" -- "${initscript}"
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "An error has occurred while executing the *stop functions in the initscript."
+		fi
+	fi
+
+	lib_warn "Stopping ${jail_name}..."
+
+	if [ ${opt_force} -eq 1 ]; then
+		jail_stop_args="-R"
+	fi
+
+	local fifo_filename
+	fifo_filename=`lib_generate_fifo` || exit $?
+
+	local escape_fifo_filename=`lib_escape_string "${fifo_filename}"`
+	lib_atexit_add "rm -f \"${escape_fifo_filename}\""
+
+	local jail_pid cat_pid
+
+	jail ${jail_stop_args} -f "${jail_path}/conf/jail.conf" "${jail_name}" > "${fifo_filename}" 2>&1 &
+	jail_pid=$!
+
+	cat < "${fifo_filename}" >&2 &
+	cat_pid=$!
+
+	wait ${jail_pid}
+
+	errlevel=$?
+	
+	kill ${cat_pid} > /dev/null 2>&1
+
+	rm -f "${fifo_filename}"
+
+	stop_jail "${jail_name}"
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "An error has occurred while stopping ${jail_name} jail."
+	fi
 }
 
-stop_appjail()
+stop_jail()
 {
-	lib_debug "Stopping..."
+	local errlevel=0
 
-	lib_su /bin/sh "${SCRIPTSDIR}/service.sh" $@
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: stop_jail jail_name"
+	fi
+
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		stop_jail # usage
+	fi
+
+	if lib_jail_exists "${jail_name}"; then
+		if lib_jail_created_by_appjail "${jail_name}"; then
+			lib_err ${EX_SOFTWARE} -- "${jail_name} is still running."
+		fi
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local jail_type
+
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	case "${jail_type}" in
+		thin)
+			basedir="${jail_path}/jail/.appjail"
+
+			if [ ! -d "${basedir}" ]; then
+				lib_err ${EX_SOFTWARE} "The base directory (${basedir}) does not exist."
+			fi
+
+			local tflag=
+			if [ "${ENABLE_ZFS}" != 0 ]; then
+				tflag="-t nozfs"
+			fi
+
+			mounted=`lib_mountpoint_mounted ${tflag} -s "${basedir}"`
+			
+			if [ -n "${mounted}" ]; then
+				lib_debug "unmounting: umount \"${basedir}\""
+
+				if ! umount "${basedir}"; then
+					lib_err ${EX_SOFTWARE} "Error unmounting \`${basedir}\`"
+				fi
+			else
+				if [ "${APPJAIL_START_SHRED}" = "0" ]; then
+					lib_warn "The base directory (${basedir}) is not mounted and should be."
+				fi
+			fi
+			;;
+	esac
 }
 
 stop_help()
 {
-	stop_usage
+	cat << EOF
+`stop_usage`
 
-	echo
-	echo "${stop_desc}"
-	echo
-	echo "Before deleting the jail, the *stop functions are executed."
-	echo
-	echo "  -T             When this is a thinjail, this flag must be used."
-	echo "  appjail        Name of the appjail application."
+${stop_desc}
+
+Parameters:
+    -I                        -- Stop jail but don't run the initscript.
+    -i initscript             -- Use a custom initscript.
+
+Options:
+    -f                        -- removes an existing jail without using the configuration file.
+                                 No removal-related parameters for this jail will be used.
+				 The jail will simply be removed.
+
+Options for -i:
+    -p parameter=value        -- Parameters for *stop functions.
+EOF
 }
 
 stop_usage()
 {
-	echo "usage: stop [-T] appjail [args]"
+	cat << EOF
+usage: stop [-f] [-i initscript] [[-p parameter=value] ...] jail
+       stop [-fI] jail
+EOF
 }

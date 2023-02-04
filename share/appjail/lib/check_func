@@ -1,23 +1,848 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/jail_types"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/network"
+lib_load "${LIBDIR}/sysexits"
+lib_load "${LIBDIR}/zfs"
+
+CHKFUNC_NETWORK_IFNAMSIZ=15
 
 lib_check_func()
 {
-	local _o _func
+	local function="$1"
 
-	_func="$1"
-	if [ -z "${_func}" ]; then
+	if [ -z "${function}" ]; then
 		lib_err ${EX_USAGE} "usage: lib_check_func function"
 	fi
 
-	_o="`type \"${_func}\" 2>&1`"
-	if [ $? -eq 0 ]; then
+	if type "${function}" > /dev/null 2>&1; then
 		return 0
 	else
 		return 1
+	fi
+}
+
+lib_check_var()
+{
+	local variable="$1"
+
+	if [ -z "${variable}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_var variable"
+	fi
+
+	if printf "%s" "${variable}" | grep -Eq '^[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_jailname()
+{
+	local jail_name="$1"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jailname jail_name"
+	fi
+
+	if _lib_check_humanname "${jail_name}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_networkname()
+{
+	local network_name="$1"
+
+	if [ -z "${network_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_networkname network_name"
+	fi
+
+	if _lib_check_humanname "${network_name}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_interfacename()
+{
+	local interface_name="$1"
+
+	if [ -z "${interface_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_interfacename interface_name"
+	fi
+
+	if printf "%s" "${interface_name}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9_.]*$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_humanname()
+{
+	local name="$1"
+
+	printf "%s" "${name}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9_-]*$'
+}
+
+lib_check_port()
+{
+	local port="$1"
+	
+	if [ -z "${port}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_port port"
+	fi
+
+	if ! lib_check_number "${port}"; then
+		return 1
+	fi
+
+	if [ ${port} -lt 1 -o ${port} -gt 65535 ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+lib_check_number()
+{
+	local number="$1"
+
+	if [ -z "${number}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_number number"
+	fi
+
+	if printf "%s" "${number}" | grep -Eq '^[0-9]+$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_jailparam()
+{
+	local parameter="$1"
+
+	if [ -z "${parameter}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jailparam parameter"
+	fi
+
+	if printf "%s" "${parameter}" | grep -Eq '^(\$?[a-zA-Z0-9._]+|\$[a-zA-Z0-9._]+|\$\{[a-zA-Z0-9._]+\})$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_comment()
+{
+	local comment="$1"
+
+	if [ -z "${comment}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_comment comment"
+	fi
+
+	if printf "%s" "${comment}" | grep -Eq '^[[:space:]]*#'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_empty()
+{
+	local text="$1"
+
+	if [ -z "${text}" ] || printf "%s" "${text}" | grep -Eq '^[[:space:]]+$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_jaillist()
+{
+	local parameter="$1"
+
+	if [ -z "${parameter}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jaillist parameter"
+	fi
+
+	if printf "%s" "${parameter}" | grep -Eq '\+$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_jailreq()
+{
+	local parameter="$1"
+
+	if [ -z "${parameter}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jailreq parameter"
+	fi
+
+	if printf "%s" "${parameter}" | grep -Eq '^\*'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_path_traversal()
+{
+	local errlevel=0
+	local src_dir dst_dir
+	local _src_dir _dst_dir
+
+	src_dir="$1"; dst_dir="$2"
+
+	if [ -z "${src_dir}" -o -z "${dst_dir}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_path_traversal src_dir dst_dir"
+	fi
+
+	_src_dir="${src_dir}"
+	_dst_dir="${dst_dir}"
+
+	if [ ! -d "${src_dir}" ]; then
+		lib_err ${EX_NOINPUT} "${src_dir} does not exist."
+	fi
+
+	# If it does not exist, it is probably path traversal.
+	if [ ! -d "${dst_dir}" ]; then
+		return 0
+	fi
+
+	src_dir=`realpath "${src_dir}"`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "realpath(1) error (${_src_dir})."
+	fi
+
+	dst_dir=`realpath "${dst_dir}"`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "realpath(1) error (${_dst_dir})."
+	fi
+
+	cmp=`printf "%s" "${dst_dir}" | grep -Fwo "${src_dir}"`
+
+	if [ "${cmp}" != "${src_dir}" ]; then
+		# Path traversal!
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_path_traversal_file()
+{
+	local errlevel=0
+	local rootdir="$1" file="$2"
+
+	if [ -z "${rootdir}" -o -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_path_traversal_file rootdir file"
+	fi
+
+	local _rootdir="${rootdir}" _file="${file}"
+
+	if [ ! -d "${rootdir}" ]; then
+		lib_err ${EX_NOINPUT} "${rootdir} does not exist."
+	fi
+
+	rootdir=`realpath "${rootdir}"`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "realpath(1) error (${_rootdir})."
+	fi
+
+	file=`realpath "${rootdir}/${file}"`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "realpath(1) error (${_file})."
+	fi
+
+	local rootdir_file=`printf "%s" "${file}" | grep -Fwo "${rootdir}"`
+
+	if [ "${rootdir}" != "${rootdir_file}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ipv4addr()
+{
+	local addr="$1"
+
+	if [ -z "${addr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_ipv4addr address"
+	fi
+
+	if "${UTILDIR}/ipcheck/ipcheck" -4 "${addr}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ipv6addr()
+{
+	local addr="$1"
+
+	if [ -z "${addr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_ipv6addr address"
+	fi
+
+	if "${UTILDIR}/ipcheck/ipcheck" -6 "${addr}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_testnet()
+{
+	local address network_address cidr
+
+	address="$1"; network_address="$2"; cidr="$3"
+
+	if [ -z "${address}" -o -z "${network_address}" -o -z "${cidr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_testnet address network_address cidr"
+	fi
+
+	if "${UTILDIR}/network/network" -N "${network_address}" -a "${address}" -n "${cidr}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_overlapnet()
+{
+	local network_addr1 network_cidr1
+	local network_addr2 network_cidr2
+
+	network_addr1="$1"; network_cidr1="$2"
+	network_addr2="$3"; network_cidr2="$4"
+
+	if [ -z "${network_addr1}" -o -z "${network_cidr1}" -o -z "${network_addr2}" -o -z "${network_cidr2}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_overlapnet network_addr1 network_cidr1 network_addr2 network_cidr2"
+	fi
+
+	if "${UTILDIR}/network/network" -O "${network_addr1}" -C "${network_cidr1}" -a "${network_addr2}" -n "${network_cidr2}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_vimage()
+{
+	local vimage=`sysctl -in kern.features.vimage`
+	vimage="${vimage:-0}"
+
+	if [ ${vimage} -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_racct()
+{
+	local racct=`sysctl -n kern.racct.enable`
+
+	if [ ${racct} -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ipv4_forwarding()
+{
+	local ipv4_forwarding=`sysctl -in net.inet.ip.forwarding`
+
+	if [ ${ipv4_forwarding} -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ispath()
+{
+	local pathname="$1"
+
+	if [ -z "${pathname}" ]; then
+		lib_err ${EX_USAGE} "lib_check_ispath pathname"
+	fi
+
+	if printf "%s" "${pathname}" | grep "[/]"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ifacegrp()
+{
+	local grp_iface
+	local iface="$1"
+	local group="$2"
+
+	if [ -z "${iface}" -o -z "${group}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_ifacegrp iface group"
+	fi
+
+	grp_iface=`_lib_check_ifacegrp "${iface}" "${group}"`
+
+	if [ -n "${grp_iface}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_ifacegrp()
+{
+	local iface="$1"
+	local group="$2"
+
+	if [ -z "${iface}" -o -z "${group}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_getifacegrp iface group"
+	fi
+
+	lib_network_ifacesgrp "${group}" | while IFS= read -r _iface; do
+		if [ "${_iface}" = "${iface}" ]; then
+			printf "%s\n" "${_iface}"
+			break
+		fi
+	done
+}
+
+lib_check_iface()
+{
+	local iface="$1"
+	local jail_name="$2"
+
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_iface iface [jail_name]"
+	fi
+
+	iface=`_lib_check_iface "${iface}" "${jail_name}"`
+
+	if [ -n "${iface}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_iface()
+{
+	local iface="$1"
+	local jail_name="$2"
+
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_iface iface [jail_name]"
+	fi
+
+	lib_network_ifaces "${jail_name}" | while IFS= read -r _iface; do
+		if [ "${_iface}" = "${iface}" ]; then
+			printf "%s\n" "${_iface}"
+			break
+		fi
+	done
+}
+
+lib_check_brgmember()
+{
+	local bridge="$1"
+	local member="$2"
+
+	if [ -z "${bridge}" -o -z "${member}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_brgmember bridge member"
+	fi
+
+	member=`_lib_check_brgmember "${bridge}" "${member}"`
+
+	if [ -n "${member}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_brgmember()
+{
+	local bridge="$1"
+	local member="$2"
+
+	if [ -z "${bridge}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_brgmember bridge member"
+	fi
+
+	lib_network_getbrgmembers "${bridge}" | while IFS= read -r _iface; do
+		if [ "${_iface}" = "${member}" ]; then
+			printf "%s\n" "${_iface}"
+			break
+		fi 
+	done
+}
+
+lib_check_signal()
+{
+	local signal="$1"
+	if [ -z "${signal}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_signal signal"
+	fi
+
+	local signals=`kill -l | tr '\n' ' ' | tr '[:upper:]' '[:lower:]' | sed -Ee 's/([a-z]+)/sig\1/g' | tr ' ' '\n'`
+
+	if echo "${signals}" | grep -qFw "${signal}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_rctl_rule()
+{
+	local rctl_rule="$1"
+
+	if [ -z "${rctl_rule}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_rctl_rule rctl_rule"
+	fi
+
+	if echo "${rctl_rule}" | grep -q -Ee '^[a-z]+:[a-z]+=[0-9]+[KkMmGgTtPpEe]?/[a-z]+$' -e '^[a-z]+:[a-z]+=[0-9]+[KkMmGgTtPpEe]?$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_rctl_resource()
+{
+	local resource="$1"
+
+	if [ -z "${resource}" ]; then
+		lib_err ${EX_USAGE} "lib_check_rctl_resource resource"
+	fi
+
+	if grep -qFw "${resource}" "${FILESDIR}/rctl-resources"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_rctl_action()
+{
+	local action="$1"
+
+	if [ -z "${action}" ]; then
+		lib_err ${EX_USAGE} "lib_check_rctl_action action"
+	fi
+
+	if grep -qFw "${action}" "${FILESDIR}/rctl-actions"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_rctl_subject()
+{
+	local subject="$1"
+
+	if [ -z "${subject}" ]; then
+		lib_err ${EX_USAGE} "lib_check_rctl_subject subject"
+	fi
+
+	if grep -qFw "${subject}" "${FILESDIR}/rctl-subjects"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_zfs_snapshot()
+{
+	local name="$1"
+	local snapname="$2"
+
+	if [ -z "${name}" -o -z "${snapname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_zfs_snapshot name snapname"
+	fi
+
+	snapname=`_lib_check_zfs_snapshot "${name}" "${snapname}"`
+
+	if [ -n "${snapname}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_zfs_snapshot()
+{
+	local name="$1"
+	local snapname="$2"
+
+	if [ -z "${name}" -o -z "${snapname}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_zfs_snapshot name snapname"
+	fi
+
+	lib_zfs_listsnapshots "${name}" | while IFS= read -r _snapname; do
+		if [ "${ZPOOL}/${ZROOTFS}/${name}@${snapname}" = "${_snapname}" ]; then
+			printf "%s\n" "${snapname}"
+			break
+		fi
+	done
+}
+
+lib_check_zfs_fs()
+{
+	local name="$1"
+	local fs="$2"
+
+	if [ -z "${name}" -o -z "${fs}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_zfs_fs name fs"
+	fi
+
+	fs=`_lib_check_zfs_fs "${name}" "${fs}"`
+
+	if [ -n "${fs}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_zfs_fs()
+{
+	local name="$1"
+	local fs="$2"
+
+	if [ -z "${name}" -o -z "${fs}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_zfs_fs name fs"
+	fi
+
+	lib_zfs_listfs "${name}" | while IFS= read -r _fs; do
+		if [ "${ZPOOL}/${ZROOTFS}/${name}/${fs}" = "${_fs}" ]; then
+			printf "%s\n" "${fs}"
+			break
+		fi
+	done
+}
+
+lib_check_jail_type()
+{
+	local jail_type="$1"
+
+	if [ -z "${jail_type}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jail_type jail_type"
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_GENERIC}|${JAIL_TYPE_THICK}|${JAIL_TYPE_THIN}|${JAIL_TYPE_DEBOOTSTRAP}) ;;
+		*) lib_err ${EX_DATAERR} "Valid jail types: ${JAIL_TYPE_GENERIC} ${JAIL_TYPE_THICK} ${JAIL_TYPE_THIN} ${JAIL_TYPE_DEBOOTSTRAP}" ;;
+	esac
+}
+
+lib_check_jinnet()
+{
+	local jail_name="$1"
+	local network_name="$2"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_jinnet jail_name network_name"
+	fi
+
+	if [ -f "${JAILDIR}/${jail_name}/conf/boot/network/reserved.${network_name}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_duplicate()
+{
+	local file="$1"
+
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_duplicate [- | file]"
+	fi
+
+	if [ "${file}" = "-" ]; then
+		sort | uniq -d
+	else
+		sort "${file}" | uniq -d
+	fi
+}
+
+lib_check_kernmod()
+{
+	local module="$1"
+
+	if [ -z "${module}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_kernmod module"
+	fi
+
+	if kldstat -qm "${module}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_devfs_ruleset()
+{
+	local devfs_ruleset="$1"
+
+	if [ -z "${devfs_ruleset}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_devfs_ruleset ruleset"
+	fi
+	
+	# See devfs(8)
+	if [ "${devfs_ruleset}" -eq 0 ]; then
+		return 0
+	fi
+
+	if devfs rule showsets | grep -qEe "^${devfs_ruleset}$"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_ifacelen()
+{
+	local iface="$1"
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_ifacelen iface"
+	fi
+
+	if [ `printf "%s" "${iface}" | wc -c` -gt ${CHKFUNC_NETWORK_IFNAMSIZ} ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_etherlen()
+{
+	local ether_name="$1"
+	if [ -z "${ether_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_etherlen ether_name"
+	fi
+	
+	# CHKFUNC_NETWORK_IFNAMSIZ - <prefix>[ab]_
+	# <prefix> must have 1 byte.
+	if [ `printf "%s" ${ether_name} | wc -c` -gt $((CHKFUNC_NETWORK_IFNAMSIZ-3)) ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_cpulist()
+{
+	local cpu_list="$1"
+	if [ -z "${cpu_list}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_cpulist cpu_list"
+	fi
+
+	local new_list
+	new_list=`_lib_check_cpulist "${cpu_list}"` || exit $?
+	new_list=`echo "${new_list}" | sed -Ee 's/,$//'`
+
+	echo "${new_list}"
+}
+
+_lib_check_cpulist()
+{
+	local errlevel
+
+	local ncpu
+	ncpu=`sysctl -n hw.ncpu`
+	ncpu=$((ncpu-1))
+
+	local new_list=
+
+	printf "%s\n" "${cpu_list}" | grep -Eoe '([^,-]+)' -e '([^,-]+-[^,-]+)' -e '([^,-]+),[^,-]+)' | while IFS= read -r cpu
+	do
+		if printf "%s\n" "${cpu}" | grep -qEe '[^,-]+-[^,-]+'; then
+			first=`echo "${cpu}" | cut -d'-' -f1`
+			last=`echo "${cpu}" | cut -d'-' -f2`
+
+			if ! lib_check_number "${first}" || ! lib_check_number "${last}"; then
+				lib_err ${EX_DATAERR} "Invalid range: ${first}-${last}"
+			fi
+
+			if [ ${first} -gt ${last} -o ${last} -lt ${first} ]; then
+				lib_err ${EX_DATAERR} "Invalid range: ${first}-${last}"
+			fi
+
+			if [ ${first} -lt 0 -o ${last} -gt ${ncpu} ]; then
+				lib_err ${EX_DATAERR} "Valid range: 0-${ncpu}"
+			fi
+
+			echo -n "${first}-${last},"
+		else
+			if ! lib_check_number "${cpu}"; then
+				lib_err ${EX_DATAERR} "Invalid CPU ID: ${cpu}"
+			fi
+
+			if [ ${cpu} -lt 0 -o ${cpu} -gt ${ncpu} ]; then
+				lib_err ${EX_DATAERR} "Valid range: 0-${ncpu}"
+			fi
+
+			echo -n "${cpu},"
+		fi
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
 	fi
 }

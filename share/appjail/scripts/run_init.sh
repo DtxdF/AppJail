@@ -1,129 +1,146 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 main()
 {
 	local _o
-	local script config function
+	local config function script
 
 	if [ $# -eq 0 ]; then
 		usage
 		exit 64 # EX_USAGE
 	fi
 
-	while getopts ":sSCc:i:" _o; do
+	while getopts ":CcSsf:" _o; do
 		case "${_o}" in
-			s)
-				function="start"
-				;;
-			S)
-				function="stop"
-				;;
 			C)
 				function="cmd"
 				;;
 			c)
+				function="create"
+				;;
+			S)
+				function="stop"
+				;;
+			s)
+				function="start"
+				;;
+			f)
 				config="${OPTARG}"
 				;;
-			i)
-				script="${OPTARG}"
-				;;
 			*)
-				usage
-				exit 64 # EX_USAGE
+				main # usage
 				;;
 		esac
 	done
 	shift $((OPTIND-1))
 
-	if [ -z "${config}" -o -z "${script}" -o -z "${function}" ]; then
-		usage
-		exit 64 # EX_USAGE
+	script="$1"; shift
+
+	if [ -z "${config}" -o -z "${function}" -o -z "${script}" ]; then
+		main # usage
 	fi
 
 	if [ ! -f "${config}" ]; then
-		echo "Configuration file \`${config}\` does not exists or you don't have permission to read it." >&2
+		echo "Configuration file \`${config}\` does not exist or you don't have permission to read it." >&2
 		exit 66 # EX_NOINPUT
 	fi
 
 	. "${config}"
-	. "${LIBDIR}/sysexits"
-	. "${LIBDIR}/log"
+	. "${LIBDIR}/load"
+	lib_load "${SCRIPTSDIR}/default_env.sh"
+	lib_load "${LIBDIR}/log"
+	lib_load "${LIBDIR}/check_func"
 
-	run_cmd "${script}" "${function}" $@
-}
-
-help()
-{
-	usage
-
-	echo
-	echo "  -s                                 Run the *start functions."
-	echo "  -S                                 Run the *stop functions."
-	echo "  -C                                 Run the *cmd functions."
-	echo "  -c path/to/appjail.conf            Path to the appjail configuration."
-	echo "  -i path/to/some/init_script        Path to the init script."
+	run_cmd "${script}" "${function}" "$@"
 }
 
 usage()
 {
-	echo "usage: run_init.sh [-s | -S | -C] -c path/to/appjail.conf -i path/to/some/init_script -- args..."
+	echo "usage: run_init.sh [-C | -c | -S | -s] -f config init_script [args ...]"
 }
 
 run_cmd()
 {
-	local script
-
-	script="$1"
-	func="$2"
+	local __appjail_script__="$1"
+	local __appjail_function__="$2"
 
 	shift 2
 
-	if [ -z "${script}" -o -z "${func}" ]; then
-		lib_err ${EX_USAGE} "usage: run_cmd path/to/some/init_script function [args...]"
+	if [ -z "${__appjail_script__}" -o -z "${__appjail_function__}" ]; then
+		lib_err ${EX_USAGE} "usage: run_cmd init_script function [args...]"
 	fi
 
-	if [ ! -x "${script}" ]; then
-		lib_err ${EX_NOINPUT} "You don't have permissions to run \`${script}\` or it does not exists."
+	if [ ! -x "${__appjail_script__}" ]; then
+		lib_err ${EX_NOPERM} "Cannot execute \`${__appjail_script__}\`: No such file exists or it does not have the execution bit."
 	fi
 
-	. "${LIBDIR}/check_func"
-	# Paranoid method to not overwrite the run_init.sh functions.
+	lib_debug "Running initscript \`${__appjail_script__}\` ..."
+
 	(
-	_ret=0
+	__appjail_errlevel__=0
+	__appjail_scriptdir__=`dirname "${__appjail_script__}"`
 
-	cd "`dirname \"${script}\"`"
+	cd "${__appjail_scriptdir__}"
+	. "${__appjail_script__}"
 
-	. "${script}"
+	if lib_check_func "pre${__appjail_function__}"; then
+		lib_debug "Running pre${__appjail_function__}() ..."
 
-	if lib_check_func "pre${func}"; then
-		eval pre${func}
+		pre${__appjail_function__} "$@"; __appjail_errlevel__=$?
+
+		lib_debug "pre${__appjail_function__}() exits with status code ${__appjail_errlevel__}"
 	fi
 
-	_ret=$?
-
-	if [ $? -eq 0 ] && lib_check_func "${func}"; then
-		eval ${func} $@
+	if [ ${__appjail_errlevel__} -ne 0 ]; then
+		lib_debug -- "${__appjail_function__}() will not run because pre${__appjail_function__}() exits with a non-zero exit status."
 	fi
 
-	# Catch only the non-zero return values
-	if [ ${_ret} -eq 0 ]; then
-		_ret=$?
+	if [ ${__appjail_errlevel__} -eq 0 ] && lib_check_func "${__appjail_function__}"; then
+		${__appjail_function__} "$@"; __appjail_errlevel__=$?
+
+		lib_debug -- "${__appjail_function__}() exits with status code ${__appjail_errlevel__}"
 	fi
 
-	if lib_check_func "post${func}"; then
-		eval post${func}
+	if lib_check_func "post${__appjail_function__}"; then
+		post${__appjail_function__} "$@"
+
+		lib_debug "post${__appjail_function__}() exits with status code $?"
 	fi
 
-	exit ${_ret}
+	lib_debug "\`${__appjail_script__}\` exits with status code ${__appjail_errlevel__}"
+
+	exit ${__appjail_errlevel__}
 	)
 
 	return $?
 }
 
-main $@
+main "$@"

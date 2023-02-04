@@ -1,0 +1,15 @@
+bin
+boot
+lib
+libexec
+rescue
+sbin
+usr/bin
+usr/include
+usr/lib
+usr/lib32
+usr/libdata
+usr/libexec
+usr/sbin
+usr/share
+usr/src

@@ -1,0 +1,307 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+
+cmd_desc="Execute commands in a jail."
+
+cmd_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		all|jaildir|chroot|jexec|local) ;;
+		*) cmd_usage; exit ${EX_USAGE} ;;
+	esac
+
+	cmd_${entity} "$@"
+}
+
+cmd_all()
+{
+	local _o
+	local opt_failsafe=0
+	local input_file="/dev/null"
+	local errlevel=0
+	local jail_name
+
+	while getopts ":ei:" _o; do
+		case "${_o}" in
+			e)
+				opt_failsafe=1
+				;;
+			i)
+				input_file="${OPTARG}"
+				;;
+			*)
+				cmd_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	command="$1"; shift
+	if [ -z "${command}" ]; then
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		chroot|jexec|local) ;;
+		*) lib_err ${EX_DATAERR} "Valid commands: chroot, jexec, local."
+	esac
+
+	"${APPJAIL_PROGRAM}" jail list -HIpt name | while IFS= read -r jail_name
+	do
+		lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+		lib_debug "Running: $@"
+
+		"${APPJAIL_PROGRAM}" cmd "${command}" "${jail_name}" "$@" < "${input_file}"
+
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			if [ ${opt_failsafe} -eq 1 ]; then
+				lib_err ${errlevel} "Stop caused by a non-zero value."
+			fi
+		fi
+	done
+}
+
+cmd_jaildir()
+{
+	if [ ! -d "${JAILDIR}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${JAILDIR}\` directory."
+	fi
+
+	# If no commands are provided
+	if [ $# -eq 0 ]; then
+		set -- "${SHELL:-/bin/sh}"
+	fi
+
+	(cd "${JAILDIR}"; command -- "$@")
+}
+
+cmd_chroot()
+{
+	local jail_name
+
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}/jail"
+	if [ ! -d "${jail_path}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	chroot -- "${jail_path}" "$@"
+}
+
+cmd_jexec()
+{
+	local _o
+	local opt_clean=1
+	local jail_username=
+	local host_username=
+	local jail_name
+	local jexec_args=
+
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":lU:u:" _o; do
+		case "${_o}" in
+			U|u)
+				if lib_check_empty "${OPTARG}"; then
+					cmd_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			l)
+				opt_clean=0
+				;;
+			U)
+				jail_username="${OPTARG}"
+				;;
+			u)
+				host_username="${OPTARG}"
+				;;
+			*)
+				cmd_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}/jail" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		return 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		return 0
+	fi
+
+	if [ ${opt_clean} -eq 1 ]; then
+		jexec_args="-l"
+	fi
+
+	if ! lib_check_empty "${jail_username}"; then
+		jexec ${jexec_args} -U "${jail_username}" -- "${jail_name}" "$@"
+	elif ! lib_check_empty "${host_username}"; then
+		jexec ${jexec_args} -u "${host_username}" -- "${jail_name}" "$@"
+	else
+		jexec ${jexec_args} -- "${jail_name}" "$@"
+	fi
+}
+
+cmd_local()
+{
+	local _o
+	local opt_jails=0
+	local opt_jail=1
+	local opt_rootdir=0
+	local jail_name
+	local basedir
+
+	jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":jr" _o; do
+		case "${_o}" in
+			j)
+				opt_jail=1
+				opt_rootdir=0
+				;;
+			r)
+				opt_rootdir=1
+				opt_jail=0
+				;;
+			*)
+				cmd_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_jail} -eq 1 ]; then
+		basedir="${JAILDIR}/${jail_name}/jail"
+	elif [ ${opt_rootdir} -eq 1 ]; then
+		basedir="${JAILDIR}/${jail_name}"
+	else
+		cmd_usage
+		exit ${EX_USAGE}
+	fi
+
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${basedir}\` directory."
+	fi
+
+	# If no commands are provided
+	if [ $# -eq 0 ]; then
+		set -- "${SHELL:-/bin/sh}"
+	fi
+
+	(cd "${basedir}"; command -- "$@")
+}
+
+cmd_help()
+{
+	cat << EOF
+`cmd_usage`
+
+${cmd_desc}
+
+Parameters:
+    all                     -- Run a command in all jails.
+    chroot                  -- Use chroot(8).
+    jaildir                 -- Like local, but use {JAILDIR}.
+    jexec                   -- Use jexec(8).
+    local                   -- Run a command after changing the directory to the
+                               jail directory.
+
+Options for all:
+    -e                      -- Exits when a command returns a non-zero value.
+    -i input_file           -- File to use as input for all commands.
+
+Options for jexec:
+    -l                      -- By default -l of jexec(8) is used. This option
+                               does not use -l to clean up the environment.
+    -U jail_username        -- See -U in jexec(8).
+    -u host_username        -- See -u in jexec(8).
+
+Options for local:
+    -j                      -- Use {JAILDIR}/{jail_name}/jail.
+    -r                      -- Use {JAILDIR}/{jail_name}.
+EOF
+}
+
+cmd_usage()
+{
+	cat << EOF
+usage: cmd all [-e] [-i input_file] [chroot | jexec | local] args ...
+       cmd jaildir [cmd args ...]
+       cmd chroot jail_name [cmd args ...]
+       cmd jexec jail_name [-l] [-U jail_username | -u host_username] [cmd args ...]
+       cmd local jail_name [-j | -r] [cmd args ...]
+EOF
+}

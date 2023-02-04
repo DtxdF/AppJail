@@ -1,53 +1,132 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-run_desc="Run an init script from an appjail application."
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+
+run_desc="Execute the *cmd functions from an initscript of a jail."
 
 run_main()
 {
-	local appjail
+	local _o
+	local jail_name
+	local initscript=
+	local args=
 
-	appjail="$1"
+	while getopts ":i:p:" _o; do
+		case "${_o}" in
+			i|p)
+				if lib_check_empty "${OPTARG}"; then
+					run_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
 
-	if [ -z "${appjail}" ]; then
+		case "${_o}" in
+			i)
+				initscript="${OPTARG}"
+				;;
+			p)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				args="${args} \"${arg}\""
+				;;
+			*)
+				run_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
 		run_usage
 		exit ${EX_USAGE}
 	fi
 
-	shift
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
 
-	. "${LIBDIR}/replace"
-	. "${LIBDIR}/su"
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
 
-	run_appjail -C -c "${CONFIG}" -a "${appjail}" -- $@
-}
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}/jail" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
 
-run_appjail()
-{
-	lib_debug "Running..."
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		return 0
+	fi
 
-	lib_su /bin/sh "${SCRIPTSDIR}/run_jail.sh" $@
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		return 0
+	fi
+
+	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" run -i`}"
+	args="${args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" run -p`}"
+
+	if lib_check_empty "${initscript}"; then
+		initscript="${JAILDIR}/${jail_name}/init"
+	fi
+
+	env \
+		APPJAIL_CONFIG="${CONFIG}" \
+		APPJAIL_JAILDIR="${jail_path}/jail" \
+		APPJAIL_JAILNAME="${jail_name}" \
+		APPJAIL_ROOTDIR="${jail_path}" \
+		APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+			"${SCRIPTSDIR}/run_jail.sh" -Cf "${CONFIG}" -a "${args}" -- "${initscript}"
 }
 
 run_help()
 {
-	run_usage
+	cat << EOF
+`run_usage`
 
-	echo
-	echo "${run_desc}"
-	echo
-	echo "The command only executes the *cmd functions. The *start and *stop functions are the"
-	echo "responsibility of the start and stop commands."
-	echo
-	echo "  appjail          Name of the appjail application."
+${run_desc}
+
+Options:
+    -i initscript             -- Use a custom initscript.
+    -p parameter=value        -- Parameters for *cmd functions.
+EOF
 }
 
 run_usage()
 {
-	echo "usage: run appjail [args]"
+	echo "usage: run [-i initscript] [[-p parameter=value] ...] jail"
 }

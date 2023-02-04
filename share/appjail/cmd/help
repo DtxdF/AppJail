@@ -1,10 +1,35 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/whitespaces"
+lib_load "${LIBDIR}/strlen"
 
 help_desc="Show help for commands and list the available commands."
 
@@ -24,19 +49,13 @@ help_message()
 {
 	local _var _val _desc
 	local _cmd_minlen _cmd_len _cmd_maxlen _cmds cmd
+	local _help_information
 
-	. "${LIBDIR}/whitespaces"
-	. "${LIBDIR}/strlen"
-
-	echo "Help information"
-	echo "================"
-	echo
-
-	_cmds="`ls "${COMMANDS}"`"
+	_cmds=`ls "${COMMANDS}"`
 
 	_cmd_maxlen=0
 	for cmd in ${_cmds}; do
-		_cmd_len="`lib_strlen \"${cmd}\"`"
+		_cmd_len=`lib_strlen "${cmd}"`
 
 		if [ ${_cmd_len} -gt ${_cmd_maxlen} ]; then
 			_cmd_maxlen=${_cmd_len}
@@ -44,22 +63,20 @@ help_message()
 	done
 
 	for cmd in ${_cmds}; do
-		. "${COMMANDS}/${cmd}"
+		lib_load "${COMMANDS}/${cmd}"
 
 		_var=`echo \\$${cmd}_desc`
 		_val=`eval echo $_var`
-		_desc=$_val
+		_desc="$_val"
 
-		_cmd_len="`lib_strlen \"${cmd}\"`"
+		_cmd_len=`lib_strlen "${cmd}"`
 		_cmd_minlen=$((${_cmd_maxlen}-${_cmd_len}))
 
-		echo -n "${cmd}"
-		echo -n "`lib_generate_whitespaces ${_cmd_minlen}`"
-		echo -n "`lib_generate_whitespaces 4`"
-		echo "${_desc}"
+		_help_information="${_help_information}  ${cmd}`lib_generate_whitespaces $((_cmd_minlen+4))`${_desc}\n"
 	done
 
-	echo
+	echo "Commands:"
+	echo -e "${_help_information}"
 	echo "Use \`help cmd\` to display the help information for that command."
 }
 
@@ -73,16 +90,16 @@ help_for()
 	fi
 
 	if [ ! -x "${COMMANDS}/${cmd}" ]; then
-		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exists."
+		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exist."
 	fi
 
-	. "${COMMANDS}/${cmd}"
+	lib_load "${COMMANDS}/${cmd}"
 
 	if ! lib_check_func "${cmd}_help"; then
-		lib_err ${EX_SOFTWARE} "${cmd}_help function does not exists in the ${cmd} command."
+		lib_err ${EX_SOFTWARE} "${cmd}_help function does not exist in the ${cmd} command."
 	fi
 
-	eval ${cmd}_help
+	${cmd}_help
 }
 
 help_help()

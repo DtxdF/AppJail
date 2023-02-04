@@ -1,102 +1,120 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 main()
 {
 	local _o
-	local config
-	local jail_conf
-	local appjail
 	local cmd
+	local args
+	local config
+	local initscript
+	# For argument parsing
+	local args_list arg
+	local total_items current_index
+	local parameter param_value
 
 	if [ $# -eq 0 ]; then
-		help
-		exit 64 # EX_USAGE
-	fi
-
-	while getopts ":sSCa:c:" _o; do
-		case "${_o}" in
-			s|S|C)
-				cmd="-${_o}"
-				;;
-			a)
-				appjail="${OPTARG}"
-				;;
-			c)
-				config="${OPTARG}"
-				;;
-			*)
-				usage
-				exit 64 # EX_USAGE
-		esac
-	done
-	shift $((OPTIND-1))
-
-	if [ -z "${config}" -o -z "${cmd}" -o -z "${appjail}" ]; then
 		usage
 		exit 64 # EX_USAGE
 	fi
 
+	while getopts ":CcSsa:f:" _o; do
+		case "${_o}" in
+			C|c|S|s)
+				cmd="-${_o}"
+				;;
+			a)
+				args="${OPTARG}"
+				;;
+			f)
+				config="${OPTARG}"
+				;;
+			*)
+				main # EX_USAGE
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	initscript="$1"; shift
+
+	if [ -z "${cmd}" -o -z "${config}" -o -z "${initscript}" ]; then
+		main # EX_USAGE
+	fi
+
 	if [ ! -f "${config}" ]; then
-		echo "Configuration file \`${config}\` does not exists or you don't have permission to read it." >&2
+		echo "Configuration file \`${config}\` does not exist or you don't have permission to read it." >&2
 		exit 66 # EX_NOINPUT
 	fi
 
 	. "${config}"
-	. "${LIBDIR}/sysexits"
-	. "${LIBDIR}/log"
-	. "${LIBDIR}/tempfile"
-	. "${LIBDIR}/replace"
-	. "${LIBDIR}/atexit"
-	. "${LIBDIR}/jail"
+	. "${LIBDIR}/load"
+	lib_load "${SCRIPTSDIR}/default_env.sh"
+	lib_load "${LIBDIR}/check_func"
+	lib_load "${LIBDIR}/jail"
+	lib_load "${LIBDIR}/log"
 
-	lib_atexit_init
+	# cleared
+	set --
+	if ! lib_check_empty "${args}"; then
+		args_list=`lib_split_jailparams "${args}"`
+		total_items=`printf "%s\n" "${args_list}" | wc -l`
+		current_index=0
 
-	if [ ! -d "${APPSDIR}/${appjail}" ]; then
-		lib_err ${EX_NOINPUT} "The ${appjail} appjail does not exists."
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+			arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+			
+			parameter=`lib_jailparam_name "${arg}" =`
+
+			if lib_check_empty "${parameter}"; then
+				lib_err ${EX_DATAERR} "The parameter (${current_index}) is empty: ${arg}"
+			fi
+
+			param_value=`lib_jailparam_value "${arg}" =`
+
+			if lib_check_empty "${param_value}"; then
+				lib_err ${EX_DATAERR} "option requires an argument -- ${parameter}"
+			fi
+
+			set -- "$@" "--${parameter}" "${param_value}"
+		done
 	fi
 
-	if [ ! -f "${APPSDIR}/${appjail}/.${appjail}" ]; then
-		lib_err ${EX_NOINPUT} "The ${appjail} appjail exists, but it seems to have an incomplete installation."
-	fi
+	"${SCRIPTSDIR}/run_init.sh" -f "${config}" ${cmd} "${initscript}" "$@"
 
-	if [ ! -f "${APPSDIR}/${appjail}/init" ]; then
-		lib_err ${EX_NOINPUT} "The init script does not exists in ${APPSDIR}/${appjail}."
-	fi
-
-	if ! lib_jail_exists "${appjail}"; then
-		lib_err ${EX_SOFTWARE}  "${appjail} is not running."
-	fi
-
-	init_script="${APPSDIR}/${appjail}/init"
-
-	env \
-		APPJAIL_ROOTDIR="${APPSDIR}/${appjail}" \
-		APPJAIL_JAILDIR="${APPSDIR}/${appjail}/jail" \
-		APPJAIL_JAILNAME="${appjail}" \
-		/bin/sh "${SCRIPTSDIR}/run_init.sh" ${cmd} -c "${config}" -i "${init_script}" -- $@
-}
-
-help()
-{
-	usage
-
-	echo
-	echo "  -s                  Run the *start functions."
-	echo "  -S                  Run the *stop functions."
-	echo "  -C                  Run the *cmd functions."
-	echo "  -c config           Path to the appjail configuration."
-	echo "  -a appjail          Name of the appjail application."
 }
 
 usage()
 {
-	echo "usage: run_jail.sh [-s | -S | -C] -c config -a appjail -- [args...]"
+	echo "usage: run_jail.sh [-C | -c | -S | -s] -f config [-a args] initscript"
 }
 
-main $@
+main "$@"

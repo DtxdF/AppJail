@@ -1,0 +1,297 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/random"
+
+enabled_desc="Get value of a enabled parameter."
+
+enabled_main()
+{
+	local jail_path
+	local bootdir
+	local jail_name="$1"
+	local command="$2"
+
+	shift 2
+
+	if lib_check_empty "${jail_name}" || lib_check_empty "${command}"; then
+		enabled_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ $# -eq 0 ]; then
+		enabled_usage
+		exit ${EX_USAGE}
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}/jail" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+
+	case "${command}" in
+		start|stop|run) ;;
+		*) enabled_usage; exit ${EX_USAGE} ;;
+	esac
+
+	bootdir="${jail_path}/conf/boot/${command}"
+	if [ ! -d "${bootdir}" ]; then
+		return 0
+	fi
+
+	case "${command}" in
+		start)
+			enabled_start "${jail_name}" "$@"
+			;;
+		stop)
+			enabled_stop "${jail_name}" "$@"
+			;;
+		run)
+			enabled_run "${jail_name}" "$@"
+			;;
+	esac
+}
+
+enabled_start()
+{
+	local _o
+	local jail_name
+	local jail_path
+	local bootdir
+	local opt_run_initscript=0
+	local opt_create_args=0
+	local opt_initscript=0
+	local opt_start_args=0
+	local opt_template=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: enabled_start jail_name [-I | -c | -i | -s | -t]"
+	fi
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		enabled_start # usage
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	bootdir="${jail_path}/conf/boot/start"
+
+	while getopts ":cIist" _o; do
+		case "${_o}" in
+			c)
+				opt_create_args=1
+				;;
+			I)
+				opt_run_initscript=1
+				;;
+			i)
+				opt_initscript=1
+				;;
+			s)
+				opt_start_args=1
+				;;
+			t)
+				opt_template=1
+				;;
+			*)
+				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
+				;;
+		esac
+	done
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		if [ -f "${bootdir}/norun_initscript" ]; then
+			echo "1"
+		fi
+	elif [ ${opt_create_args} -eq 1 ]; then
+		if [ -f "${bootdir}/create_args" ]; then
+			head -1 "${bootdir}/create_args"
+		fi
+	elif [ ${opt_initscript} -eq 1 ]; then
+		if [ -f "${bootdir}/initscript" ]; then
+			head -1 "${bootdir}/initscript"
+		fi
+	elif [ ${opt_start_args} -eq 1 ]; then
+		if [ -f "${bootdir}/start_args" ]; then
+			head -1 "${bootdir}/start_args"
+		fi
+	elif [ ${opt_template} -eq 1 ]; then
+		if [ -f "${bootdir}/template" ]; then
+			head -1 "${bootdir}/template"
+		fi
+	fi
+}
+
+enabled_stop()
+{
+	local _o
+	local jail_name
+	local jail_path
+	local bootdir
+	local opt_run_initscript=0
+	local opt_initscript=0
+	local opt_args=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: enabled_stop jail_name [-I | -i | -p]"
+	fi
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		enabled_stop # usage
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	bootdir="${jail_path}/conf/boot/stop"
+
+	while getopts ":Iip" _o; do
+		case "${_o}" in
+			I)
+				opt_run_initscript=1
+				;;
+			i)
+				opt_initscript=1
+				;;
+			p)
+				opt_args=1
+				;;
+			*)
+				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
+				;;
+		esac
+	done
+
+	if [ ${opt_run_initscript} -eq 1 ]; then
+		if [ -f "${bootdir}/norun_initscript" ]; then
+			echo "1"
+		fi
+	elif [ ${opt_initscript} -eq 1 ]; then
+		if [ -f "${bootdir}/initscript" ]; then
+			head -1 "${bootdir}/initscript"
+		fi
+	elif [ ${opt_args} -eq 1 ]; then
+		if [ -f "${bootdir}/args" ]; then
+			head -1 "${bootdir}/args"
+		fi
+	fi
+}
+
+enabled_run()
+{
+	local _o
+	local jail_name
+	local jail_path
+	local bootdir
+	local opt_initscript=0
+	local opt_args=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: enabled_run jail_name [-i | -p]"
+	fi
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		enabled_run # usage
+	fi
+
+	jail_path="${JAILDIR}/${jail_name}"
+	bootdir="${jail_path}/conf/boot/run"
+
+	while getopts ":ip" _o; do
+		case "${_o}" in
+			i)
+				opt_initscript=1
+				;;
+			p)
+				opt_args=1
+				;;
+			*)
+				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
+				;;
+		esac
+	done
+
+	if [ ${opt_initscript} -eq 1 ]; then
+		if [ -f "${bootdir}/initscript" ]; then
+			head -1 "${bootdir}/initscript"
+		fi
+	elif [ ${opt_args} -eq 1 ]; then
+		if [ -f "${bootdir}/args" ]; then
+			head -1 "${bootdir}/args"
+		fi
+	fi
+}
+
+enabled_help()
+{
+	cat << EOF
+`enabled_usage`
+
+${enabled_desc}
+
+Parameters:
+    start        -- Get values for the start command.
+    stop         -- Get values for the stop command.
+    run          -- Get values for the run command.
+
+Options for start:
+    -c           -- Get parameters for the *create functions.
+    -I           -- Print zero if the initscript will not be executed.
+    -i           -- Get path to the custom initscript.
+    -s           -- Get parameters for the *start functions.
+    -t           -- Get path to the custom template.
+
+Options for stop:
+    -I           -- Print zero if the initscript will not be executed.
+    -i           -- Get path to the custom initscript.
+    -p           -- Get parameters for the *stop functions.
+
+Options for run:
+    -i           -- Get path to the custom initscript.
+    -p           -- Get parameters for the *cmd functions.
+EOF
+}
+
+enabled_usage()
+{
+	cat << EOF
+usage: enabled jail start [-I | -c | -i | -s | -t]
+       enabled jail stop [-I | -i | -p]
+       enabled jail run [-i | -p]
+EOF
+}

@@ -1,0 +1,142 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${SCRIPTSDIR}/default_env.sh"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+COPY_OPTION_URL=1
+COPY_OPTION_DST=2
+
+main()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: ADD [--verbose] url [dst]"
+	fi
+	
+	# Options
+	local verbose=0
+	
+	# Arguments
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local current_index=0
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		case "${arg}" in
+			--verbose)
+				verbose=1
+				;;
+			--)
+				break
+				;;
+			--*)
+				main # usage
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+	current_index=$((current_index-1))
+
+	# add options
+	local url= dst=
+
+	local option=0
+	while [ ${current_index} -lt ${total_items} ]; do 
+		option=$((option+1))
+		current_index=$((current_index+1))
+
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+
+		if lib_check_empty "${arg}"; then
+			main # usage
+		fi
+
+		if [ ${option} -eq ${COPY_OPTION_URL} ]; then
+			url="${arg}"
+		elif [ ${option} -eq ${COPY_OPTION_DST} ]; then
+			dst="${arg}"
+		else
+			break
+		fi
+	done
+
+	if [ -z "${url}" ]; then
+		main # usage
+	fi
+
+	local escape_chars
+	escape_chars='`"\'
+
+	local workdir
+	local workdir_file="${MAKEJAIL_TEMPDIR}/workdir/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${workdir_file}" ]; then
+		local workdir_escape_chars='`"\$'
+
+		workdir=`head -1 -- "${workdir_file}"`
+		workdir=`lib_escape_string "${workdir}" "" "${workdir_escape_chars}"`
+	else
+		workdir=
+	fi
+
+	local escape_dst=
+	if [ -n "${dst}" ]; then
+		escape_dst=`lib_escape_string "${dst}" "" "${escape_chars}"`
+	fi
+	escape_dst="${workdir}/${escape_dst}"
+	escape_dst="\${APPJAIL_JAILDIR}${escape_dst}"
+
+	local tar_args
+	if [ ${verbose} -eq 1 ]; then
+		tar_args="-v"
+	fi
+
+	local escape_url=`lib_escape_string "${url}" "" "${escape_chars}"`
+	local fetch_cmd=`lib_multi_replace "${MAKEJAIL_ADD_FETCH_CMD}" u "\"${escape_url}\""`
+
+	echo "${fetch_cmd} | tar ${tar_args} -C \"${escape_dst}\" -xf -"
+}
+
+main "$@"

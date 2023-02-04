@@ -1,26 +1,67 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/sysexits"
+lib_load "${LIBDIR}/tempfile"
 
 lib_atexit_init()
 {
-	. "${LIBDIR}/tempfile"
-
 	_ATEXIT_CMDS=`lib_generate_tempfile`
 
-	chmod +x "${_ATEXIT_CMDS}"
+	if [ $? -ne 0 ]; then
+		lib_err ${EX_SOFTWARE} "Error initializing the atexit file."
+	fi
 
-	trap "[ ! -x \"${_ATEXIT_CMDS}\" ] || /bin/sh \"${_ATEXIT_CMDS}\"; rm -f \"${_ATEXIT_CMDS}\"" SIGINT SIGQUIT SIGTERM EXIT
+	trap "ATEXIT_ERRLEVEL=\$?; lib_atexit_cleanup; exit \${ATEXIT_ERRLEVEL}" SIGINT SIGQUIT SIGTERM EXIT
+}
+
+lib_atexit_cleanup()
+{
+	# ignore
+	trap '' SIGINT SIGQUIT SIGTERM EXIT
+
+	if [ -f "${_ATEXIT_CMDS}" ]; then
+		/bin/sh "${_ATEXIT_CMDS}"
+		rm -f "${_ATEXIT_CMDS}"
+	fi
 }
 
 lib_atexit_add()
 {
-	if [ -z "${_ATEXIT_CMDS}" ]; then
+	local cmd="$@"
+
+	if [ ! -f "${_ATEXIT_CMDS}" ]; then
 		lib_err ${EX_NOINPUT} "You must first executed lib_atexit_init() function before use this function."
 	fi
 
-	echo $* >> "${_ATEXIT_CMDS}"
+	if ! printf "%s\n" "${cmd}" >> "${_ATEXIT_CMDS}"; then
+		lib_err ${EX_IOERR} "Could not add a command to the atexit file."
+	fi
 }

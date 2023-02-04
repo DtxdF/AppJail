@@ -1,75 +1,1879 @@
 #!/bin/sh
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-jail_desc="Create a jail. This command must be used before the build command."
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/copy"
+lib_load "${LIBDIR}/files"
+lib_load "${LIBDIR}/kern_modules"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+lib_load "${LIBDIR}/zfs"
+
+jail_desc="Create a new thin or thick jail."
 
 jail_main()
 {
-	local _o jail_name
-	local _cj_cmd _cj_opts
-	local opt_download opt_extract
-	local chroot_tempfile jail_tempfile
-	local components
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		boot|clean|create|destroy|get|list|mark|priority|rename) ;;
+		*) jail_usage; exit ${EX_USAGE} ;;
+	esac
+
+	jail_${entity} "$@"
+}
+
+jail_boot()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		off|on) ;;
+		*) jail_usage; exit ${EX_USAGE} ;;
+	esac
+
+	jail_boot_${entity} "$@"
+}
+
+jail_boot_off()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local startupdir="${JAILDIR}/${jail_name}/conf/boot/startup"
+
+	rm -f -- "${startupdir}/boot"
+}
+
+jail_boot_on()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local startupdir="${JAILDIR}/${jail_name}/conf/boot/startup"
+	if ! mkdir -p "${startupdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${startupdir}"
+	fi
+
+	touch -- "${startupdir}/boot"
+}
+
+jail_clean()
+{
+	jail_list -HIpt dirty name | while read -r dirty jail_name
+	do
+		if [ ${dirty} -eq 0 ]; then
+			continue
+		fi
+
+		jail_destroy "${jail_name}"
+	done
+}
+
+jail_create()
+{
+	local _o
+	local osarch="${FREEBSD_ARCH}"
+	local install_method="${DEFAULT_INSTALL_METHOD}" install_args
+	local initscript=
+	local jail_name=
+	local release_name="${DEFAULT_RELEASE}"
+	local jail_type="${JAIL_TYPE_THIN}"
+	local template=
+	local osversion="${FREEBSD_VERSION}"
+
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${JAILDIR}" "${ZFS_JAILS_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${JAILDIR}"
+	fi
 
 	if [ $# -eq 0 ]; then
 		jail_usage
 		exit ${EX_USAGE}
 	fi
 
-	opt_download=1
-	opt_extract=1
-
-	while getopts ":delrCa:c:p:t:u:v:D:P:U:n:" _o; do
+	while getopts ":a:I:i:F:n:r:T:t:v:" _o; do
 		case "${_o}" in
-			d)
-				opt_download=0
+			a|I|i|n|r|T|t|v)
+				if lib_check_empty "${OPTARG}"; then
+					jail_usage
+					exit ${EX_USAGE}
+				fi
 				;;
-			e)
-				opt_extract=0
-				;;
-			l)
-				_cj_opts="${_cj_opts} -l"
-				;;
-			r)
-				_cj_opts="${_cj_opts} -r"
-				;;
-			C)
-				_cj_opts="${_cj_opts} -c"
-				;;
+		esac
+
+		case "${_o}" in
 			a)
-				FREEBSD_ARCH="${OPTARG}"
+				osarch="${OPTARG}"
 				;;
-			c)
-				components="${components} ${OPTARG}"
+			I)
+				install_method="${OPTARG}"
 				;;
-			p)
-				CHROOT_PROGRAM="${OPTARG}"
-				;;
-			t)
-				TEMPLATE_PREBUILD="${OPTARG}"
-				;;
-			u)
-				DOWNLOADURL="${OPTARG}"
-				;;
-			v)
-				FREEBSD_VERSION="${OPTARG}"
-				;;
-			D)
-				_cj_opts="${_cj_opts} -d ${OPTARG}"
-				;;
-			P)
-				CONSOLE_PROGRAM="${OPTARG}"
-				;;
-			U)
-				JAILUSER="${OPTARG}"
-				CONSOLE_PROGRAM="login -f \"${JAILUSER}\""
+			i)
+				initscript="${OPTARG}"
 				;;
 			n)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			T)
+				jail_type="${OPTARG}"
+				;;
+			t)
+				template="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				jail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	lib_check_jail_type "${jail_type}"
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ -n "${initscript}" ]; then
+		if [ ! -f "${initscript}" ]; then
+			lib_err ${EX_NOINPUT} "The initscript \"${initscript}\" cannot be found."
+		fi
+	fi
+
+	if [ -n "${template}" ]; then
+		if [ ! -f "${template}" ]; then
+			lib_err ${EX_NOINPUT} "The template \"${template}\" cannot be found."
+		fi
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+
+	install_args=`lib_jailparam_value "${install_method}" =`
+	install_method=`lib_jailparam_name "${install_method}" =`
+
+	local conf_keys=
+	local notouch=0
+
+	# Create the jail
+	case "${install_method}" in
+		copy)
+			jail_install_copy -j "${jail_name}" -- "${install_args}"
+			;;
+		clone+jail)
+			jail_install_clone+jail -j "${jail_name}" -- "${install_args}"
+			;;
+		clone+release)
+			conf_keys="appjail_version birth osarch osversion jail_type release_name"
+
+			jail_install_clone+release -a "${osarch}" -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -v "${osversion}"
+			;;
+		empty)
+			conf_keys="appjail_version birth jail_type"
+			jail_type="${JAIL_TYPE_GENERIC}"
+
+			jail_install_empty -j "${jail_name}"
+			;;
+		export+jail)
+			notouch=1
+			jail_install_export+jail -j "${jail_name}" -- "${install_args}"
+			;;
+		export+root)
+			notouch=1
+			jail_install_export+root -j "${jail_name}" -- "${install_args}"
+			;;
+		import+jail)
+			conf_keys="appjail_version birth osarch osversion jail_type release_name"
+			jail_install_import+jail -j "${jail_name}" -- "${install_args}"
+			;;
+		import+root)
+			jail_install_import+root -j "${jail_name}" -- "${install_args}"
+			;;
+		standard)
+			conf_keys="appjail_version birth osarch osversion jail_type release_name"
+
+			jail_install_standard -a "${osarch}" -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -v "${osversion}"
+			;;
+		tiny+export)
+			notouch=1
+			jail_install_tiny+export -j "${jail_name}" -- "${install_args}"
+			;;
+		tiny+import)
+			conf_keys="jail_type release_name"
+			jail_install_tiny+import -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -- "${install_args}"
+			;;
+		zfs+export+jail)
+			notouch=1
+			jail_install_zfs+export+jail -j "${jail_name}" -- "${install_args}"
+			;;
+		zfs+export+root)
+			notouch=1
+			jail_install_zfs+export+root -j "${jail_name}" -- "${install_args}"
+			;;
+		zfs+import+jail)
+			conf_keys="appjail_version birth osarch osversion jail_type release_name"
+			jail_install_zfs+import+jail -j "${jail_name}" -- "${install_args}"
+			;;
+		zfs+import+root)
+			jail_install_zfs+import+root -j "${jail_name}" -- "${install_args}"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Unrecognized ${install_method} method."
+			;;
+	esac
+
+	if [ ${notouch} -eq 1 ]; then
+		lib_info "Done."
+		return 0
+	fi
+
+	if [ ! -d "${jail_path}" ]; then
+		lib_warn "The jail directory has not been created!"
+		return 0
+	fi
+	
+	if [ -n "${initscript}" ]; then
+		lib_debug "Copying ${initscript} as ${jail_path}/init"
+
+		if ! cp "${initscript}" "${jail_path}/init"; then
+			lib_warn "Error copying ${initscript} as ${jail_path}/init"
+		fi
+	fi
+
+	if ! mkdir -p "${jail_path}/conf"; then
+		lib_err ${EX_IOERR} "Error creating ${jail_path}/conf"
+	fi
+
+	if [ -n "${template}" ]; then
+		lib_debug "Copying ${template} as ${jail_path}/conf/template.conf"
+
+		if ! cp "${template}" "${jail_path}/conf/template.conf"; then
+			lib_warn "Error copying ${template} as ${jail_path}/conf/template.conf"
+		fi
+	fi
+
+	touch "${jail_path}/conf/config.conf"
+
+	local conf_key conf_value
+	for conf_key in ${conf_keys}; do
+		case "${conf_key}" in
+			appjail_version)
+				conf_value=`"${APPJAIL_PROGRAM}" version`
+				;;
+			birth)
+				conf_value=`date +"%s"`
+				;;
+			osarch)
+				conf_value="${osarch}"
+				;;
+			osversion)
+				conf_value="${osversion}"
+				;;
+			jail_type)
+				conf_value="${jail_type}"
+				;;
+			release_name)
+				conf_value="${release_name}"
+				;;
+			*)
+				lib_err ${EX_SOFTWARE} "${conf_key} isn't a valid configuration key."
+				;;
+		esac
+
+		"${APPJAIL_PROGRAM}" config -st "${jail_path}/conf/config.conf" -a "${conf_key}=${conf_value}"
+	done
+
+	jail_mark_clean "${jail_name}"
+
+	lib_info "Done."
+}
+
+jail_install_zfs+export+jail()
+{
+	_jail_export "zfs" "zfs+export+jail" "/jail" "$@"
+}
+
+jail_install_zfs+export+root()
+{
+	_jail_export "zfs" "zfs+export+root" "" "$@"
+}
+
+jail_install_export+jail()
+{
+	_jail_export "tar" "export+jail" "/jail" "$@"
+}
+
+jail_install_export+root()
+{
+	_jail_export "tar" "export+root" "" "$@"
+}
+
+_jail_export()
+{
+	local _o
+	local errlevel=0
+	local jail_name=
+	local type="$1"; shift
+	local function="$1"; shift
+	local extra="$1"; shift
+
+	if [ -z "${function}" ]; then
+		lib_err ${EX_USAGE} "usage: _jail_export type function [extra] args"
+	fi
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_${function} -j jail_name output:out_name [compress:algo]"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_${function} # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_${function} # usage
+	fi
+
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [compress:algo]"
+	fi
+
+	lib_info "Exporting ${jail_name} ..."
+
+	case "${type}" in
+		tar)
+			_chk_jail_export "${jail_name}"
+			;;
+		zfs)
+			_chk_jail_export_zfs "${jail_name}"
+			;;
+		*)
+			lib_err ${EX_NOINPUT} -- "${type}: type not found."
+			;;
+	esac
+
+	local params=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+	local compress= output=
+	local parameter= value= arg
+
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			compress)
+				compress="${value}"
+				;;
+			output)
+				output="${value}"
+				;;
+			*) 
+				lib_err ${EX_NOINPUT} -- "${parameter}: parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${output}"; then
+		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [compress:algo]"
+	fi
+
+	lib_debug "Generating ${output} ..."
+
+	case "${type}" in
+		tar)
+			local tar_args
+			if lib_check_empty "${compress}"; then
+				tar_args=
+			else
+				tar_args=`_compress2tar_args "${compress}"`
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					return ${errlevel}
+				fi
+			fi
+
+			local jail_path="${JAILDIR}/${jail_name}${extra}"
+			if [ ! -d "${jail_path}" ]; then
+				lib_err ${EX_NOINPUT} "Cannot find the \`${jail_path}\` directory."
+			fi
+
+			local escape_jail_path=`lib_escape_string "${jail_path}"`
+			local escape_output=`lib_escape_string "${output}"`
+
+			if ! sh -c "tar -C \"${escape_jail_path}\" ${tar_args} -cf \"${escape_output}\" . "; then
+				lib_err ${EX_CANTCREAT} "Error generating ${output}."
+			fi
+			;;
+		zfs)
+			if lib_check_empty "${compress}"; then
+				if ! lib_zfs_copy2out "${ZFS_JAILS_NAME}/${jail_name}${extra}" > "${output}"; then
+					lib_err ${EX_CANTCREAT} "Error generating ${output}."
+				fi
+			else
+				local compress_cmd
+				compress_cmd=`_compress2cmd "${compress}"`
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					return ${errlevel}
+				fi
+
+				if ! lib_zfs_copy2out "${ZFS_JAILS_NAME}/${jail_name}${extra}" | sh -c "${compress_cmd}" > "${output}"; then
+					lib_err ${EX_CANTCREAT} "Error generating ${output}."
+				fi
+			fi
+			;;
+	esac
+}
+
+jail_install_import+jail()
+{
+	_jail_import "tar" "import+jail" "/jail" "$@"
+}
+
+jail_install_import+root()
+{
+	_jail_import "tar" "import+root" "" "$@"
+}
+
+jail_install_zfs+import+jail()
+{
+	_jail_import "zfs" "zfs+import+jail" "/jail" "$@"
+}
+
+jail_install_zfs+import+root()
+{
+	_jail_import "zfs" "zfs+import+root" "" "$@"
+}
+
+_jail_import()
+{
+	local _o
+	local errlevel=0
+	local jail_name=
+	local type="$1"; shift
+	local function="$1"; shift
+	local extra="$1"; shift
+
+	if [ -z "${function}" ]; then
+		lib_err ${EX_USAGE} "usage: _jail_import type function [extra] args"
+	fi
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_${function} -j jail_name input:in_file [compress:algo]"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_${function} # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_${function} # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_DATAERR} "${function} syntax: input:in_file [compress:algo]"
+	fi
+
+	local params=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+	local compress= input=
+	local parameter= value= arg
+
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			compress)
+				compress="${value}"
+				;;
+			input)
+				input="${value}"
+				;;
+			*) 
+				lib_err ${EX_NOINPUT} -- "${parameter}: parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${input}"; then
+		lib_err ${EX_DATAERR} "${function} syntax: input:in_file [compress:algo]"
+	fi
+
+	if [ ! -f "${input}" ]; then
+		lib_err ${EX_NOINPUT} "The input \"${input}\" cannot be found."
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}${extra}"
+
+	lib_info "Importing ${jail_name} ..."
+
+	case "${type}" in
+		tar)
+			jail_install_empty -j "${jail_name}"
+
+			local escape_jail_path
+			escape_jail_path=`lib_escape_string "${jail_path}"`
+
+			local escape_input
+			escape_input=`lib_escape_string "${input}"`
+
+			if ! sh -c "tar -C \"${escape_jail_path}\" ${TAR_DECOMPRESS_ARGS} -xf \"${escape_input}\""; then
+				jail_mark_dirty "${jail_name}"
+
+				lib_err ${EX_IOERR} "Error importing ${input} as ${jail_name}."
+			fi
+			;;
+		zfs)
+			local decompress_cmd
+
+			if lib_check_empty "${compress}"; then
+				decompress_cmd=`_mimetype2decompress_cmd "${input}"`
+			else
+				decompress_cmd=`_decompress2cmd "${compress}"`
+			fi
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				return ${errlevel}
+			fi
+
+			case "${function}" in
+				zfs+import+jail)
+					if ! lib_zfs_mkdir "${jail_path}" "${ZFS_JAILS_NAME}/${jail_name}"; then
+						lib_err ${EX_IOERR} "Error creating ${jail_path}"
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${decompress_cmd}"; then
+				if ! lib_zfs_in2copy "${ZFS_JAILS_NAME}/${jail_name}${extra}" "${jail_path}" < "${input}"; then
+					jail_mark_dirty "${jail_name}"
+
+					lib_err ${EX_IOERR} "Error importing ${input} as ${jail_name}."
+				fi
+			else
+				if ! sh -c "${decompress_cmd}" < "${input}" | lib_zfs_in2copy "${ZFS_JAILS_NAME}/${jail_name}${extra}" "${jail_path}"; then
+					jail_mark_dirty "${jail_name}"
+
+					lib_err ${EX_IOERR} "Error importing ${input} as ${jail_name}."
+				fi
+			fi
+			;;
+		*)
+			lib_err ${EX_NOINPUT} -- "${type}: type not found."
+			;;
+	esac
+}
+
+jail_install_copy()
+{
+	local _o
+	local jail_name=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_copy -j jail_name jail2copy"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_copy # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_copy # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local jail2copy="$1"
+	if lib_check_empty "${jail2copy}"; then
+		lib_err ${EX_DATAERR} "copy syntax: jail2copy"
+	fi
+
+	_basic_chk_jail "${jail2copy}"
+
+	lib_info "Copying ${jail2copy} to ${jail_name} ..."
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		if ! lib_zfs_copy "${ZFS_JAILS_NAME}/${jail2copy}" "${ZFS_JAILS_NAME}/${jail_name}" "${JAILDIR}/${jail_name}"; then
+			lib_err ${EX_IOERR} "Error copying ${ZFS_JAILS_NAME}/${jail2copy}"
+		fi
+	else
+		if lib_jail_exists "${jail_name}"; then
+			if lib_jail_created_by_appjail "${jail_name}"; then
+				lib_warn -- "${jail_name} is currently running."
+				exit 0
+			fi
+		fi
+
+		if ! cp -a "${JAILDIR}/${jail2copy}" "${JAILDIR}/${jail_name}"; then
+			lib_err ${EX_IOERR} "Error copying ${JAILDIR}/${jail2copy}"
+		fi
+	fi
+}
+
+jail_install_clone+jail()
+{
+	local _o
+	local jail_name=
+
+	if [ "${ENABLE_ZFS}" = "0" ]; then
+		lib_err ${EX_CONFIG} "zfs is not enabled in the configuration file. The clone+jail method cannot be used."
+	fi
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_clone+jail -j jail_name jail2clone@snapname"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_clone+jail # usage
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_clone+jail # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local args="$1"
+	if lib_check_empty "${args}" || ! echo "${args}" | grep -Eq ".+@.+"; then
+		lib_err ${EX_DATAERR} "clone+jail syntax: jail2clone@snapname"
+	fi
+
+	local jail2clone=`echo "${args}" | sed -Ee 's/(.+)@.+/\1/'`
+	if ! lib_check_jailname "${jail2clone}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail2clone}\""
+	fi
+
+	local snapshot_name=`echo "${args}" | sed -Ee 's/.+@(.+)/\1/'`
+	local dataset="${ZFS_JAILS_NAME}/${jail2clone}"
+
+	if ! lib_check_zfs_fs "${ZFS_JAILS_NAME}" "${jail2clone}"; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail2clone}\`"
+	fi
+
+	lib_info "Cloning ${jail2clone} to ${jail_name} ..."
+
+	#
+	# root
+	#
+	if ! lib_check_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+		lib_debug "Creating snapshot ${dataset}@${snapshot_name} ..."
+
+		if ! lib_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+			lib_err ${EX_CANTCREAT} "Cannot create ${snapshot_name} snapshot for ${dataset}."
+		fi
+	fi
+
+	lib_debug "Cloning ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}"
+
+	if ! lib_zfs_clone "${dataset}@${snapshot_name}" "${ZFS_JAILS_NAME}/${jail_name}"; then
+		lib_err ${EX_CANTCREAT} "Cannot clone ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}"
+	fi
+
+	#
+	# jail
+	#
+	dataset="${dataset}/jail"
+	if ! lib_check_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+		lib_debug "Creating snapshot ${dataset}@${snapshot_name} ..."
+
+		if ! lib_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+			lib_err ${EX_CANTCREAT} "Cannot create ${snapshot_name} snapshot for ${dataset}."
+		fi
+	fi
+
+	lib_debug "Cloning ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}/jail"
+
+	if ! lib_zfs_clone "${dataset}@${snapshot_name}" "${ZFS_JAILS_NAME}/${jail_name}/jail"; then
+		lib_err ${EX_CANTCREAT} "Cannot clone ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}"
+	fi
+}
+
+jail_install_clone+release()
+{
+	local _o
+	local osarch=
+	local jail_name=
+	local release_name=
+	local jail_type=
+	local osversion=
+
+	if [ "${ENABLE_ZFS}" = "0" ]; then
+		lib_err ${EX_CONFIG} "zfs is not enabled in the configuration file. The clone+release method cannot be used."
+	fi
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_clone+release -a osarch -j jail_name -r release_name -t jail_type -v osversion snapname"
+	fi
+
+	while getopts ":a:j:r:t:v:" _o; do
+		case "${_o}" in
+			a)
+				osarch="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			t)
+				jail_type="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				jail_install_clone+release # usage
+				;;
+		esac
+	done
+
+	if [ -z "${osarch}" -o -z "${jail_name}" -o -z "${release_name}" -o -z "${jail_type}" -o -z "${osversion}" ]; then
+		jail_install_clone+release # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+        local snapshot_name="$1"
+        if lib_check_empty "${snapshot_name}"; then
+                lib_err ${EX_DATAERR} "clone+release syntax: snapname"
+        fi
+
+	local extra=
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THICK})
+			extra="/release"
+			;;
+		${JAIL_TYPE_DEBOOTSTRAP})
+			extra="/linux_debootstrap"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Valid types for clone+release are: ${JAIL_TYPE_THICK} and ${JAIL_TYPE_DEBOOTSTRAP}."
+			;;
+	esac
+
+	if ! lib_check_zfs_fs "${ZFS_RELEASE_NAME}" "${osarch}/${osversion}/${release_name}${extra}"; then
+		lib_err ${EX_NOINPUT} "Cannot find the release \`${release_name}\`"
+	fi
+
+	local dataset="${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}${extra}"
+
+	lib_info "Cloning ${osarch}/${osversion}/${release_name} to ${jail_name} ..."
+
+	if ! lib_check_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+		if ! lib_zfs_snapshot "${dataset}" "${snapshot_name}"; then
+			lib_err ${EX_CANTCREAT} "Cannot create ${snapshot_name} snapshot for ${dataset}."
+		fi
+	fi
+
+	if ! lib_zfs_mkdir "${jail_path}" "${ZFS_JAILS_NAME}/${jail_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${jail_path}"
+	fi
+
+	if ! lib_zfs_clone "${dataset}@${snapshot_name}" "${ZFS_JAILS_NAME}/${jail_name}/jail"; then
+		lib_err ${EX_CANTCREAT} "Cannot clone ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}"
+	fi
+}
+
+jail_install_empty()
+{
+	local _o
+	local jail_name=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_empty -j jail_name"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_empty # usage
+				;;
+		esac
+	done
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_empty # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local dataset="${ZFS_JAILS_NAME}/${jail_name}"
+
+	lib_info "Creating an empty jail ..."
+
+	if ! lib_zfs_mkdir "${jail_path}" "${dataset}"; then
+		lib_err ${EX_IOERR} "Error creating ${jail_path}"
+	fi
+
+	if ! lib_zfs_mkdir "${jail_path}/jail" "${dataset}/jail"; then
+		lib_err ${EX_IOERR} "Error creating ${jail_path}/jail"
+	fi
+}
+
+jail_install_standard()
+{
+	local _o
+	local osarch=
+	local jail_name=
+	local release_name=
+	local jail_type=
+	local osversion=
+	
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_standard -a osarch -j jail_name -r release_name -t jail_type -v osversion"
+	fi
+
+	while getopts ":a:j:r:t:v:" _o; do
+		case "${_o}" in
+			a)
+				osarch="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			t)
+				jail_type="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				jail_install_standard # usage
+				;;
+		esac
+	done
+
+	if [ -z "${osarch}" -o -z "${jail_name}" -o -z "${release_name}" -o -z "${jail_type}" -o -z "${osversion}" ]; then
+		jail_install_standard # usage
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if [ ! -d "${releasedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${releasedir}\` directory. Use \`appjail fetch\` to create it."
+	fi
+
+	lib_info "Creating a standard jail (${jail_type}) ..."
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THICK})
+			if ! lib_zfs_mkdir "${jail_path}" "${ZFS_JAILS_NAME}/${jail_name}"; then
+				lib_err ${EX_IOERR} "Error creating ${jail_path}"
+			fi
+			;;
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_DEBOOTSTRAP})
+			if ! lib_zfs_mkdir "${jail_path}" "${ZFS_JAILS_NAME}/${jail_name}"; then
+				lib_err ${EX_IOERR} "Error creating ${jail_path}"
+			fi
+
+			if ! lib_zfs_mkdir "${jail_path}/jail" "${ZFS_JAILS_NAME}/${jail_name}/jail"; then
+				lib_err ${EX_IOERR} "Error creating ${jail_path}/jail"
+			fi
+		;;
+	esac
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THICK})
+			jail_install_standard_thickjail -a "${osarch}" -j "${jail_name}" -r "${release_name}" -v "${osversion}"
+			;;
+		${JAIL_TYPE_THIN})
+			jail_install_standard_thinjail "${releasedir}/release" "${jail_path}/jail"
+			;;
+		${JAIL_TYPE_DEBOOTSTRAP})
+			jail_install_standard_linux_debootstrap "${releasedir}/linux_debootstrap" "${jail_path}/jail"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid jail type: ${jail_type}"
+			;;
+	esac
+}
+
+jail_install_standard_thickjail()
+{
+	local _o
+	local osarch=
+	local jail_name=
+	local release_name=
+	local osversion=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_standard_thickjail -a osarch -j jail_name -r release_name -v osversion"
+	fi
+
+	while getopts ":a:j:r:v:" _o; do
+		case "${_o}" in
+			a)
+				osarch="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				jail_install_standard_thickjail # usage
+				;;
+		esac
+	done
+
+	local jail_path="${JAILDIR}/${jail_name}/jail"
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}/release"
+
+	if [ ! -d "${releasedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${releasedir}\` directory. Use \`appjail fetch\` to create it."
+	fi
+
+	lib_info "Creating a thickjail ..."
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		local dataset="${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}/release"
+
+		lib_debug "Copying (zfs): ${dataset} to ${ZFS_JAILS_NAME}/${jail_name}/jail"
+
+		if ! lib_zfs_copy "${dataset}" "${ZFS_JAILS_NAME}/${jail_name}/jail" "${jail_path}"; then
+			lib_err ${EX_IOERR} "Error copying ${dataset}"
+		fi
+	else
+		lib_debug "Copying: cp -a \"${releasedir}/\" \"${jail_path}\""
+
+		if ! cp -a "${releasedir}/" "${jail_path}"; then
+			lib_err ${EX_IOERR} "Error copying ${releasedir}/"
+		fi
+	fi
+}
+
+jail_install_standard_thinjail()
+{
+	local source dest
+	local dir file rootdir
+
+	source="$1"; dest="$2"
+
+	if [ -z "${source}" -o -z "${dest}" ]; then
+		lib_err ${EX_USAGE} "usage: install_thin_jail source dest"
+	fi
+
+	if [ ! -d "${source}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${source}\` directory. Use \`appjail fetch\` to create it."
+	fi
+
+	lib_info "Creating a thinjail ..."
+
+	# rw-only files
+	while read -r file; do
+		dir=`dirname "${file}"`
+
+		if [ "${dir}" == "." ]; then
+			rootdir="${dest}"
+		else
+			rootdir="${dest}/${dir}"
+			mkdir -p "${rootdir}"
+		fi
+
+		lib_debug "Copying: cp -a \"${source}/${file}\" \"${rootdir}\""
+
+		if ! cp -a "${source}/${file}" "${rootdir}"; then
+			lib_err ${EX_IOERR} "Error copying ${source}/${file}"
+		fi
+	done < "${FILESDIR}/include-thinjail.files"
+
+	# ro-only files
+	while read -r file; do
+		lib_debug "Linking /.appjail/${file} -> ${dest}/${file}"
+
+		if ! ln -Ffs "/.appjail/${file}" "${dest}/${file}"; then
+			lib_err ${EX_IOERR} "Error linking ${dest}/${file}"
+		fi
+	done < "${FILESDIR}/exclude-thinjail.files"
+
+	mkdir -p "${dest}/.appjail"
+}
+
+jail_install_standard_linux_debootstrap()
+{
+	# Load linux kernel modules
+	lib_modules_linuxmods
+
+	local source dest
+
+	source="$1"; dest="$2"
+
+	if [ -z "${source}" -o -z "${dest}" ]; then
+		lib_err ${EX_USAGE} "usage: install_deboostrap_linux_jail source dest"
+	fi
+
+	if [ ! -d "${source}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${source}\` directory. Use \`appjail fetch\` to create it."
+	fi
+
+	lib_info "Creating a linux+debootstrap jail ..."
+
+	lib_debug "Copying: cp -a \"${source}/\" \"${dest}\""
+
+	if ! cp -a "${source}/" "${dest}"; then
+		lib_err ${EX_IOERR} "Error copying ${source}/"
+	fi
+
+	mkdir -p "${dest}/dev"
+	mkdir -p "${dest}/dev/shm"
+	mkdir -p "${dest}/dev/fd"
+	mkdir -p "${dest}/proc"
+	mkdir -p "${dest}/sys"
+
+	local escape_dest=`lib_escape_string "${dest}"`
+
+	lib_atexit_add "umount \"${escape_dest}/dev/shm\" > /dev/null 2>&1"
+	lib_atexit_add "umount \"${escape_dest}/dev/fd\" > /dev/null 2>&1"
+	lib_atexit_add "umount \"${escape_dest}/dev\" > /dev/null 2>&1"
+	lib_atexit_add "umount \"${escape_dest}/proc\" > /dev/null 2>&1"
+	lib_atexit_add "umount \"${escape_dest}/sys\" > /dev/null 2>&1"
+
+	if ! mount -t devfs devfs "${dest}/dev"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`devfs\` to ${dest}/dev"
+	fi
+
+	if ! mount -t tmpfs -o rw,size=1g,mode=1777 tmpfs "${dest}/dev/shm"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`tmpfs\` to ${dest}/dev/shm"
+	fi
+
+	if ! mount -t fdescfs -o rw,linrdlnk fdescfs "${dest}/dev/fd"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`fdescfs\` to ${dest}/dev/fd"
+	fi
+
+	if ! mount -t linprocfs linprocfs "${dest}/proc"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`linprocfs\` to ${dest}/proc"
+	fi
+
+	if ! mount -t linsysfs linsysfs "${dest}/sys"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`linsysfs\` to ${dest}/sys"
+	fi
+
+	if ! chroot "${dest}" sh -c "rm -f /var/cache/apt/archives/rsyslog*.deb"; then
+		lib_err ${EX_SOFTWARE} "Error removing: /var/cache/apt/archives/rsyslog*.deb"
+	fi
+
+	if ! chroot "${dest}" sh -c "DEBIAN_FRONTEND=noninteractive dpkg --force-depends --force-confdef --force-confold -i /var/cache/apt/archives/*.deb"; then
+		lib_err ${EX_SOFTWARE} "Error installing *.deb packages."
+	fi
+
+	umount "${dest}/dev/shm"
+	umount "${dest}/dev/fd"
+	umount "${dest}/dev"
+	umount "${dest}/proc"
+	umount "${dest}/sys"
+}
+
+jail_install_tiny+export()
+{
+	local _o
+	local jail_name=
+	local errlevel=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_tiny+export -j jail_name files:file_list output:out_name [compress:algo]"
+	fi
+
+	while getopts ":j:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			*)
+				jail_install_tiny+export # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" ]; then
+		jail_install_tiny+export # usage
+	fi
+
+	_chk_jail_export "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_DATAERR} "tiny+export syntax: files:file_list output:out_name [compress:algo]"
+	fi
+
+	lib_info "Exporting ${jail_name} as a tiny jail ..."
+
+	local params=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+	local compress= files= output=
+	local parameter= value= arg
+
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			compress)
+				compress="${value}"
+				;;
+			files)
+				files="${value}"
+				;;
+			output)
+				output="${value}"
+				;;
+			*) 
+				lib_err ${EX_NOINPUT} -- "${parameter}: parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${files}" || lib_check_empty "${output}"; then
+		lib_err ${EX_DATAERR} "tiny+export syntax: files:file_list output:out_name [compress:algo]"
+	fi
+
+	local tar_args
+	if lib_check_empty "${compress}"; then
+		tar_args=
+	else
+		tar_args=`_compress2tar_args "${compress}"`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			return ${errlevel}
+		fi
+	fi
+
+	if [ ! -f "${files}" ]; then
+		lib_err ${EX_NOINPUT} "The file (${files}) does not exist."
+	fi
+
+	local tempdir
+	tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	local escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "chflags -R 0 \"${escape_tempdir}\" > /dev/null 2>&1"
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	# Create /jail
+	if ! mkdir -p "${tempdir}/jail"; then
+		lib_err ${EX_IOERR} "Error creating ${tempdir}/jail"
+	fi
+
+	# Copy files
+	lib_safe_copy_lst -l "${files}" -s "${jail_path}/jail" -d "${tempdir}/jail"
+
+	# Create /conf
+	if ! mkdir -p "${tempdir}/conf"; then
+		lib_err ${EX_IOERR} "Error creating ${tempdir}/conf"
+	fi
+
+	# Copy conf/config.conf
+	if [ -f "${jail_path}/conf/config.conf" ]; then
+		if ! cp -a "${jail_path}/conf/config.conf" "${tempdir}/conf"; then
+			lib_err ${EX_IOERR} "Error copying ${jail_path}/conf/config.conf"
+		fi
+	fi
+
+	local escape_tempdir=`lib_escape_string "${tempdir}"`
+	local escape_output=`lib_escape_string "${output}"`
+
+	# Compress
+	lib_debug "Generating ${output} ..."
+	if ! sh -c "tar -C \"${escape_tempdir}\" ${tar_args} -cf \"${escape_output}\" ."; then
+		lib_err ${EX_CANTCREAT} "Error generating ${output}."
+	fi
+
+	# Clean up
+	chflags -R 0 "${tempdir}" > /dev/null 2>&1
+	rm -rf "${tempdir}" > /dev/null 2>&1
+}
+
+jail_install_tiny+import()
+{
+	local _o
+	local jail_name=
+	local release_name=
+	local jail_type=
+	local errlevel=0
+	
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_tiny+import -j jail_name -r release_name -t jail_type -- path/to/appjail_file"
+	fi
+
+	while getopts ":j:r:t:" _o; do
+		case "${_o}" in
+			j)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			t)
+				jail_type="${OPTARG}"
+				;;
+			*)
+				jail_install_tiny+import # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${jail_name}" -o -z "${release_name}" -o -z "${jail_type}" ]; then
+		jail_install_tiny+import # usage
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THICK}|${JAIL_TYPE_THIN}) ;;
+		*) lib_err ${EX_DATAERR} "Valid types for tiny+import are: ${JAIL_TYPE_THICK} and ${JAIL_TYPE_THIN}." ;;
+	esac
+
+	local appjail_file="$1"
+	if lib_check_empty "${appjail_file}"; then
+		lib_err ${EX_DATAERR} "tiny+import syntax: path/to/appjail_file"
+	fi
+
+	local tempdir
+	tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	lib_debug "Trying to extract conf/config.conf from ${appjail_file} ..."
+
+	if ! tar -C "${tempdir}" --strip-components 2 -xf "${appjail_file}" ./conf/config.conf; then
+		lib_err ${EX_IOERR} "An error occurred when extracting conf/config.conf from ${appjail_file}."
+	fi
+
+	local conf_keys="osarch osversion jail_type"
+	local conf_key conf_value
+	# From config.conf
+	local param_osarch param_osversion param_jail_type
+
+	for conf_key in ${conf_keys}; do
+		conf_value=`"${APPJAIL_PROGRAM}" config -gnit "${tempdir}/config.conf" -a "${conf_key}"`
+
+		if lib_check_empty "${conf_value}"; then
+			lib_err ${EX_CONFIG} -- "${conf_key} is empty or not defined in the configuration file!"
+		fi
+
+		setvar param_${conf_key} "${conf_value}"
+	done
+
+	case "${param_jail_type}" in
+		${JAIL_TYPE_THICK}|${JAIL_TYPE_THIN}) ;;
+		*) lib_err ${EX_DATAERR} "This jail uses an invalid jail type (${param_jail_type}) for tiny+import. Valid types are: ${JAIL_TYPE_THICK} and ${JAIL_TYPE_THIN}." ;;
+	esac
+
+	jail_install_standard -a "${param_osarch}" -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -v "${param_osversion}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+
+	jail_mark_dirty "${jail_name}"
+
+	local escape_tempdir=`lib_escape_string "${tempdir}"`
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	local escape_appjail_file=`lib_escape_string "${appjail_file}"`
+
+	lib_debug "Decompressing ${appjail_file} ..."
+
+	if ! sh -c "tar -C \"${jail_path}\" ${TAR_DECOMPRESS_ARGS} -xf \"${appjail_file}\""; then
+		lib_err ${EX_IOERR} "An error occurred when extracting ${appjail_file} to ${jail_path} ..."
+	fi
+
+	jail_mark_clean "${jail_name}"
+}
+
+jail_destroy()
+{
+	local _o
+	local opt_force=0 fflag=
+	local opt_all_dependents=0 Rflag=
+
+	while getopts ":fR" _o; do
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			R)
+				opt_all_dependents=1
+				;;
+			*)
+				jail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	_jail_chkjfolder "${jail_name}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	lib_debug "Removing \`${jail_name}\` jail..."
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		lib_debug "Using zfs-destroy(8) ..."
+
+		if [ ${opt_force} -eq 1 ]; then
+			fflag="-f"
+		fi
+
+		if [ ${opt_all_dependents} -eq 1 ]; then
+			Rflag="-R"
+		fi
+
+		if ! lib_zfs_rrmfs ${fflag} ${Rflag} "${ZFS_JAILS_NAME}/${jail_name}"; then
+			lib_err ${EX_IOERR} "Error destroying ${ZFS_JAILS_NAME}/${jail_name}"
+		fi
+	else
+		lib_debug "Removing \`noschg\` flag..."
+		if ! chflags -R noschg "${JAILDIR}/${jail_name}"; then
+			lib_err ${EX_IOERR} "Error removing the \`noschg\` flag to ${JAILDIR}/${jail_name}"
+		fi
+	fi
+
+	lib_debug "Removing files..."
+	if ! rm -rf "${JAILDIR}/${jail_name}"; then
+		lib_err ${EX_IOERR} "Error removing ${JAILDIR}/${jail_name}"
+	fi
+
+	lib_debug -- "${jail_name} was removed."
+}
+
+jail_mark()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		clean|dirty|locked|unlocked) ;;
+		*) jail_usage; exit ${EX_USAGE} ;;
+	esac
+
+	jail_mark_${entity} "$@"
+}
+
+jail_mark_clean()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ -f "${jail_path}/.done" ]; then
+		lib_warn -- "${jail_name} is already clean."
+	else
+		touch -- "${jail_path}/.done"
+	fi
+}
+
+jail_mark_dirty()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ -f "${jail_path}/.done" ]; then
+		rm -f "${jail_path}/.done"
+	else
+		lib_warn -- "${jail_name} is already dirty."
+	fi
+}
+
+jail_mark_locked()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local lockdir="${JAILDIR}/${jail_name}/conf/boot/lock"
+	if ! mkdir -p "${lockdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${lockdir}"
+	fi
+
+	if [ -f "${lockdir}/locked" ]; then
+		lib_err ${EX_CANTCREAT} "The ${jail_name} jail has been locked. Use \`appjail mark unlocked\` to fix it."
+	fi
+
+	lib_debug "Locking ${jail_name} ..."
+
+	touch -- "${lockdir}/locked"
+}
+
+jail_mark_unlocked()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local lockdir="${JAILDIR}/${jail_name}/conf/boot/lock"
+
+	if [ ! -f "${lockdir}/locked" ]; then
+		return 0
+	fi
+
+	lib_debug "Unlocking ${jail_name} ..."
+
+	rm -f -- "${lockdir}/locked"
+}
+
+jail_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local jail_name
+
+	local flag_appjail_version=0
+	local flag_arch=0
+	local flag_boot=0
+	local flag_created=0
+	local flag_dirty=0
+	local flag_hostname=0
+	local flag_ip4=0
+	local flag_ip6=0
+	local flag_locked=0
+	local flag_name=0
+	local flag_network_ip4=0
+	local flag_networks=0
+	local flag_path=0
+	local flag_priority=0
+	local flag_ports=0
+	local flag_release_name=0
+	local flag_status=0
+	local flag_type=0
+	local flag_version=0
+	
+	while getopts ":eHIpt" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			*)
+				jail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	jail_name="$1"; shift
+
+	_basic_chk_jail "${jail_name}"
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	# General files
+	local config_file="${JAILDIR}/${jail_name}/conf/config.conf"
+	local template_conf="${JAILDIR}/${jail_name}/conf/template.conf"
+
+	# Status
+	local status_config=0
+	local status_template=0
+
+	if [ -f "${config_file}" ]; then
+		status_config=1
+	fi
+
+	if [ -f "${template_conf}" ]; then
+		status_template=1
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "status" "name" "type" "version" "ports" "network_ip4"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword value
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			appjail_version|arch|boot|created|dirty|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${keywords}" | tr '[:lower:]' '[:upper:]' | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				appjail_version)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "appjail_version"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e appjail_version "${config_file}" | cut -d' ' -f2-`
+					fi
+					;;
+				arch)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "osarch"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e osarch "${config_file}" | cut -d' ' -f2-`
+					fi
+					;;
+				boot)
+					if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/boot" ]; then
+						value=1
+					else
+						value=0
+					fi
+					;;
+				created)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "birth"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e birth "${config_file}" | cut -d' ' -f2-`
+
+						if ! lib_check_empty "${value}"; then
+							if ! lib_check_number "${value}"; then
+								lib_warn -- "${value} is not a valid number to calculate the birth."
+							else
+								value=`date -r${value} +"${CREATED_FORMAT}"`
+
+								if [ $? -ne 0 ]; then
+									lib_warn "Error calculating the birth."
+								fi
+							fi
+						fi
+					fi
+					;;
+				dirty)
+					if [ -f "${JAILDIR}/${jail_name}/.done" ]; then
+						value="0"
+					else
+						value="1"
+					fi
+					;;
+				ip4)
+
+					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *ip4\.addr' "${template_conf}"; then
+						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'ip4.addr' | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					fi
+					;;
+				ip6)
+					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *ip6\.addr' "${template_conf}"; then
+						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'ip6.addr' | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					fi
+					;;
+				hostname)
+					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *host\.hostname' "${template_conf}"; then
+						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'host.hostname' | tr '\n' ' ' | sed -Ee 's/ $/\n/'`
+					fi
+					;;
+				locked)
+					if [ -f "${JAILDIR}/${jail_name}/conf/boot/lock/locked" ]; then
+						value=1
+					else
+						value=0
+					fi
+					;;
+				name)
+					value="${jail_name}"
+					;;
+				network_ip4)
+					if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
+						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
+							value=`"${APPJAIL_PROGRAM}" network hosts -Rj "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+						fi
+					fi
+					;;
+				networks)
+					if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
+						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
+							value=`"${APPJAIL_PROGRAM}" network hosts -ej "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+						fi
+					fi
+					;;
+				path)
+					value="${JAILDIR}/${jail_name}/jail"
+					;;
+				priority)
+					if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/priority" ]; then
+						value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/startup/priority"`
+					else
+						value=0
+					fi
+					;;
+				ports)
+					if [ -d "${JAILDIR}/${jail_name}/conf/boot/expose" ]; then
+						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/expose" | wc -l` -gt 0 ]; then
+							value=`"${APPJAIL_PROGRAM}" expose list -HIpt -- "${jail_name}" ports protocol | sed -Ee 's#(.+) (.+)#\1/\2#' | tr '\n' ',' | sed -Ee 's/,$//'`
+						fi
+					fi
+					;;
+				release_name)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "release_name"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e release_name "${config_file}" | cut -d' ' -f2-`
+					fi
+					;;
+				status)
+					value="DOWN"
+					if lib_jail_exists "${jail_name}"; then
+						if lib_jail_created_by_appjail "${jail_name}"; then
+							value="UP"
+						fi
+					fi
+					;;
+				type)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "jail_type"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e jail_type "${config_file}" | cut -d' ' -f2-`
+					fi
+					;;
+				version)
+					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "osversion"`
+					if [ ${status_config} -eq 1 ]; then
+						value=`grep -e osversion "${config_file}" | cut -d' ' -f2-`
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+jail_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local jail_name=
+
+	while getopts ":eHIptj:" _o; do
+		case "${_o}" in
+			j)
+				if lib_check_empty "${OPTARG}"; then
+					jail_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			j)
 				jail_name="${OPTARG}"
 				;;
 			*)
@@ -78,105 +1882,608 @@ jail_main()
 				;;
 		esac
 	done
+	shift $((OPTIND-1))
 
-	if [ -z "${jail_name}" ]; then
-		jail_usage
-		return ${EX_USAGE}
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
 	fi
 
-	. "${LIBDIR}/replace"
-	. "${LIBDIR}/tempfile"
-	. "${LIBDIR}/su"
-	. "${LIBDIR}/strlen"
-	. "${LIBDIR}/jail_types"
-	. "${LIBDIR}/jail"
-
-	lib_replace_downloadurl
-	lib_replace_componentsdir
-	lib_replace_jaildir
-
-	if [ -z "${components}" ]; then
-		components="${COMPONENTS}"
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
 	fi
 
-	if [ $opt_download -eq 1 -a -n "${components}" ]; then
-		lib_download_components ${components} || exit $?
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
 	fi
 
-	if [ $opt_extract -eq 1 -a -n "${components}" ]; then
-		if [ -d "${JAILDIR}/${jail_name}" ] && [ `lib_countfiles "${JAILDIR}/${jail_name}"` -gt 0 ]; then
-			lib_err ${EX_DATAERR} "The \"${JAILDIR}/${jail_name}\" directory already exists."
-		fi
-
-		lib_extract_components "${JAILDIR}/${jail_name}" "${JAIL_TYPE_THICK}" ${components} || exit $?
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
 	fi
 
-	# chroot
-	chroot_tempfile="`lib_generate_tempfile`"
-	lib_atexit_add rm -f "${chroot_tempfile}"
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
 
-	echo "${CHROOT_PROGRAM}" > "${chroot_tempfile}"
+	if [ -n "${jail_name}" ]; then
+		jail_get ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -- "${jail_name}" "$@"
+		return $?
+	fi
 
-	# jail
-	jail_tempfile="`lib_generate_tempfile`"
-	lib_atexit_add rm -f "${jail_tempfile}"
+	if [ ! -d "${JAILDIR}" ]; then
+		return
+	fi
 
-	echo "${CONSOLE_PROGRAM}" > "${jail_tempfile}"
+	ls -A "${JAILDIR}" | while IFS= read -r jail_name; do
+		jail_get ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${jail_name}" "$@"
 
-	create_jail \
-		${_cj_opts} \
-		-p "${chroot_tempfile}" \
-		-t "${TEMPLATE_PREBUILD}" \
-		-C "${CONFIG}" \
-		-P "${jail_tempfile}" \
-		-n "${jail_name}"
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
 }
 
-create_jail()
+jail_priority()
 {
-	lib_debug "Creating jail..."
+	local _o
+	local priority=
 
-	lib_su /bin/sh "${SCRIPTSDIR}/create_jail.sh" $@
+	while getopts ":p:" _o; do
+		case "${_o}" in
+			p)
+				if lib_check_empty "${OPTARG}"; then
+					jail_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			p)
+				priority="${OPTARG}"
+				;;
+			*)
+				jail_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if ! lib_check_number "${priority}"; then
+		lib_err ${EX_DATAERR} "priority must be a number!"
+	fi
+
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local startupdir="${JAILDIR}/${jail_name}/conf/boot/startup"
+	if ! mkdir -p "${startupdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${startupdir}"
+	fi
+
+	echo "${priority}" > "${startupdir}/priority"
+}
+
+jail_rename()
+{
+	local errlevel
+	local old new
+
+	old="$1"; new="$2"
+	if lib_check_empty "${old}" || lib_check_empty "${new}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	_jail_chkjfolder "${old}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	if ! lib_check_jailname "${new}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${new}\""
+	fi
+
+	if [ -e "${JAILDIR}/${new}" ]; then
+		lib_err ${EX_CANTCREAT} -- "The ${new} jail already exists."
+	fi
+
+	lib_debug "Renaming ${old} to ${new} ..."
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		if ! lib_zfs_jail_rename "${old}" "${new}"; then
+			lib_err ${EX_SOFTWARE} "Cannot rename ${old} to ${new}."
+		fi
+
+		if ! rm -rf "${JAILDIR}/${old}"; then
+			lib_err ${EX_SOFTWARE} "Cannot remove ${JAILDIR}/${old}"
+		fi
+	else
+		if ! mv "${JAILDIR}/${old}" "${JAILDIR}/${new}"; then
+			lib_err ${EX_SOFTWARE} "Cannot rename ${old} to ${new}."
+		fi
+	fi
+}
+
+_jail_chkjfolder()
+{
+	local jail_name
+	local mounted
+
+	jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "_jail_chkjfolder jail_name"
+	fi
+
+	_basic_chk_jail "${jail_name}"
+	
+	if lib_jail_exists "${jail_name}"; then
+		if lib_jail_created_by_appjail "${jail_name}"; then
+			lib_warn -- "${jail_name} is currently running."
+			return ${EX_NOPERM}
+		fi
+	fi
+
+	local tflag=
+	if [ "${ENABLE_ZFS}" != 0 ]; then
+		tflag="-t nozfs"
+	fi
+
+	mounted=`lib_mountpoint_mounted -F '%2 -> %1' ${tflag} "${JAILDIR}/${jail_name}"`
+	if [ -n "${mounted}" ]; then
+		lib_warn "The jail directory (${JAILDIR}/${jail_name}) has one or more mounted file systems:"
+		printf "%s\n" "${mounted}" | while IFS= read -r line; do
+			lib_warn "    - ${line}"
+		done
+		return ${EX_NOPERM}
+	fi
+}
+
+_basic_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+_chk_jail()
+{
+	local jail_name="$1"
+	
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "_chk_jail jail_name"
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ -f "${jail_path}/.done" ]; then
+		lib_err ${EX_CANTCREAT} "The \"${jail_name}\" jail is already created."
+	fi
+
+	if [ -d "${jail_path}" ] && [ `ls -A "${jail_path}" | wc -l` -gt 0 ]; then
+		lib_warn -- "${jail_name} is dirty. Removing..."
+
+		if ! jail_destroy "${jail_name}"; then
+			lib_err ${EX_SOFTWARE} "There was a problem destroying the dirty jail \`${jail_name}\`. You must remove it using \`appjail jail destroy\`."
+		fi
+	fi
+}
+
+_chk_jail_export()
+{
+	local jail_name="$1"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "_chk_jail_export jail_name"
+	fi
+
+	_basic_chk_jail "${jail_name}"
+
+	if lib_jail_exists "${jail_name}"; then
+		if lib_jail_created_by_appjail "${jail_name}"; then
+			lib_warn -- "${jail_name} is currently running."
+			exit 0
+		fi
+	fi
+}
+
+_chk_jail_export_zfs()
+{
+	local jail_name="$1"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "_chk_jail_export_zfs jail_name"
+	fi
+
+	_basic_chk_jail "${jail_name}"
+}
+
+_compress2cmd()
+{
+	local compress="$1"
+
+	if [ -z "${compress}" ]; then
+		lib_err ${EX_USAGE} "usage: _compress2cmd compress"
+	fi
+
+	local cmd
+	case "${compress}" in
+		bzip)
+			cmd="${BZIP_COMPRESS_CMD}"
+			;;
+		gzip)
+			cmd="${GZIP_COMPRESS_CMD}"
+			;;
+		lrzip)
+			cmd="${LRZIP_COMPRESS_CMD}"
+			;;
+		lz4)
+			cmd="${LZ4_COMPRESS_CMD}"
+			;;
+		lzma)
+			cmd="${LZMA_COMPRESS_CMD}"
+			;;
+		lzop)
+			cmd="${LZOP_COMPRESS_CMD}"
+			;;
+		xz)
+			cmd="${XZ_COMPRESS_CMD}"
+			;;
+		zstd)
+			cmd="${ZSTD_COMPRESS_CMD}"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid compression algorithm: ${compress}"
+			;;
+	esac
+
+	echo "${cmd}"
+}
+
+_mimetype2decompress_cmd()
+{
+	local errlevel=0
+	local input="$1"
+
+	if [ -z "${input}" ]; then
+		lib_err ${EX_USAGE} "usage: _mimetype2decompress_cmd input"
+	fi
+
+	local mime_type
+	mime_type=`lib_files_getmime "${input}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error in determining the mime type."
+	fi
+
+	local cmd=
+	case "${mime_type}" in
+		application/x-bzip2)
+			cmd=`_decompress2cmd "bzip"`
+			;;
+		application/gzip)
+			cmd=`_decompress2cmd "gzip"`
+			;;
+		application/x-lz4)
+			cmd=`_decompress2cmd "lz4"`
+			;;
+		application/x-lzma)
+			cmd=`_decompress2cmd "lzma"`
+			;;
+		application/x-xz)
+			cmd=`_decompress2cmd "xz"`
+			;;
+		application/zstd)
+			cmd=`_decompress2cmd "zstd"`
+			;;
+		application/octet-stream)
+			local file_type=`file -Eb -- "${input}"`
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "Error in determining the file type."
+			fi
+
+			case "${file_type}" in
+				"ZFS snapshot"*)
+					;;
+				lzop*)
+					cmd=`_decompress2cmd "lzop"`
+					;;
+				LRZIP*)
+					cmd=`_decompress2cmd "lrzip"`
+					;;
+				*)
+					lib_err ${EX_DATAERR} "Invalid file type: ${file_type}"
+					;;
+			esac
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid file type: ${mime_type}"
+			;;
+	esac
+
+	echo "${cmd}"
+}
+
+_decompress2cmd()
+{
+	local compress="$1"
+
+	if [ -z "${compress}" ]; then
+		lib_err ${EX_USAGE} "usage: _decompress2cmd compress"
+	fi
+
+	local compress_args
+	case "${compress}" in
+		bzip)
+			compress_args="${BZIP_DECOMPRESS_CMD}"
+			;;
+		gzip)
+			compress_args="${GZIP_DECOMPRESS_CMD}"
+			;;
+		lrzip)
+			compress_args="${LRZIP_DECOMPRESS_CMD}"
+			;;
+		lz4)
+			compress_args="${LZ4_DECOMPRESS_CMD}"
+			;;
+		lzma)
+			compress_args="${LZMA_DECOMPRESS_CMD}"
+			;;
+		lzop)
+			compress_args="${LZOP_DECOMPRESS_CMD}"
+			;;
+		xz)
+			compress_args="${XZ_DECOMPRESS_CMD}"
+			;;
+		zstd)
+			compress_args="${ZSTD_DECOMPRESS_CMD}"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid compression algorithm: ${compress}"
+			;;
+	esac
+
+	echo "${compress_args}"
+}
+
+_compress2tar_args()
+{
+	local compress="$1"
+
+	if [ -z "${compress}" ]; then
+		lib_err ${EX_USAGE} "usage: _compress2tar_args compress"
+	fi
+
+	local tar_args
+	case "${compress}" in
+		bzip)
+			tar_args="${TAR_BZIP_ARGS}"
+			;;
+		gzip)
+			tar_args="${TAR_GZIP_ARGS}"
+			;;
+		lrzip)
+			tar_args="${TAR_LRZIP_ARGS}"
+			;;
+		lz4)
+			tar_args="${TAR_LZ4_ARGS}"
+			;;
+		lzma)
+			tar_args="${TAR_LZMA_ARGS}"
+			;;
+		lzop)
+			tar_args="${TAR_LZOP_ARGS}"
+			;;
+		xz)
+			tar_args="${TAR_XZ_ARGS}"
+			;;
+		zstd)
+			tar_args="${TAR_ZSTD_ARGS}"
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid compression algorithm: ${compress}"
+			;;
+	esac
+
+	echo "${tar_args}"
 }
 
 jail_help()
 {
-	jail_usage
+	cat << EOF
+`jail_usage`
 
-	echo
-	echo "${jail_desc}"
-	echo
-	echo "The classic jails. Nothing more, nothing less. The workflow of this command is easy to"
-	echo "understand: Download components that do not exist, extract them, enter to a chroot"
-	echo "environment, enter in the jail, and delete the jail. Of course, you can control"
-	echo "which stages are used."
-	echo
-	echo "This command is very useful to create and use a jail in a few minutes."
-	echo
-	echo "  -d                        Don't download the components."
-	echo "  -e                        Don't extract the components."
-	echo "  -l                        Don't enter the jail after creating it."
-	echo "  -r                        Don't remove the jail after exiting it."
-	echo "  -C                        Don't run chroot(8) before create the jail."
-	echo "  -a freebsd_arch           FreeBSD architecture used by components. Default: ${FREEBSD_ARCH}"
-	echo "  -c components             Components to be downloaded. Default: ${COMPONENTS}"
-	echo "  -p chroot_program         Program to run when chroot(8) is executed."
-	echo "  -t template               Template used to create the jail."
-	echo "  -u url                    URL where the components will be downloaded. Default: ${DOWNLOADURL}"
-	echo "  -v freebsd_version        FreeBSD version used by components. Default: ${FREEBSD_VERSION}"
-	echo "  -D dir                    Copy this directory into the jail environment. This directory should"
-	echo "                            be mimicked as the tree directory of the jail. For example, if the"
-	echo "                            directory to copy is foo/ and you want to get an exact copy of"
-	echo "                            /etc/resolv.conf, you must have a file like foo/etc/resolv.conf."
-	echo "  -P jail_program           Program to run when jexec(8) is executed. Default: ${CONSOLE_PROGRAM}"
-	echo "  -U jail_user              User to run inside the jail. This replace the -P argument and the"
-	echo "                            CONSOLE_PROGRAM variable with \`login -f <jail_user>\`."
-	echo "  -n jail_name              Name of the jail."
+${jail_desc}
+
+Parameters:
+    boot                      -- Start and stop the jail with the \`appjail startup\` command.
+    clean                     -- Remove dirty jails.
+    create                    -- Create a new jail.
+    destroy                   -- Destroy a jail.
+    get                       -- Get information about a jail.
+    list                      -- Like \`get\` but for all jails.
+    mark                      -- Mark a jail as clean or dirty.
+    priority                  -- Set the order in which the jail will start and stop using the \`appjail startup\` command.
+    rename                    -- Rename a jail.
+
+Parameters for boot:
+    off                       -- Removes the boot flag.
+    on                        -- Creates the boot flag.
+
+Options for create:
+    -a osarch                 -- OS architecture. Default: ${FREEBSD_ARCH}
+    -I install_method         -- Method to install the jail. Default: ${DEFAULT_INSTALL_METHOD}
+    -i initscript             -- initscript to make the jail interactive.
+    -r release_name           -- Release name to use as the new jail or base for thinjails. Default: ${DEFAULT_RELEASE}
+    -T jail_type              -- Specify which jail type to use. Default: ${JAIL_TYPE_THIN}
+    -t template               -- Template to start and stop the jail.
+    -v osversion              -- OS version. Default: ${FREEBSD_VERSION}
+
+Installation methods:
+    clone+jail                -- Syntax: clone+jail=jail2clone@snapname
+                                 Parameters:
+				     - jail2clone: Jail name to clone.
+				     - snapname: Snapshot name to be created if it does not exist.
+                                 Descr: Clones a jail and uses it to create another jail.
+
+    clone+release             -- Syntax: clone+release=snapname
+                                 Parameters: 
+				     - snapname: Snapshot name to be created if it does not exist.
+                                 Descr: Clones a release and uses it to create another jail.
+				        Valid types: \`thick\`, \`linux+debootstrap\`
+
+    copy                      -- Syntax: copy=jail2copy
+                                 Parameters:
+				     - jail2copy: Jail name to copy.
+                                 Descr: Copy an entire jail.
+
+    empty                     -- Syntax: empty
+                                 Descr: Create an empty jail. The jail type will be set to \`${JAIL_TYPE_GENERIC}\`.
+
+    export+jail               -- Syntax: export+jail="output:out_name [compress:algo]"
+                                 Parameters:
+				     - output: Tarball name.
+				     - compress: Compress the tarball using the following methods:
+				                 bzip, gzip, lrzip (requires archivers/lrzip), lz4,
+						 lzma, lzop (requires archivers/lzop), xz, zstd.
+						 If not defined, compression is not used.
+				 Descr: Export the jail directory (\`{JAILDIR}/{JAIL_NAME}/jail\`).
+
+    export+root               -- Syntax: export+root="output:out_name [compress:algo]"
+				 Descr: Export the root directory of the jail (\`{JAILDIR}/{JAIL_NAME}\`).
+
+    import+jail               -- Syntax: import+jail="input:in_file [compress:algo]"
+                                 Parameters:
+				     - input: Tarball to import.
+				     - compress: Ignored, but used by \`zfs+import+jail\` and \`zfs+import+root\`.
+				 Descr: Import the tarball to the jail directory (\`{JAILDIR}/{JAIL_NAME}/jail\`).
+
+    import+root               -- Syntax: import+root="input:in_file [compress:algo]"
+			      -- Descr: Import the tarball to the root directory of the jail (\`{JAILDIR}/{JAIL_NAME}\`).
+
+    standard                  -- Syntax: standard
+                              -- Descr: Create a ${JAIL_TYPE_THIN}, ${JAIL_TYPE_THICK} or ${JAIL_TYPE_DEBOOTSTRAP} jail.
+
+    tiny+export               -- Syntax: tiny+export="files:file_list output:out_name [compress:algo]"
+                                 Parameters:
+				     - files: A file containing the list of files to copy.
+				     - output: Tarball name.
+				     - compress: See \`export+jail\`.
+                              -- Descr: Export a jail with only the files needed to run a program.
+
+    tiny+import               -- Syntax: tiny+import="path/to/appjail_file"
+                                 Descr: Import a TinyJail.
+
+    zfs+export+jail           -- Syntax: zfs+export+jail="output:out_name [compress:algo]"
+                                 Parameters:
+				     - output: Output name.
+				     - compress: It has the same meaning as \`export+jail\` but does not use tar(1).
+				 Descr: Recursively export the dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}/jail\`).
+
+    zfs+export+root           -- Syntax: zfs+export+jail="output:out_name [compress:algo]"
+				 Descr: Recursively export the root dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}\`).
+
+    zfs+import+jail           -- Syntax: zfs+import+jail="input:in_file [compress:algo]"
+                                 Parameters:
+				     - input: The file to import.
+				     - compress: AppJail can auto-detect the compression used, but you can force any other
+				                 compression if you wish.
+				 Descr: Import the file to the dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}/jail\`).
+				        The root dataset will be created.
+
+    zfs+import+root           -- Syntax: zfs+import+root="input:in_file [compress:algo]"
+				 Descr: Import the file to the root dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}\`).
+
+Options for destroy:
+    -f                        -- See -f in zfs-destroy(8).
+    -R                        -- See -R in zfs-destroy(8).
+
+Options for get:
+    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                 in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                        -- Display the name of the columns.
+    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                        -- Columnate the list.
+    -t                        -- Tabulate columns and values.
+
+Options for list:
+    -e                        -- This option is the opposite in \`Options for get\`.
+    -H                        -- This option is the opposite in \`Options for get\`.
+    -I                        -- This option is the same as in \`Options for get\`.
+    -p                        -- This option is the opposite in \`Options for get\`.
+    -t                        -- This option is the opposite in \`Options for get\`.
+    -j jail_name              -- Operate in this jail. If not set operate in all jails.
+
+Keywords for get and list:
+    appjail_version           -- AppJail version used by the jail.
+    arch                      -- OS architecture
+    boot                      -- If 1, the jail will be started using the \`appjail startup\` command.
+    created                   -- Jail creation date. See \`{CREATED_FORMAT}\` in the AppJail configuration file.
+    dirty                     -- If 1, AppJail will remove the jail using the \`appjail jail clean\` command or by
+                                 creating a new jail with the same name. See \`appjail jail mark\`.
+    hostname                  -- Jail host name.
+    ip4                       -- Jail IPv4 address (ip4.addr). AppJail will get all columns and rows.
+    ip6                       -- Counterpart of \`ip4\`.
+    locked                    -- If 1, the jail is locked. See \`appjail jail mark locked\` for more details.
+    name                      -- Jail name.
+    network_ip4               -- All IP addresses that the jail is using in its networks. See \`appjail network hosts -R\`.
+    networks                  -- Networks to which the jail belongs.
+    path                      -- Jail directory.
+    priority                  -- Jail priority used by the \`appjail startup\` command.
+    ports                     -- Exposed jail ports.
+    release_name              -- Release name that was used to create the jail or that is used as the base jail. \`appjail fetch\`.
+    status                    -- Shows whether the jail is running or stopped.
+    type                      -- Jail type.
+    version                   -- OS version.
+
+Parameters for mark:
+    clean                     -- Mark a jail as clean. This is used by some commands, especially for those who take some responsability
+                                 for making a jail.
+    dirty                     -- Mark a jail as dirty.
+    locked                    -- Mark a jail as locked. This is used by the \`appjail start\` command to avoid starting the same jail
+                                 at the same time when using a command like \`appjail startup\` or manually.
+    unlocked                  -- Mark a jail as unlocked.
+
+Options for priority:
+    -p priority               -- The priority affecting the order in which the jail will be started.
+EOF
 }
 
 jail_usage()
 {
-	echo "usage: jail [-delrC] [-a freebsd_arch] [-c components] [-p chroot_program] [-t template]"
-	echo "            [-u url] [-v freebsd_version] [-D dir] [-P console_program] [-U jail_user]"
-	echo "            -n name"
+	cat << EOF
+usage: jail boot [off | on] jail_name
+       jail clean
+       jail create [-a osarch] [-I install_method] [-i initscript] [-T jail_type] [-t template] [-v osversion] jail_name
+       jail destroy [-fR] jail_name
+       jail get [-eHIpt] jail_name [keyword ...]
+       jail list [-eHIpt] [-j jail_name] [keyword ...]
+       jail mark [clean | dirty] jail_name
+       jail mark [locked | unlocked] jail_name
+       jail priority -p priority jail_name
+       jail rename old new
+EOF
 }

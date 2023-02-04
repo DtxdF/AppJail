@@ -1,0 +1,1308 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+nat_desc="Mapping a network or jail IPv4 address to an external IPv4 address (NAT)."
+
+nat_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		add|off|on|status) _nat_chk_firewall ;;
+		boot|get|list|remove) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_${entity} "$@"
+}
+
+_nat_chk_firewall()
+{
+	if ! lib_check_ipv4_forwarding; then
+		lib_warn "You must enable IPv4 forwarding between interfaces: sysctl net.inet.ip.forwarding=1"
+	fi
+
+	case "${USE_FIREWALL}" in
+		pf)
+			if [ ! -c "/dev/pf" ]; then
+				lib_err ${EX_UNAVAILABLE} "pf.ko is not loaded. Run \`kldload pf\` to load it."
+			fi
+
+			if ! service pf onestatus > /dev/null 2>&1; then
+				lib_warn "pf not started. Run \`service pf start\` to start it."
+			fi
+
+			local anchors=`pfctl -sn | grep -E "^nat-anchor [\"']appjail-nat/(jail|network)/\*[\"']"`
+			if [ `echo "${anchors}" | wc -l` -lt 2 ]; then
+				lib_err ${EX_CONFIG} "The nat command requires appjail-nat/jail/* and appjail-nat/network/* anchors to work."
+			fi
+
+			local first_anchor=`echo "${anchors}" | head -1`
+
+			if ! echo "${first_anchor}" | grep -Eq "^nat-anchor [\"']appjail-nat/jail/\*[\"']"; then
+				lib_err ${EX_CONFIG} "The nat command requires the following anchor order: appjail-nat/jail/*, appjail-nat/network/*"
+			fi
+			;;
+		ipfw|ipfilter)
+			lib_err ${EX_UNAVAILABLE} "${USE_FIREWALL}: Not yet implemented!"
+			;;
+		*)
+			lib_err ${EX_CONFIG} "Unknown firewall: ${USE_FIREWALL}"
+			;;
+	esac
+}
+
+nat_add()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_add_${entity} "$@"
+}
+
+nat_add_jail()
+{
+	local _o
+	local opt_nonat=0
+	local ext_if="${EXT_IF}"
+	local opt_log=0 log_options=
+	local network_name=
+	local on_if="${ON_IF}"
+
+	while getopts ":Ne:l:n:o:" _o; do
+		case "${_o}" in
+			e|l|n|o)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			N)
+				opt_nonat=1
+				;;
+			e)
+				ext_if="${OPTARG}"
+				;;
+			l)
+				opt_log=1
+				log_options="${OPTARG}"
+				if [ "${log_options}" = "-" ]; then
+					log_options=
+				fi
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			o)
+				on_if="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${network_name}" ]; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_network "${network_name}"
+
+	local jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_jail "${jail_name}"
+
+	if ! lib_check_jinnet "${jail_name}" "${network_name}"; then
+		lib_err ${EX_CONFIG} -- "${jail_name} is not in ${network_name} network."
+	fi
+
+	if ! lib_check_iface "${ext_if}"; then
+		lib_err ${EX_NOINPUT} -- "${ext_if} interface does not exist."
+	fi
+
+	if ! lib_check_iface "${on_if}"; then
+		lib_err ${EX_NOINPUT} -- "${on_if} interface does not exist."
+	fi
+
+	local jaddr
+	jaddr=`"${APPJAIL_PROGRAM}" network hosts -Rn "${network_name}" -j "${jail_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local natdir="${jail_path}/conf/boot/nat/${network_name}"
+	if ! mkdir -p "${natdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${natdir}"
+	fi
+
+	local nat_conf="${natdir}/${USE_FIREWALL}-nat.conf"
+
+	local raw_rule=
+	case "${USE_FIREWALL}" in
+		pf)
+			if [ ${opt_nonat} -eq 0 ]; then
+				if [ ${opt_log} -eq 1 ]; then
+					raw_rule="nat log ${log_options} on \"${on_if}\" from ${jaddr} to any -> (\"${ext_if}:0\")"
+				else
+					raw_rule="nat on \"${on_if}\" from ${jaddr} to any -> (\"${ext_if}:0\")"
+				fi
+			else
+				raw_rule="no nat on \"${on_if}\" from ${jaddr} to any"
+			fi
+
+			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
+				lib_err ${EX_DATAERR} "An error occurred while parsing the pf rule: ${raw_rule}"
+			fi
+
+			if ! printf "%s\n" "${raw_rule}" > "${nat_conf}"; then
+				lib_err ${EX_IOERR} "Error writing \`${raw_rule}\` to \`${nat_conf}\`"
+			fi
+			;;
+	esac
+}
+
+nat_add_network()
+{
+	local _o
+	local ext_if="${EXT_IF}"
+	local opt_log=0 log_options=
+	local on_if="${ON_IF}"
+	local errlevel=0
+
+	while getopts ":e:l:o:" _o; do
+		case "${_o}" in
+			e|l|o)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				ext_if="${OPTARG}"
+				;;
+			l)
+				opt_log=1
+				log_options="${OPTARG}"
+				if [ "${log_options}" = "-" ]; then
+					log_options=
+				fi
+				;;
+			o)
+				on_if="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_iface "${ext_if}"; then
+		lib_err ${EX_NOINPUT} -- "${ext_if} interface does not exist."
+	fi
+
+	if ! lib_check_iface "${on_if}"; then
+		lib_err ${EX_NOINPUT} -- "${on_if} interface does not exist."
+	fi
+
+	local network_info
+	network_info=`"${APPJAIL_PROGRAM}" network get -I -- "${network_name}" network cidr`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	local network_addr=`echo "${network_info}" | awk '{print $1}'`
+	local network_cidr=`echo "${network_info}" | awk '{print $2}'`
+
+	local natdir="${NETWORKDIR}/${network_name}"
+	local nat_conf="${natdir}/${USE_FIREWALL}-nat.conf"
+
+	local raw_rule=
+	case "${USE_FIREWALL}" in
+		pf)
+			if [ ${opt_log} -eq 1 ]; then
+				raw_rule="nat log ${log_options} on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> (\"${ext_if}:0\")"
+			else
+				raw_rule="nat on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> (\"${ext_if}:0\")"
+			fi
+
+			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
+				lib_err ${EX_DATAERR} "An error occurred while parsing the pf rule: ${raw_rule}"
+			fi
+
+			if ! printf "%s\n" "${raw_rule}" > "${nat_conf}"; then
+				lib_err ${EX_IOERR} "Error writing \`${raw_rule}\` to \`${nat_conf}\`"
+			fi
+			;;
+	esac
+}
+
+nat_boot()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		off|on) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_boot_${entity} "$@"
+}
+
+nat_boot_off()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_boot_off_${entity} "$@"
+}
+
+nat_boot_off_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	# Check only
+	_nat_nconf "${network_name}" > /dev/null
+
+	rm -f -- "${NETWORKDIR}/${network_name}/nat-boot"
+}
+
+nat_boot_on()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_boot_on_${entity} "$@"
+}
+
+nat_boot_on_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	# Check only
+	_nat_nconf "${network_name}" > /dev/null
+
+	touch -- "${NETWORKDIR}/${network_name}/nat-boot"
+}
+
+nat_get()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local network_name=
+
+	local flag_boot=0
+	local flag_name=0
+	local flag_network=0
+	local flag_rule=0
+
+	local errlevel=0
+
+	while getopts ":eHIptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target="$1"; shift
+	if lib_check_empty "${target}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	local nat_conf
+	case "${entity}" in
+		jail)
+			if [ -z "${network_name}" ]; then
+				nat_usage
+				exit ${EX_USAGE}
+			fi
+
+			nat_conf=`_nat_jconf -n "${network_name}" -- "${target}"`
+			;;
+		network)
+			nat_conf=`_nat_nconf "${target}"`
+			;;
+	esac
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	if [ $# -eq 0 ]; then
+		case "${entity}" in
+			jail)
+				set -- "name" "network" "rule"
+				;;
+			network)
+				set -- "boot" "name" "rule"
+				;;
+		esac
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			name|rule)
+				;;
+			*)
+				local found=0
+
+				if [ "${entity}" = "jail" ]; then
+					case "${keyword}" in
+						network)
+							found=1
+							;;
+					esac
+				else
+					case "${keyword}" in
+						boot)
+							found=1
+							;;
+					esac
+				fi
+
+				if [ ${found} -eq 0 ]; then
+					lib_warn -- "${keyword}: keyword not found."
+					continue
+				fi
+				;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	keywords=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${keywords}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				BOOT)
+					if [ -f "${NETWORKDIR}/${target}/nat-boot" ]; then
+						value=1
+					else
+						value=0
+					fi
+					;;
+				NAME)
+					value="${target}"
+					;;
+				NETWORK)
+					value="${network_name}"
+					;;
+				RULE)
+					value=`head -1 -- "${nat_conf}"`
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+nat_list()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_list_${entity} "$@"
+}
+
+nat_list_jail()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local network_name=
+
+	while getopts ":eHIptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${network_name}" ]; then
+		nat_get jail ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -n "${network_name}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local natdir="${jail_path}/conf/boot/nat"
+
+	if [ ! -d "${natdir}" ]; then
+		return 0
+	fi
+
+	ls -A -- "${natdir}" | while IFS= read -r network_name
+	do
+		nat_conf="${natdir}/${network_name}/${USE_FIREWALL}-nat.conf"
+
+		if [ ! -f "${nat_conf}" ]; then
+			continue
+		fi
+
+		nat_get jail ${eflag} ${Hflag} ${Iflag} ${tflag} -n "${network_name}" -- "${jail_name}" "$@"
+
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+nat_list_network()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local network_name=
+
+	while getopts ":eHIptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${network_name}" ]; then
+		nat_get network ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -- "${network_name}" "$@"
+		return $?
+	fi
+
+	if [ ! -d "${NETWORKDIR}" ]; then
+		return
+	fi
+
+	ls -A -- "${NETWORKDIR}" | while IFS= read -r network_name
+	do
+		networkdir="${NETWORKDIR}/${network_name}"
+		nat_conf="${networkdir}/${USE_FIREWALL}-nat.conf"
+
+		if [ ! -f "${nat_conf}" ]; then
+			continue
+		fi
+
+		nat_get network ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${network_name}" "$@"
+
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+nat_off()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_off_${entity} "$@"
+}
+
+nat_off_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_jail "${jail_name}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "jail/${jail_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The nat configuration of ${jail_name} is not loaded."
+			fi
+
+			local pf_anchor="appjail-nat/jail/${jail_name}"
+
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			;;
+	esac
+}
+
+nat_off_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_network "${network_name}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "network/${network_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The nat configuration of ${network_name} is not loaded."
+			fi
+
+			local pf_anchor="appjail-nat/network/${network_name}"
+
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			;;
+	esac
+}
+
+_nat_pf_loaded()
+{
+	local part="$1"
+	if [ -z "${part}" ]; then
+		lib_err ${EX_USAGE} "usage: _nat_pf_loaded part"
+	fi
+
+	pfctl -a "appjail-nat/${part}" -sn -P 2> /dev/null
+}
+
+nat_on()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_on_${entity} "$@"
+}
+
+nat_on_jail()
+{
+	local _o
+	local errlevel
+
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	local rules
+	rules=`lib_generate_tempfile`
+	
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_rules
+	escape_rules=`lib_escape_string "${rules}"`
+
+	lib_atexit_add "rm -f \"${escape_rules}\""
+
+	nat_list jail -HIpt -- "${jail_name}" rule > "${rules}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			if ! pfctl -a "appjail-nat/jail/${jail_name}" -f "${rules}"; then
+				lib_err - "An error occurred while parsing the pf rules for ${jail_name}:"
+				while IFS= read -r rule
+				do
+					lib_err - "    - ${rule}"
+				done < "${rules}"
+				exit ${EX_DATAERR}
+			fi
+			;;
+	esac
+}
+
+nat_on_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	local errlevel
+
+	local nat_conf
+	nat_conf=`_nat_nconf "${network_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	local rule
+	rule=`head -1 -- "${nat_conf}"`
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local pf_anchor="appjail-nat/network/${network_name}"
+
+			if ! printf "%s\n" "${rule}" | pfctl -a "${pf_anchor}" -f -; then
+				lib_err ${EX_DATAERR} "An error occurred while parsing the pf rule for ${network_name}: ${rule}"
+			fi
+			;;
+	esac
+}
+
+nat_remove()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_remove_${entity} "$@"
+}
+
+nat_remove_jail()
+{
+	local _o
+	local network_name=
+	local errlevel=0
+
+	while getopts ":n:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					nat_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				nat_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	local nat_conf
+	nat_conf=`_nat_jconf -n "${network_name}" -- "${jail_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	rm -f -- "${nat_conf}"
+	rmdir -- "${JAILDIR}/${jail_name}/conf/boot/nat/${network_name}" > /dev/null 2>&1
+}
+
+nat_remove_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	local errlevel
+
+	local nat_conf
+	nat_conf=`_nat_nconf "${network_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		return ${errlevel}
+	fi
+
+	rm -f -- "${nat_conf}"
+	rm -f -- "${NETWORKDIR}/${network_name}/nat-boot"
+}
+
+nat_status()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|network) ;;
+		*) nat_usage; exit ${EX_USAGE} ;;
+	esac
+
+	nat_status_${entity} "$@"
+}
+
+nat_status_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_jail "${jail_name}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "jail/${jail_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The nat configuration of ${jail_name} is not loaded."
+			fi
+
+			echo -e "${loaded}"
+			;;
+	esac
+}
+
+nat_status_network()
+{
+	local network_name="$1"
+	if lib_check_empty "${network_name}"; then
+		nat_usage
+		exit ${EX_USAGE}
+	fi
+
+	_nat_chk_network "${network_name}"
+
+	case "${USE_FIREWALL}" in
+		pf)
+			local loaded=`_nat_pf_loaded "network/${network_name}"`
+			if lib_check_empty "${loaded}"; then
+				lib_err ${EX_NOINPUT} "The nat configuration of ${network_name} is not loaded."
+			fi
+
+			echo -e "${loaded}"
+			;;
+	esac
+}
+
+_nat_jconf()
+{
+	local _o
+	local network_name=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: _nat_jconf -n network_name jail_name"
+	fi
+
+	while getopts ":n:" _o; do
+		case "${_o}" in
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				_nat_jconf # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${network_name}" ]; then
+		_nat_jconf # usage
+	fi
+
+	_nat_chk_network "${network_name}"
+
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		_nat_jconf # usage
+	fi
+	
+	_nat_chk_jail "${jail_name}"
+
+	if ! lib_check_jinnet "${jail_name}" "${network_name}"; then
+		lib_err ${EX_CONFIG} -- "${jail_name} is not in ${network_name} network."
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local natdir="${jail_path}/conf/boot/nat/${network_name}"
+	local nat_conf="${natdir}/${USE_FIREWALL}-nat.conf"
+
+	if [ ! -f "${nat_conf}" ]; then
+		lib_err ${EX_NOINPUT} -- "${jail_name} is not configured to use NAT for ${network_name} network."
+	fi
+
+	printf "%s\n" "${nat_conf}"
+}
+
+_nat_nconf()
+{
+	local network_name="$1"
+	if [ -z "${network_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _nat_nconf network_name"
+	fi
+
+	_nat_chk_network "${network_name}"
+
+	local network_path="${NETWORKDIR}/${network_name}"
+	local nat_conf="${network_path}/${USE_FIREWALL}-nat.conf"
+	if [ ! -f "${nat_conf}" ]; then
+		lib_err ${EX_NOINPUT} -- "${network_name} is not configured to use NAT."
+	fi
+
+	printf "%s\n" "${nat_conf}"
+}
+
+_nat_chk_jail()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _nat_chk_jail jail_name"
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+_nat_chk_network()
+{
+	local network_name="$1"
+	if [ -z "${network_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _nat_chk_network network_name"
+	fi
+
+	if ! lib_check_networkname "${network_name}"; then
+		lib_err ${EX_DATAERR} "Invalid network name: ${network_name}"
+	fi
+
+	if [ ! -d "${NETWORKDIR}/${network_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the network \`${network_name}\`"
+	fi
+}
+
+nat_help()
+{
+	cat << EOF
+`nat_usage`
+
+${nat_desc}
+
+Parameters:
+    add                       -- Add a NAT configuration. This parameter overrides the current rule.
+    boot                      -- Set the \`boot\` flag to apply NAT rules using \`appjail startup\`.
+    get                       -- Get information about the current NAT configuration for a given target.
+    list                      -- Like \`get\` but for all targets.
+    off                       -- Disables the current NAT rule.
+    on                        -- Enables the current NAT rule.
+    remove                    -- Remove the current NAT rule.
+    status                    -- Show loaded nat rules.
+
+Parameters for add jail:
+    -N                        -- Don't use NAT for this jail.
+
+Options for add jail and add network:
+    -e ext_if                 -- The external interface. If not defined, {EXT_IF} is used.
+    -l - | log_options        -- Enable logging. Not all firewalls support options. At the moment, pf(4) accepts
+                                 options like \`(option1, option2, optionN)\`. Pass - to enable logging, but not use
+    -o on_if                  -- The name or group of the network interface to transmit packets on. If not defined, {ON_IF} is used.
+				 the options.
+
+Options for add jail:
+    -n network_name           -- The network to obtain the IP.
+
+Parameters for boot:
+    off                       -- Removes the boot flag.
+    on                        -- Creates the boot flag.
+
+Parameters for boot off and boot on:
+    network                   -- Creates or removes the boot flag on a network.
+
+Options for get jail and get network:
+    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                 in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                        -- Display the name of the columns.
+    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                        -- Columnate the list.
+    -t                        -- Tabulate columns and values.
+
+Options for list jail and list network:
+    -e                        -- This option is the opposite in \`Options for get\`.
+    -H                        -- This option is the opposite in \`Options for get\`.
+    -I                        -- This option is the same as in \`Options for get\`.
+    -p                        -- This option is the opposite in \`Options for get\`.
+    -t                        -- This option is the opposite in \`Options for get\`.
+    -n network_name           -- Operate in this network. If not defined, operate in all networks.
+
+Keywords for get jail, get network, list jail and list network:
+    name                      -- Jail or network name.
+    rule                      -- Firewall rule to be used.
+
+Keywords for get jail and list jail:
+    network                   -- Network used by the jail to obtain the IP address.
+
+Keywords for get network and list network:
+    boot                      -- If 1, the NAT rule for the network will be started using the \`appjail startup\` command.
+EOF
+}
+
+nat_usage()
+{
+	cat << EOF
+usage: nat add jail -n network_name [-e ext_if] [-l [- | log_options]] [-o on_if] jail_name
+       nat add jail -N -n network_name [-e ext_if] [-o on_if] jail_name
+       nat get jail [-eHIpt] -n network_name jail_name [keyword ...]
+       nat list jail [-eHIpt] [-n network_name] jail_name [keyword ...]
+       nat off jail jail_name
+       nat on jail [-n network_name] jail_name
+       nat remove jail -n network_name jail_name
+       nat status jail jail_name
+
+usage: nat add network [-e ext_if] [-l [- | log_options]] [-o on_if] network_name
+       nat boot [off | on] network network_name
+       nat get network [-eHIpt] network_name [keyword ...]
+       nat list network [-eHIpt] [-n network_name] [keyword ...]
+       nat off network network_name
+       nat on network network_name
+       nat remove network network_name
+       nat status network network_name
+EOF
+}

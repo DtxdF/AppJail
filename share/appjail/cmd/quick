@@ -1,0 +1,3054 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/copy"
+lib_load "${LIBDIR}/kern_modules"
+lib_load "${LIBDIR}/keys"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/tempfile"
+
+# Allows to use the default values in the *_run functions.
+QUICK_DEFAULT_SUBGROUP="<default>"
+
+# Types & Default interface types used by the `bridge` option.
+QUICK_IFACE_TYPE_EPAIR="epair"
+QUICK_IFACE_TYPE_IFACE="iface"
+QUICK_DEFAULT_IFACE_TYPE="${QUICK_IFACE_TYPE_EPAIR}"
+
+# See `quick_set_jng`
+QUICK_REGEX_JNG="^[a-zA-Z_]+[a-zA-Z0-9_]*$"
+QUICK_REGEX_JNG_NAME="^[0-9a-zA-Z_]+$"
+
+# Temp dir
+QUICK_TEMPDIR=
+
+# Misc
+QUICK_ESCAPE_TEMPLATE=3
+QUICK_IFNAMSIZ=15
+
+# Directories
+QUICK_KEY_BRIDGE="bridge"
+QUICK_KEY_DHCP="dhcp"
+QUICK_KEY_EXPOSE="expose"
+QUICK_KEY_FSTAB="fstab"
+QUICK_KEY_IP4="ip4"
+QUICK_KEY_IP6="ip6"
+QUICK_KEY_JNG="jng"
+QUICK_KEY_LIMITS="limits"
+QUICK_KEY_NAT="nat"
+QUICK_KEY_NONAT="nonat"
+QUICK_KEY_SLAAC="slaac"
+QUICK_KEY_VIRTUALNET="virtualnet"
+
+# Fstab constants
+QUICK_FSTAB_OPTION_DEVICE=1
+QUICK_FSTAB_OPTION_MOUNTPOINT=2
+QUICK_FSTAB_OPTION_TYPE=3
+QUICK_FSTAB_OPTION_OPTIONS=4
+QUICK_FSTAB_OPTION_DUMP=5
+QUICK_FSTAB_OPTION_PASS=6
+
+# Jail name
+QUICK_JAILNAME=
+# Temp template
+QUICK_TEMP_TEMPLATE=
+# Jail path
+QUICK_JAILPATH=
+# Options
+QUICK_OPTION_ALIAS=0
+QUICK_OPTION_ALIAS_IFACE=
+QUICK_OPTION_BOOT=${DEFAULT_BOOT}
+QUICK_OPTION_BRIDGE=0
+QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
+QUICK_OPTION_CPUSET=
+QUICK_OPTION_CREATE_ARGS=
+QUICK_OPTION_DEFNET=
+QUICK_OPTION_DEVFS_RULESET=${DEFAULT_DEVFS_RULESET}
+QUICK_OPTION_DHCP=0
+QUICK_OPTION_EXPOSE=0
+QUICK_OPTION_FILE=
+QUICK_OPTION_FILES=
+QUICK_OPTION_FSTAB=0
+QUICK_OPTION_INITSCRIPT=
+QUICK_OPTION_INSTALL_METHOD="${DEFAULT_INSTALL_METHOD}"
+QUICK_OPTION_IP4=0
+QUICK_OPTION_IP4_DISABLE=0
+QUICK_OPTION_IP4_INHERIT=0
+QUICK_OPTION_IP6=0
+QUICK_OPTION_IP6_DISABLE=0
+QUICK_OPTION_IP6_INHERIT=0
+QUICK_OPTION_JAILTYPE="${JAIL_TYPE_THIN}"
+QUICK_OPTION_JNG=0
+QUICK_OPTION_LINUXFS=0
+QUICK_OPTION_LOGIN=${DEFAULT_LOGIN}
+QUICK_OPTION_LOGIN_USER=${DEFAULT_LOGIN_USER}
+QUICK_OPTION_MOUNT_DEVFS=${DEFAULT_MOUNT_DEVFS}
+QUICK_OPTION_NAT=0
+QUICK_OPTION_NONAT=0
+QUICK_OPTION_OSARCH="${FREEBSD_ARCH}"
+QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
+QUICK_OPTION_OVERWRITE=${DEFAULT_OVERWRITE}
+QUICK_OPTION_PRIORITY=${DEFAULT_PRIORITY}
+QUICK_OPTION_RESTART=${DEFAULT_RESTART}
+QUICK_OPTION_RUN=${DEFAULT_RUN}
+QUICK_OPTION_RUN_ARGS=
+QUICK_OPTION_SLAAC=0
+QUICK_OPTION_START=${DEFAULT_START}
+QUICK_OPTION_START_ARGS=
+QUICK_OPTION_STOP_ARGS=
+QUICK_OPTION_TEMPLATE="${DEFAULT_TEMPLATE}"
+QUICK_OPTION_TMPDIR=0
+QUICK_OPTION_USE_LIMITS=0
+QUICK_OPTION_USE_RESOLV_CONF=${USE_RESOLV_CONF}; QUICK_OPTION_RESOLV_CONF="${DEFAULT_RESOLV_CONF}"
+QUICK_OPTION_USE_TZDATA=${USE_TIMEZONE}; QUICK_OPTION_TZDATA="${DEFAULT_TIMEZONE}"
+QUICK_OPTION_VIRTUALNET=0
+QUICK_OPTION_VNET=0
+QUICK_OPTION_VNET_INTERFACES=
+QUICK_OPTION_X11=0
+
+quick_desc="Create a pre-configured jail."
+
+quick_main()
+{
+	if ! which -s "appjail"; then
+		lib_err ${EX_UNAVAILABLE} "appjail is not installed. Cannot continue ..."
+	fi
+
+	QUICK_JAILNAME="$1"; shift
+	if lib_check_empty "${QUICK_JAILNAME}"; then
+		quick_usage
+		exit ${EX_USAGE}
+	fi
+
+	# Jail path
+	QUICK_JAILPATH="${JAILDIR}/${QUICK_JAILNAME}"
+
+	# Random color name
+	lib_set_logprefix " [`random_color`${QUICK_JAILNAME}${COLOR_DEFAULT}]"
+
+	# Useful for debugging
+	lib_debug "quick parameters: $@"
+
+	# Tempdir
+	QUICK_TEMPDIR=`lib_generate_tempdir` || exit $?
+
+	local escape_tempdir
+	escape_tempdir=`lib_escape_string "${QUICK_TEMPDIR}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+	
+	local option value
+	for option in "$@"; do
+		value=`lib_jailparam_value "${option}" =`
+		option=`lib_jailparam_name "${option}" =`
+
+		case "${option}" in
+			alias|boot|bridge|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tmpdir|type|tzdata|virtualnet|vnet|x11) quick_set_${option} "${value}" ;;
+			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
+		esac
+	done
+
+	# temp. template
+	quick_temp_template
+
+	# create jail
+	quick_create_jail
+
+	local file_options
+	file_options="copy tzdata resolv_conf"
+
+	local vnet_options
+	vnet_options="vnet"
+
+	local bridge_options
+	bridge_options="bridge"
+
+	local alias_options
+	alias_options="alias"
+	
+	local jng_options
+	jng_options="jng"
+
+	local virtualnet_options
+	virtualnet_options="virtualnet"
+
+	local autoconf_options
+	autoconf_options="dhcp slaac"
+
+	local nat_options
+	nat_options="nat nonat expose"
+
+	local network_options
+	network_options="${vnet_options} ${bridge_options} ${alias_options} ${virtualnet_options} ${jng_options} ${autoconf_options} ${nat_options}"
+
+	local limits_options
+	limits_options="cpuset limits"
+
+	local device_options
+	device_options="devfs fstab tmpdir linuxfs x11"
+
+	local startup_options
+	startup_options="boot priority"
+
+	local args_options
+	args_options="create_args start_args run_args stop_args"
+
+	local all_options
+	all_options="${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${args_options}"
+
+	for option in ${all_options}; do
+		quick_run_${option}
+	done
+
+	# write template
+	quick_write_template
+
+	# end
+	quick_end_jail
+
+	# start must be executed after the template is written
+	quick_run_start
+}
+
+quick_temp_template()
+{
+	QUICK_TEMP_TEMPLATE="`lib_generate_tempfile`" || exit $?
+
+	local escape_temp_template
+	escape_temp_template=`lib_escape_string "${QUICK_TEMP_TEMPLATE}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_template}\""
+
+	if ! cat -- "${QUICK_OPTION_TEMPLATE}" > "${QUICK_TEMP_TEMPLATE}"; then
+		lib_err ${EX_IOERR} "Error writing ${QUICK_OPTION_TEMPLATE} to ${QUICK_TEMP_TEMPLATE}"
+	fi
+}
+
+quick_create_jail()
+{
+	if [ "${QUICK_OPTION_OVERWRITE}" -eq 1 ]; then
+		if [ -d "${JAILDIR}/${QUICK_JAILNAME}" ]; then
+			lib_debug "Trying to remove ${QUICK_JAILNAME} ..."
+
+			appjail stop -- "${QUICK_JAILNAME}" || exit $?
+			appjail jail destroy -- "${QUICK_JAILNAME}" || exit $?
+		fi
+	fi
+
+	local escape_osarch=`lib_escape_string "${QUICK_OPTION_OSARCH}"`
+	local escape_install_method=`lib_escape_string "${QUICK_OPTION_INSTALL_METHOD}"`
+	local escape_jail_type=`lib_escape_string "${QUICK_OPTION_JAILTYPE}"`
+	local escape_osversion=`lib_escape_string "${QUICK_OPTION_OSVERSION}"`
+	# This is not necessary after running `appjail jail create` because
+	# the jail name is already checked.
+	local escape_jail_name=`lib_escape_string "${QUICK_JAILNAME}"`
+
+	local appjail_cmd="appjail jail create"
+	appjail_cmd="${appjail_cmd} -a \"${escape_osarch}\" -I \"${escape_install_method}\" -T \"${escape_jail_type}\" -v \"${escape_osversion}\""
+
+	if [ -n "${QUICK_OPTION_INITSCRIPT}" ]; then
+		local escape_initscript=`lib_escape_string "${QUICK_OPTION_INITSCRIPT}"`
+
+		appjail_cmd="${appjail_cmd} -i \"${escape_initscript}\""
+	fi
+
+	appjail_cmd="${appjail_cmd} -- \"${escape_jail_name}\""
+
+	if ! sh -c "${appjail_cmd}"; then
+		appjail jail mark dirty "${QUICK_JAILNAME}" > /dev/null 2>&1
+
+		lib_err ${EX_CANTCREAT} "Error creating ${QUICK_JAILNAME} jail."
+	fi
+
+	lib_atexit_add "appjail jail mark dirty \"${QUICK_JAILNAME}\" > /dev/null 2>&1"
+}
+
+quick_write_template()
+{
+	local jail_template
+	jail_template="${QUICK_JAILPATH}/conf/template.conf"
+	if ! cat -- "${QUICK_TEMP_TEMPLATE}" > "${jail_template}"; then
+		lib_err ${EX_IOERR} "Error writing ${QUICK_TEMP_TEMPLATE} to ${jail_template}"
+	fi
+
+	lib_debug "Template generated:"
+	lib_debug_read "${jail_template}"
+}
+
+quick_end_jail()
+{
+	# Clean up
+	lib_atexit_add "appjail jail mark clean \"${QUICK_JAILNAME}\" > /dev/null 2>&1"
+	appjail jail mark clean "${QUICK_JAILNAME}" > /dev/null 2>&1
+
+	lib_debug "Done."
+}
+
+quick_run_vnet()
+{
+	if [ ${QUICK_OPTION_VNET} -eq 0 ]; then
+		return 0
+	fi
+
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+
+	local interface
+	for interface in ${QUICK_OPTION_VNET_INTERFACES}; do
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"${interface}\""
+	done
+}
+
+quick_set_vnet()
+{
+	if [ ${QUICK_OPTION_ALIAS} -eq 1 ]; then
+		quick_exclusive "vnet" "alias"
+	fi
+
+	quick_vimage
+
+	local interface
+	interface="$1"; quick_reqoption "vnet" "${interface}"
+
+	quick_iface "${interface}"
+
+	QUICK_OPTION_VNET_INTERFACES="${QUICK_OPTION_VNET_INTERFACES} ${interface}"
+
+	QUICK_OPTION_VNET=1
+}
+
+quick_run_nat()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_NAT} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_VIRTUALNET} -eq 0 ]; then
+		quick_reqoptions "nat" "virtualnet"
+	fi
+
+	lib_debug "Creating NAT rules ..."
+
+	lib_keys_list "${QUICK_KEY_NAT}" | while IFS= read -r network
+	do
+		if [ "${network}" = "${QUICK_DEFAULT_SUBGROUP}" ]; then
+			real_network="${QUICK_OPTION_DEFNET}"
+
+			if lib_check_empty "${real_network}"; then
+				lib_err ${EX_CONFIG} "This NAT rule cannot be configured because the default network is not defined."
+			fi
+		else
+			real_network="${network}"
+
+			if ! lib_keys_check "${QUICK_KEY_VIRTUALNET}" "${real_network}"; then
+				lib_err ${EX_NOINPUT} -- "${real_network}: unknown virtual network."
+			fi
+		fi
+
+		# head
+		nat_add_cmd="appjail nat add jail -n \"${real_network}\""
+
+		# ext_if
+		ext_if=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "ext_if"`
+		nat_add_cmd="${nat_add_cmd} -e \"${ext_if}\""
+
+		# logopts
+		use_logopts=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "use_logopts"`
+		if [ ${use_logopts} -eq 1 ]; then
+			logopts=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "logopts"`
+
+			if [ -z "${logopts}" ]; then
+				logopts="-"
+			fi
+
+			escape_logopts=`lib_escape_string "${logopts}"`
+
+			nat_add_cmd="${nat_add_cmd} -l \"${escape_logopts}\""
+		fi
+
+		# on_if
+		on_if=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "on_if"`
+		nat_add_cmd="${nat_add_cmd} -o \"${on_if}\""
+
+		# tail
+		nat_add_cmd="${nat_add_cmd} -- \"${QUICK_JAILNAME}\""
+
+		# debugging
+		lib_debug "Setting NAT rule: network:${real_network} ext_if:${ext_if} logopts:${use_logopts} (${logopts}) on_if:${on_if}"
+
+		# profit!
+		sh -c "${nat_add_cmd}" || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail nat on jail \"${name}\""'
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail nat off jail \"${name}\""'
+}
+
+quick_set_nat()
+{
+	local params
+	local total_items=0 current_index=0
+
+	params="$1"
+	if ! lib_check_empty "${params}"; then
+		params=`lib_split_jailparams "${params}"`
+		total_items=`printf "%s\n" "${params}" | wc -l`
+	fi
+
+	local network_name=
+	local ext_if=
+	local use_logopts=0 logopts=
+	local on_if=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			ext_if)
+				ext_if="${value}"
+				;;
+			logopts)
+				use_logopts=1
+				logopts="${value}"
+				;;
+			network)
+				network_name="${value}"
+				;;
+			on_if)
+				on_if="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (nat): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${network_name}"; then
+		network_name="${QUICK_DEFAULT_SUBGROUP}"
+	else
+		if lib_check_ifacelen "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: network name too long."
+		fi
+
+		if ! lib_check_networkname "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: invalid network name."
+		fi
+	fi
+
+	if lib_check_empty "${ext_if}"; then
+		ext_if="${EXT_IF}"
+	else
+		quick_iface "${ext_if}"
+	fi
+
+	if lib_check_empty "${on_if}"; then
+		on_if="${ON_IF}"
+	else
+		quick_iface "${on_if}"
+	fi
+
+	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "ext_if" "${ext_if}"
+	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "use_logopts" "${use_logopts}"
+	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "logopts" "${logopts}"
+	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "on_if" "${on_if}"
+
+	QUICK_OPTION_NAT=1
+}
+
+quick_run_nonat()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_NONAT} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_VIRTUALNET} -eq 0 ]; then
+		quick_reqoptions "nonat" "virtualnet"
+	fi
+
+	lib_debug "Creating NONAT rules ..."
+
+	lib_keys_list "${QUICK_KEY_NONAT}" | while IFS= read -r network
+	do
+		if [ "${network}" = "${QUICK_DEFAULT_SUBGROUP}" ]; then
+			real_network="${QUICK_OPTION_DEFNET}"
+
+			if lib_check_empty "${real_network}"; then
+				lib_err ${EX_CONFIG} "This NONAT rule cannot be configured because the default network is not defined."
+			fi
+		else
+			real_network="${network}"
+
+			if ! lib_keys_check "${QUICK_KEY_VIRTUALNET}" "${real_network}"; then
+				lib_err ${EX_NOINPUT} -- "${real_network}: unknown virtual network."
+			fi
+		fi
+
+		# head
+		nonat_add_cmd="appjail nat add jail -N -n \"${real_network}\""
+
+		# ext_if
+		ext_if=`lib_keys_get "${QUICK_KEY_NONAT}" "${network}" "ext_if"`
+		nonat_add_cmd="${nonat_add_cmd} -e \"${ext_if}\""
+
+		# on_if
+		on_if=`lib_keys_get "${QUICK_KEY_NONAT}" "${network}" "on_if"`
+		nonat_add_cmd="${nonat_add_cmd} -o \"${on_if}\""
+
+		# tail
+		nonat_add_cmd="${nonat_add_cmd} -- \"${QUICK_JAILNAME}\""
+
+		# debugging
+		lib_debug "Setting NONAT rule: network:${real_network} ext_if:${ext_if} on_if:${on_if}"
+
+		# profit!
+		sh -c "${nonat_add_cmd}" || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail nat on jail \"${name}\""'
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail nat off jail \"${name}\""'
+}
+
+quick_set_nonat()
+{
+	local params
+	local total_items=0 current_index=0
+
+	params="$1"
+	if ! lib_check_empty "${params}"; then
+		params=`lib_split_jailparams "${params}"`
+		total_items=`printf "%s\n" "${params}" | wc -l`
+	fi
+
+	local network_name=
+	local ext_if=
+	local on_if=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			ext_if)
+				ext_if="${value}"
+				;;
+			network)
+				network_name="${value}"
+				;;
+			on_if)
+				on_if="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (nonat): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${network_name}"; then
+		network_name="${QUICK_DEFAULT_SUBGROUP}"
+	else
+		if lib_check_ifacelen "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: network name too long."
+		fi
+
+		if ! lib_check_networkname "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: invalid network name."
+		fi
+	fi
+
+	if lib_check_empty "${ext_if}"; then
+		ext_if="${EXT_IF}"
+	else
+		quick_iface "${ext_if}"
+	fi
+
+	if lib_check_empty "${on_if}"; then
+		on_if="${ON_IF}"
+	else
+		quick_iface "${on_if}"
+	fi
+
+	lib_keys_set "${QUICK_KEY_NONAT}" "${network_name}" "ext_if" "${ext_if}"
+	lib_keys_set "${QUICK_KEY_NONAT}" "${network_name}" "on_if" "${on_if}"
+
+	QUICK_OPTION_NONAT=1
+}
+
+quick_run_expose()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_EXPOSE} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_VIRTUALNET} -eq 0 ]; then
+		quick_reqoptions "expose" "virtualnet"
+	fi
+
+	lib_keys_list "${QUICK_KEY_EXPOSE}" | while IFS= read -r nro
+	do
+		network=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "network"`
+
+		if [ "${network}" = "${QUICK_DEFAULT_SUBGROUP}" ]; then
+			network="${QUICK_OPTION_DEFNET}"
+
+			if lib_check_empty "${network}"; then
+				lib_err ${EX_CONFIG} "This expose rule cannot be configured because the default network is not defined."
+			fi
+		else
+			if ! lib_keys_check "${QUICK_KEY_VIRTUALNET}" "${network}"; then
+				lib_err ${EX_NOINPUT} -- "${network}: unknown virtual network."
+			fi
+		fi
+
+		expose_set_cmd="appjail expose set -k \"${network}\""
+
+		# ext_if
+		ext_if=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "ext_if"`
+		expose_set_cmd="${expose_set_cmd} -i \"${ext_if}\""
+
+		# logopts
+		use_logopts=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "use_logopts"`
+		if [ ${use_logopts} -eq 1 ]; then
+			logopts=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "logopts"`
+
+			if [ -z "${logopts}" ]; then
+				logopts="-"
+			fi
+
+			escape_logopts=`lib_escape_string "${logopts}"`
+			expose_set_cmd="${expose_set_cmd} -l \"${escape_logopts}\""
+		fi
+
+		# proto
+		proto=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "proto"`
+		if [ "${proto}" = "tcp" ]; then
+			expose_set_cmd="${expose_set_cmd} -t"
+		else
+			expose_set_cmd="${expose_set_cmd} -u"
+		fi
+	
+		# port
+		port=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "port"`
+		escape_port=`lib_escape_string "${port}"`
+		expose_set_cmd="${expose_set_cmd} -p \"${escape_port}\""
+
+		# on_if
+		on_if=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "on_if"`
+		expose_set_cmd="${expose_set_cmd} -o \"${on_if}\""
+
+		# description
+		description=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "description"`
+		if ! lib_check_empty "${description}"; then
+			escape_description=`lib_escape_string "${description}"`
+
+			expose_set_cmd="${expose_set_cmd} -N \"${escape_description}\""
+		fi
+
+		# debugging
+		lib_debug "Setting expose rule#${nro}: network:${network} port:${port}/${proto} ext_if:${ext_if} logopts:${use_logopts} (${logopts}) on_if:${on_if} descr:${description}"
+
+		# tail
+		expose_set_cmd="${expose_set_cmd} -- \"${QUICK_JAILNAME}\""
+
+		# profit!
+		sh -c "${expose_set_cmd}" || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail expose on \"${name}\""'
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail expose off \"${name}\""'
+}
+
+quick_set_expose()
+{
+	local params
+
+	params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "expose syntax: hport[:jport] [descr:description] [ext_if:external_interface] [logopts:firewall_logopts] [network:network_name] [on_if:interface] [proto:protocol]"
+	fi
+
+	local params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local port=
+	local description=
+	local ext_if=
+	local use_logopts=0 logopts=
+	local network_name=
+	local on_if=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		if [ -z "${port}" ]; then
+			port="${arg}"
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			descr)
+				description="${value}"
+				;;
+			ext_if)
+				ext_if="${value}"
+				;;
+			logopts)
+				use_logopts=1
+				logopts="${value}"
+				;;
+			proto)
+				proto="${value}"
+				;;
+			network)
+				network_name="${value}"
+				;;
+			on_if)
+				on_if="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (expose): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${port}"; then
+		quick_set_expose # usage
+	fi
+
+	if ! printf "%s" "${port}" | grep -Eq '^[^:]+(:[^:]+)?$'; then
+		lib_err ${EX_DATAERR} "Invalid port: ${port}"
+	fi
+
+	if lib_check_empty "${proto}"; then
+		proto="tcp"
+	fi
+
+	case "${proto}" in
+		tcp|udp) ;;
+		*) lib_err ${EX_DATAERR} -- "${proto}: invalid protocol." ;;
+	esac
+
+	if lib_check_empty "${network_name}"; then
+		network_name="${QUICK_DEFAULT_SUBGROUP}"
+	else
+		if lib_check_ifacelen "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: network name too long."
+		fi
+
+		if ! lib_check_networkname "${network_name}"; then
+			lib_err ${EX_DATAERR} -- "${network_name}: invalid network name."
+		fi
+	fi
+
+	if lib_check_empty "${ext_if}"; then
+		ext_if="${EXT_IF}"
+	else
+		quick_iface "${ext_if}"
+	fi
+
+	if lib_check_empty "${on_if}"; then
+		on_if="${ON_IF}"
+	else
+		quick_iface "${on_if}"
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_EXPOSE}"
+	nro=`lib_keys_append "${QUICK_KEY_EXPOSE}" "description" "${description}"`
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "ext_if" "${ext_if}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "use_logopts" "${use_logopts}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "logopts" "${logopts}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "proto" "${proto}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "port" "${port}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "on_if" "${on_if}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "network" "${network_name}"
+
+	QUICK_OPTION_EXPOSE=1
+}
+
+quick_run_jng()
+{
+	if [ ${QUICK_OPTION_JNG} -eq 0 ]; then
+		return 0
+	fi
+
+	if ! which -s "jng"; then
+		lib_err ${EX_UNAVAILABLE} "jng is not installed or does not have the execution bit. Use \`install -m 555 /usr/share/examples/jails/jng /usr/local/bin/jng\` to install it."
+	fi
+
+	# required by jng
+	lib_modules_load "ng_ether"
+	
+	# vnet
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+
+	lib_keys_list "${QUICK_KEY_JNG}" | while IFS= read -r jng_name
+	do
+		ng_interfaces=`lib_keys_get "${QUICK_KEY_JNG}" "${jng_name}" "ng_interfaces"`
+		interfaces=`lib_keys_get "${QUICK_KEY_JNG}" "${jng_name}" "interfaces"`
+		bridge=`lib_keys_get "${QUICK_KEY_JNG}" "${jng_name}" "bridge"`
+
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=${ng_interfaces}"
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"jng bridge -b ${bridge} ${jng_name} ${interfaces}\""
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.poststop=\"jng shutdown ${jng_name}\""
+	done
+}
+
+quick_set_jng()
+{
+	if [ ${QUICK_OPTION_ALIAS} -eq 1 ]; then
+		quick_exclusive "jng" "alias"
+	fi
+
+	quick_vimage
+
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "jng syntax: name [iface:]interface ... [bridge:bridge_name]"
+	fi
+
+	params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local jng_name=
+	local jng_bridge=
+	local interfaces=
+	local ng_interfaces= niface=0
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		if [ -z "${jng_name}" ]; then
+			jng_name="${arg}"
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		if lib_check_empty "${value}"; then
+			value="${parameter}"
+			parameter="iface"
+		fi
+
+		case "${parameter}" in
+			bridge)
+				jng_bridge="${value}"
+				;;
+			iface)
+				local interface="${value}"
+
+				if ! printf "%s" "${interface}" | grep -qEe "${QUICK_REGEX_JNG}"; then
+					lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+				fi
+
+				if ! lib_check_iface "${interface}"; then
+					lib_err ${EX_NOINPUT} -- "${interface}: interface does not exist."
+				fi
+
+				if [ -z "${interfaces}" ]; then
+					interfaces="${interface}"
+				else
+					interfaces="${interfaces} ${interface}"
+				fi
+
+				if [ -z "${ng_interfaces}" ]; then
+					ng_interfaces="ng${niface}_"
+				else
+					ng_interfaces="${ng_interfaces} ng${niface}_"
+				fi
+
+				niface=$((niface+1))
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (jng): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${interfaces}" || lib_check_empty "${jng_name}"; then
+		quick_set_jng # usage
+	fi
+
+	if lib_check_empty "${jng_bridge}"; then
+		jng_bridge="bridge"
+	fi
+
+	if ! printf "%s" "${jng_bridge}" | grep -qEe "${QUICK_REGEX_JNG}"; then
+		lib_err ${EX_DATAERR} -- "${jng_bridge}: invalid bridge name."
+	fi
+
+	if ! printf "%s" "${jng_name}" | grep -qEe "${QUICK_REGEX_JNG_NAME}"; then
+		lib_err ${EX_DATAERR} -- "${jng_name}: invalid name."
+	fi
+
+	# ng<niface>_ -> ng<niface>_<jng_name>
+	local ng_interface _ng_interfaces
+	for ng_interface in ${ng_interfaces}; do
+		ng_interface="${ng_interface}${jng_name}"
+
+		if [ `echo -n "${ng_interface}" | wc -c` -gt ${QUICK_IFNAMSIZ} ]; then
+			lib_err ${EX_DATAERR} -- "${ng_interface}: interface name too long."
+		fi
+
+		if [ -z "${_ng_interfaces}" ]; then
+			_ng_interfaces="${ng_interface}"
+		else
+			_ng_interfaces="${_ng_interfaces} ${ng_interface}"
+		fi
+	done
+	ng_interfaces="${_ng_interfaces}"
+
+	lib_keys_set "${QUICK_KEY_JNG}" "${jng_name}" "bridge" "${jng_bridge}"
+	lib_keys_set "${QUICK_KEY_JNG}" "${jng_name}" "interfaces" "${interfaces}"
+	lib_keys_set "${QUICK_KEY_JNG}" "${jng_name}" "ng_interfaces" "${ng_interfaces}"
+
+	QUICK_OPTION_JNG=1
+}
+
+quick_run_virtualnet()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_VIRTUALNET} -eq 0 ]; then
+		return 0
+	fi
+
+	# see `quick_run_alias`
+	if [ ${QUICK_OPTION_ALIAS} -eq 1 ]; then
+		return 0
+	fi
+
+	# vnet
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+
+	lib_keys_list "${QUICK_KEY_VIRTUALNET}" | while IFS= read -r virtualnet
+	do
+		# interface
+		interface=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface"`
+		if lib_check_empty "${interface}"; then
+			lib_err ${EX_CONFIG} -- "${virtualnet}: an interface is required."
+		fi
+
+		if lib_check_etherlen "${interface}"; then
+			lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+		fi
+
+		if ! lib_check_interfacename "${interface}"; then
+			lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+		fi
+
+		ip4=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4"`
+		if lib_check_empty "${ip4}"; then
+			ip4="auto"
+		fi
+
+		lib_debug "Reserving an IPv4 address for ${QUICK_JAILNAME} in ${virtualnet} ..."
+
+		# current IPv4
+		ip4=`appjail network reserve -j "${QUICK_JAILNAME}" -n "${virtualnet}" -a "${ip4}"` || exit $?
+
+		# interface description
+		interface_desc=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface_desc"`
+		
+		# vnet interfaces
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"eb_${interface}\""
+
+		lib_debug "VNET Interface:e[ab]_${interface} Description:${interface_desc}"
+
+		# plug
+		if ! lib_check_empty "${interface_desc}"; then
+			local escape_interface_desc
+			escape_interface_desc=`lib_escape_string "${interface_desc}" "${QUICK_ESCAPE_TEMPLATE}"`
+
+			appjail config \
+				-It "${QUICK_TEMP_TEMPLATE}" \
+				-a "exec.prestart=\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\" -d \\\"${escape_interface_desc}\\\"\""
+		else
+			appjail config \
+				-It "${QUICK_TEMP_TEMPLATE}" \
+				-a "exec.prestart=\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\"\""
+		fi
+
+		# assign
+		if [ -n "${QUICK_OPTION_DEFNET}" ] && [ "${QUICK_OPTION_DEFNET}" = "${virtualnet}" ]; then
+			lib_debug "${virtualnet} is the default router."
+
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" \
+					-a "exec.poststart=\"appjail network assign -d -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
+		else
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" \
+					-a "exec.poststart=\"appjail network assign -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
+		fi
+
+		# unplug
+		appjail config -It "${QUICK_TEMP_TEMPLATE}" \
+				-a "exec.poststop=\"appjail network unplug \\\"${virtualnet}\\\" \\\"${interface}\\\"\""
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_virtualnet()
+{
+	if [ ${QUICK_OPTION_IP4_INHERIT} -eq 1 ]; then
+		quick_exclusive "ip4" "ip4_inherit"
+	elif [ ${QUICK_OPTION_IP4_DISABLE} -eq 1 ]; then
+		quick_exclusive "ip4" "ip4_disable"
+	fi
+
+	quick_vimage
+
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "virtualnet syntax: virtualnet:interface [default] [address:ipv4_address] [interface_desc:interface_description]"
+	fi
+
+	params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local interface= virtualnet=
+	local default=0
+	local address=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		if [ -z "${virtualnet}" ]; then
+			virtualnet="${arg}"
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			default)
+				default=1
+				;;
+			address)
+				address="${value}"
+				;;
+			interface_desc)
+				interface_desc="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (virtualnet): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${virtualnet}"; then
+		quick_set_virtualnet # usage
+	fi
+
+	if ! lib_check_empty "${address}"; then
+		if ! lib_check_ip4addr "${address}"; then
+			lib_err ${EX_DATAERR} -- "${address}: invalid IPv4 address."
+		fi
+	fi
+
+	interface=`lib_jailparam_value "${virtualnet}" :`
+	virtualnet=`lib_jailparam_name "${virtualnet}" :`
+
+	if lib_check_ifacelen "${virtualnet}"; then
+		lib_err ${EX_DATAERR} -- "${virtualnet}: network name too long."
+	fi
+
+	if ! lib_check_networkname "${virtualnet}"; then
+		lib_err ${EX_DATAERR} -- "${virtualnet}: invalid network name."
+	fi
+
+	if [ ${default} -eq 1 ]; then
+		if [ -n "${QUICK_OPTION_DEFNET}" ]; then
+			lib_warn "Overwriting default network: ${QUICK_OPTION_DEFNET} -> ${virtualnet}"
+		fi
+
+		QUICK_OPTION_DEFNET="${virtualnet}"
+	fi
+
+	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4" "${address}"
+	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface" "${interface}"
+	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface_desc" "${interface_desc}"
+
+	QUICK_OPTION_VIRTUALNET=1
+}
+
+quick_set_ip4()
+{
+	if [ ${QUICK_OPTION_IP4_INHERIT} -eq 1 ]; then
+		quick_exclusive "ip4" "ip4_inherit"
+	elif [ ${QUICK_OPTION_IP4_DISABLE} -eq 1 ]; then
+		quick_exclusive "ip4" "ip4_disable"
+	fi
+
+	local interface ip4 netmask
+
+	ip4="$1"; quick_reqoption "ip4" "${ip4}"
+
+	interface=`lib_jailparam_name "${ip4}" '|'`
+	ip4=`lib_jailparam_value "${ip4}" '|'`
+
+	# The user should use `interface`.
+	if lib_check_empty "${ip4}"; then
+		ip4="${interface}"
+		interface=
+	else
+		quick_iface "${interface}"
+	fi
+
+	if lib_check_empty "${ip4}"; then
+		lib_err - "ip4 syntax: ip4_address"
+		lib_err - "            interface|ip4_address"
+		exit ${EX_DATAERR}
+	fi
+
+	netmask=`lib_jailparam_value "${ip4}" '/'`
+	ip4=`lib_jailparam_name "${ip4}" '/'`
+
+	if ! lib_check_ipv4addr "${ip4}"; then
+		lib_err ${EX_DATAERR} -- "${ip4}: invalid IPv4 address."
+	fi
+
+	if ! lib_check_empty "${netmask}"; then
+		if lib_check_number "${netmask}"; then
+			if [ ${netmask} -lt 0 -o ${netmask} -gt 32 ]; then
+				lib_err ${EX_DATAERR} -- "${netmask}: invalid netmask."
+			fi
+		else
+			if ! lib_check_ipv4addr "${netmask}"; then
+				lib_err ${EX_DATAERR} -- "${netmask}: invalid netmask."
+			fi
+		fi
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_IP4}"
+	nro=`lib_keys_append "${QUICK_KEY_IP4}" "addr" "${ip4}"`
+	lib_keys_set "${QUICK_KEY_IP4}" "${nro}" "netmask" "${netmask}"
+	lib_keys_set "${QUICK_KEY_IP4}" "${nro}" "interface" "${interface}"
+
+	QUICK_OPTION_IP4=1
+}
+
+quick_set_ip4_inherit()
+{
+	if [ ${QUICK_OPTION_IP4} -eq 1 ]; then
+		quick_exclusive "ip4_inherit" "ip4"
+	elif [ ${QUICK_OPTION_IP4_DISABLE} -eq 1 ]; then
+		quick_exclusive "ip4_inherit" "ip4_disable"
+	elif [ ${QUICK_OPTION_VIRTUALNET} -eq 1 ]; then
+		quick_exclusive "ip4_inherit" "virtualnet"
+	fi
+
+	QUICK_OPTION_IP4_INHERIT=1
+}
+
+quick_set_ip4_disable()
+{
+	if [ ${QUICK_OPTION_IP4} -eq 1 ]; then
+		quick_exclusive "ip4_disable" "ip4"
+	elif [ ${QUICK_OPTION_IP4_INHERIT} -eq 1 ]; then
+		quick_exclusive "ip4_disable" "ip4_inherit"
+	elif [ ${QUICK_OPTION_VIRTUALNET} -eq 1 ]; then
+		quick_exclusive "ip4_disable" "virtualnet"
+	fi
+
+	QUICK_OPTION_IP4_DISABLE=1
+}
+
+quick_set_ip6()
+{
+	if [ ${QUICK_OPTION_IP6_INHERIT} -eq 1 ]; then
+		quick_exclusive "ip6" "ip6_inherit"
+	elif [ ${QUICK_OPTION_IP6_DISABLE} -eq 1 ]; then
+		quick_exclusive "ip6" "ip6_disable"
+	fi
+
+	local interface ip6 netmask
+
+	ip6="$1"; quick_reqoption "ip6" "${ip6}"
+
+	interface=`lib_jailparam_name "${ip6}" '|'`
+	ip6=`lib_jailparam_value "${ip6}" '|'`
+
+	# The user should use `interface`.
+	if lib_check_empty "${ip6}"; then
+		ip6="${interface}"
+		interface=
+	else
+		quick_iface "${interface}"
+	fi
+
+	if lib_check_empty "${ip6}"; then
+		lib_err - "ip6 syntax: ip6_address"
+		lib_err - "            interface|ip6_address"
+		exit ${EX_DATAERR}
+	fi
+
+	netmask=`lib_jailparam_value "${ip6}" '/'`
+	ip6=`lib_jailparam_name "${ip6}" '/'`
+
+	if ! lib_check_ipv6addr "${ip6}"; then
+		lib_err ${EX_DATAERR} -- "${ip6}: invalid IPv6 address."
+	fi
+
+	if ! lib_check_empty "${netmask}"; then
+		if lib_check_number "${netmask}"; then
+			if [ ${netmask} -lt 0 -o ${netmask} -gt 128 ]; then
+				lib_err ${EX_DATAERR} -- "${netmask}: invalid netmask."
+			fi
+		else
+			if ! lib_check_ipv6addr "${netmask}"; then
+				lib_err ${EX_DATAERR} -- "${netmask}: invalid netmask."
+			fi
+		fi
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_IP6}"
+	nro=`lib_keys_append "${QUICK_KEY_IP6}" "addr" "${ip6}"`
+	lib_keys_set "${QUICK_KEY_IP6}" "${nro}" "netmask" "${netmask}"
+	lib_keys_set "${QUICK_KEY_IP6}" "${nro}" "interface" "${interface}"
+
+	QUICK_OPTION_IP6=1
+}
+
+quick_set_ip6_inherit()
+{
+	if [ ${QUICK_OPTION_IP6} -eq 1 ]; then
+		quick_exclusive "ip6_inherit" "ip6"
+	elif [ ${QUICK_OPTION_IP6_DISABLE} -eq 1 ]; then
+		quick_exclusive "ip6_inherit" "ip6_disable"
+	fi
+
+	QUICK_OPTION_IP6_INHERIT=1
+}
+
+quick_set_ip6_disable()
+{
+	if [ ${QUICK_OPTION_IP6} -eq 1 ]; then
+		quick_exclusive "ip6_disable" "ip6"
+	elif [ ${QUICK_OPTION_IP6_INHERIT} -eq 1 ]; then
+		quick_exclusive "ip6_disable" "ip6_inherit"
+	fi
+
+	QUICK_OPTION_IP6_DISABLE=1
+}
+
+quick_run_alias()
+{
+	local errlevel
+	local has_option=0
+
+	if [ ${QUICK_OPTION_ALIAS} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Using alias option ..."
+
+	if [ -n "${QUICK_OPTION_ALIAS_IFACE}" ]; then
+		lib_debug "Default interface: ${QUICK_OPTION_ALIAS_IFACE}"
+
+		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "interface=\"${QUICK_OPTION_ALIAS_IFACE}\""
+	fi
+
+	if [ ${QUICK_OPTION_VIRTUALNET} -eq 1 ]; then
+		lib_keys_list "${QUICK_KEY_VIRTUALNET}" | while IFS= read -r virtualnet
+		do
+			cidr=`appjail network get -I -- "${virtualnet}" cidr` || exit $?
+
+			lib_debug "Reserving an IPv4 address for ${QUICK_JAILNAME} in ${virtualnet} ..."
+
+			ip4=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4"`
+
+			if lib_check_empty "${ip4}"; then
+				ip4="auto"
+			fi
+			
+			ip4=`appjail network reserve -j "${QUICK_JAILNAME}" -n "${virtualnet}" -a "${ip4}"` || exit $?
+			ip4="${ip4}/${cidr}"
+
+			interface=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface"`
+			if ! lib_check_empty "${interface}"; then
+				ip4="${interface}|${ip4}"
+			fi
+
+			lib_debug "Adding IPv4 address to ${QUICK_JAILNAME} template: ${ip4}"
+
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip4.addr=${ip4}"
+		done
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		has_option=1
+	fi
+
+	if [ ${QUICK_OPTION_IP4} -eq 1 ]; then
+		lib_keys_list "${QUICK_KEY_IP4}" | while IFS= read -r nro
+		do
+			addr=`lib_keys_get "${QUICK_KEY_IP4}" "${nro}" "addr"`
+
+			interface=`lib_keys_get "${QUICK_KEY_IP4}" "${nro}" "interface"`
+			if [ -n "${interface}" ]; then
+				addr="${interface}|${addr}"
+			fi
+
+			netmask=`lib_keys_get "${QUICK_KEY_IP4}" "${nro}" "netmask"`
+			if [ -n "${netmask}" ]; then
+				addr="${addr}/${netmask}"
+			fi
+
+			lib_debug "Adding IPv4 address to ${QUICK_JAILNAME} template: ${addr}"
+
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip4.addr=${addr}"
+		done
+
+		has_option=1
+	elif [ ${QUICK_OPTION_IP4_INHERIT} -eq 1 ]; then
+		lib_debug -- "${QUICK_JAILNAME} will inherit the IPv4 stack ..."
+
+		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip4=inherit"
+
+		has_option=1
+	elif [ ${QUICK_OPTION_IP4_DISABLE} -eq 1 ]; then
+		lib_debug -- "${QUICK_JAILNAME} will not be able to use the IPv4 stack ..."
+
+		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip4=disable"
+
+		has_option=1
+	fi
+
+	if [ ${QUICK_OPTION_IP6} -eq 1 ]; then
+		lib_keys_list "${QUICK_KEY_IP6}" | while IFS= read -r nro
+		do
+			addr=`lib_keys_get "${QUICK_KEY_IP6}" "${nro}" "addr"`
+
+			interface=`lib_keys_get "${QUICK_KEY_IP6}" "${nro}" "interface"`
+			if [ -n "${interface}" ]; then
+				addr="${interface}|${addr}"
+			fi
+
+			netmask=`lib_keys_get "${QUICK_KEY_IP6}" "${nro}" "netmask"`
+			if [ -n "${netmask}" ]; then
+				addr="${addr}/${netmask}"
+			fi
+
+			lib_debug "Adding IPv6 address to ${QUICK_JAILNAME} template: ${addr}"
+
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip6.addr=${addr}"
+		done
+
+		has_option=1
+	elif [ ${QUICK_OPTION_IP6_INHERIT} -eq 1 ]; then
+		lib_debug -- "${QUICK_JAILNAME} will inherit the IPv6 stack ..."
+
+		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip6=inherit"
+
+		has_option=1
+	elif [ ${QUICK_OPTION_IP6_DISABLE} -eq 1 ]; then
+		lib_debug -- "${QUICK_JAILNAME} will not be able to use the IPv6 stack ..."
+
+		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip6=disable"
+
+		has_option=1
+	fi
+
+	if [ ${has_option} -eq 0 ]; then
+		quick_reqoptions "alias" "virtualnet, ip4, ip4_disable, ip4_inherit, ip6, ip6_disable or ip6_inherit"
+	fi
+
+	lib_debug -- "${QUICK_JAILNAME} has been configured to use \`alias\`."
+}
+
+quick_set_alias()
+{
+	if [ ${QUICK_OPTION_BRIDGE} -eq 1 ]; then
+		quick_exclusive "alias" "bridge"
+	elif [ ${QUICK_OPTION_JNG} -eq 1 ]; then
+		quick_exclusive "alias" "jng"
+	elif [ ${QUICK_OPTION_VNET} -eq 1 ]; then
+		quick_exclusive "alias" "vnet"
+	fi
+
+	local interface="$1"
+	if ! lib_check_empty "${interface}"; then
+		quick_iface "${interface}"
+
+		QUICK_OPTION_ALIAS_IFACE="${interface}"
+	fi
+
+	QUICK_OPTION_ALIAS=1
+}
+
+quick_run_dhcp()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_DHCP} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_BRIDGE} -eq 0 -a ${QUICK_OPTION_JNG} -eq 0 -a ${QUICK_OPTION_VNET} -eq 0 ]; then
+		quick_reqoptions "dhcp" "bridge, jng or vnet"
+	fi
+
+	case "${QUICK_OPTION_JAILTYPE}" in
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
+		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: dhcp can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+	esac
+
+	lib_keys_list "${QUICK_KEY_DHCP}" | while IFS= read -r nro
+	do
+		interface=`lib_keys_get "${QUICK_KEY_DHCP}" "${nro}" "interface"`
+
+		# Check if {interface} is in {vnet.interface}.
+		match=`quick_vnetiface "${interface}"`
+		if lib_check_empty "${match}"; then
+			interfaces=`quick_list_vifaces`
+			lib_err ${EX_CONFIG} -- "${interface}: the interface is not in vnet.interface. Current interfaces: ${interfaces}"
+		fi
+
+		lib_debug "Configuring ${interface} to use DHCP ..."
+
+		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}="SYNCDHCP" >&2 || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_dhcp()
+{
+	local interface
+
+	interface="$1"; quick_reqoption "dhcp" "${interface}"
+
+	lib_keys_append "${QUICK_KEY_DHCP}" "interface" "${interface}" > /dev/null
+
+	QUICK_OPTION_DHCP=1
+}
+
+quick_run_slaac()
+{
+	if [ ${QUICK_OPTION_SLAAC} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_BRIDGE} -eq 0 -a ${QUICK_OPTION_JNG} -eq 0 -a ${QUICK_OPTION_VNET} -eq 0 ]; then
+		quick_reqoptions "slaac" "bridge, jng or vnet"
+	fi
+
+	case "${QUICK_OPTION_JAILTYPE}" in
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
+		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: slaac can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+	esac
+
+	lib_debug "Enabling rtsold ..."
+
+	mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+	sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" rtsold_enable="YES" >&2 || exit $?
+	sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" rtsold_flags="--" >&2 || exit $?
+
+	lib_keys_list "${QUICK_KEY_SLAAC}" | while IFS= read -r nro
+	do
+		interface=`lib_keys_get "${QUICK_KEY_SLAAC}" "${nro}" "interface"`
+
+		# Check if {interface} is in {vnet.interface}.
+		match=`quick_vnetiface "${interface}"`
+		if lib_check_empty "${match}"; then
+			interfaces=`quick_list_vifaces`
+			lib_err ${EX_CONFIG} -- "${interface}: the interface is not in vnet.interface. Current interfaces: ${interfaces}"
+		fi
+
+		lib_debug "Configuring ${interface} to use SLAAC ..."
+
+		# Actives the interface if the `dhcp` option did not.
+		if [ ${QUICK_OPTION_DHCP} -eq 0 ]; then
+			sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}="up" >&2 || exit $?
+		fi
+
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}_ipv6="inet6 auto_linklocal accept_rtadv" >&2 || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" rtsold_flags+="${interface}" >&2 || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_slaac()
+{
+	local interface
+
+	interface="$1"; quick_reqoption "slaac" "${interface}"
+
+	lib_keys_append "${QUICK_KEY_SLAAC}" "interface" "${interface}" > /dev/null
+
+	QUICK_OPTION_SLAAC=1
+}
+
+quick_run_bridge()
+{
+	if [ ${QUICK_OPTION_BRIDGE} -eq 0 ]; then
+		return 0
+	fi
+	
+	# vnet
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+
+	lib_keys_list "${QUICK_KEY_BRIDGE}" | while IFS= read -r bridge
+	do
+		lib_debug "Configuring ${QUICK_JAILNAME} to use ${bridge} bridge ..."
+
+		epairs=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "epairs"`
+		for epair in ${epairs}; do
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"sb_${epair}\""
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"appjail network attach -b \\\"${bridge}\\\" \\\"epair:${epair}\\\"\""
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.poststop=\"appjail network detach -b \\\"${bridge}\\\" -id \\\"epair:${epair}\\\"\""
+		done
+
+		interfaces=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "interfaces"`
+		for interface in ${interfaces}; do
+			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"appjail network attach -b \\\"${bridge}\\\" \\\"iface:${interface}\\\"\""
+		done
+	done
+}
+
+quick_set_bridge()
+{
+	if [ ${QUICK_OPTION_ALIAS} -eq 1 ]; then
+		quick_exclusive "bridge" "alias"
+	fi
+
+	quick_vimage
+
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "bridge syntax: [[epair|iface]:]interface ... [bridge:bridge_name]"
+	fi
+
+	params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local bridge_name=
+	local epairs=
+	local interfaces=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		if lib_check_empty "${value}"; then
+			value="${parameter}"
+			parameter="${QUICK_DEFAULT_IFACE_TYPE}"
+		fi
+
+		case "${parameter}" in
+			bridge)
+				bridge_name="${value}"
+				;;
+			epair)
+				local interface="${value}"
+
+				if lib_check_etherlen "${interface}"; then
+					lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+				fi
+
+				if ! lib_check_interfacename "${interface}"; then
+					lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+				fi
+
+				if [ -z "${epairs}" ]; then
+					epairs="${interface}"
+				else
+					epairs="${epairs} ${interface}"
+				fi
+				;;
+			iface)
+				local interface="${value}"
+
+				quick_iface "${interface}"
+
+				if [ -z "${interfaces}" ]; then
+					interfaces="${interface}"
+				else
+					interfaces="${interfaces} ${interface}"
+				fi
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (bridge): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${epairs}" && lib_check_empty "${interfaces}"; then
+		quick_set_bridge # usage
+	fi
+
+	if lib_check_empty "${bridge_name}"; then
+		bridge_name="${SHARED_BRIDGE}"
+	fi
+
+	if lib_check_ifacelen "${bridge_name}"; then
+		lib_err ${EX_DATAERR} -- "${bridge_name}: network name too long."
+	fi
+
+	if ! lib_check_networkname "${bridge_name}"; then
+		lib_err ${EX_DATAERR} -- "${bridge_name}: invalid bridge name."
+	fi
+
+	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "epairs" "${epairs}"
+	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "interfaces" "${interfaces}"
+
+	QUICK_OPTION_BRIDGE=1
+}
+
+quick_run_fstab()
+{
+	if [ ${QUICK_OPTION_FSTAB} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring fstab ..."
+
+	lib_keys_list "${QUICK_KEY_FSTAB}" | sort -n | while IFS= read -r nro
+	do
+		device=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "device"`
+		mountpoint=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "mountpoint"`
+		type=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "type"`
+		options=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "options"`
+		dump=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "dump"`
+		pass=`lib_keys_get "${QUICK_KEY_FSTAB}" "${nro}" "pass"`
+
+		lib_debug "fstab#${nro}: \"${device}\" \"${mountpoint}\" \"${type}\" \"${options}\" \"${dump}\" \"${pass}\""
+
+		appjail fstab jail "${QUICK_JAILNAME}" set -d "${device}" -m "${mountpoint}" -t "${type}" -o "${options}" -D "${dump}" -P "${pass}" -p
+	done
+}
+
+quick_set_fstab()
+{
+	local params
+
+	params="$1"; quick_reqoption "fstab" "${params}"
+
+	params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	# options
+	local device=
+	local mountpoint=
+	local type="nullfs"
+	local options="rw"
+	local dump=0
+	local pass=0
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		local arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+
+		if lib_check_empty "${arg}"; then
+			lib_err ${EX_DATAERR} "An empty field cannot be used in fstab."
+		fi
+
+		if [ ${current_index} -eq ${QUICK_FSTAB_OPTION_DEVICE} ]; then
+			device="${arg}"
+		elif [ ${current_index} -eq ${QUICK_FSTAB_OPTION_MOUNTPOINT} ]; then
+			mountpoint="${arg}"
+		elif [ ${current_index} -eq ${QUICK_FSTAB_OPTION_TYPE} ]; then
+			type="${arg}"
+		elif [ ${current_index} -eq ${QUICK_FSTAB_OPTION_OPTIONS} ]; then
+			options="${arg}"
+		elif [ ${current_index} -eq ${QUICK_FSTAB_OPTION_DUMP} ]; then
+			dump="${arg}"
+		elif [ ${current_index} -eq ${QUICK_FSTAB_OPTION_PASS} ]; then
+			pass="${arg}"
+		else
+			break
+		fi
+	done
+
+	if [ -z "${device}" -o -z "${mountpoint}" ]; then
+		lib_err ${EX_DATAERR} "fstab syntax: device mountpoint [type] [options] [dump] [pass]"
+	fi
+
+	if ! lib_check_number "${dump}"; then
+		lib_err ${EX_DATAERR} "DUMP must be a number!"
+	fi
+
+	if ! lib_check_number "${pass}"; then
+		lib_err ${EX_DATAERR} "PASS must be a number!"
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_FSTAB}"
+	nro=`lib_keys_append "${QUICK_KEY_FSTAB}" "device" "${device}"`
+	lib_keys_set "${QUICK_KEY_FSTAB}" "${nro}" "mountpoint" "${mountpoint}"
+	lib_keys_set "${QUICK_KEY_FSTAB}" "${nro}" "type" "${type}"
+	lib_keys_set "${QUICK_KEY_FSTAB}" "${nro}" "options" "${options}"
+	lib_keys_set "${QUICK_KEY_FSTAB}" "${nro}" "dump" "${dump}"
+	lib_keys_set "${QUICK_KEY_FSTAB}" "${nro}" "pass" "${pass}"
+
+	QUICK_OPTION_FSTAB=1
+}
+
+quick_run_cpuset()
+{
+	if [ -z "${QUICK_OPTION_CPUSET}" ]; then
+		return 0
+	fi
+
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.created=\"appjail cpuset \\\"\${name}\\\" \\\"${QUICK_OPTION_CPUSET}\\\"\""
+}
+
+quick_set_cpuset()
+{
+	local cpuset
+	cpuset="$1"; quick_reqoption "cpuset" "${cpuset}"
+
+	cpu_list=`lib_check_cpulist "${cpuset}"` || exit $?
+
+	QUICK_OPTION_CPUSET="${cpu_list}"
+}
+
+quick_run_limits()
+{
+	if [ ${QUICK_OPTION_USE_LIMITS} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring limits rules ..."
+
+	lib_keys_list "limits" | sort -n | while IFS= read -r nro
+	do
+		limits_set_cmd="appjail limits set"
+
+		limits_descr=`lib_keys_get "${QUICK_KEY_LIMITS}" "${nro}" "descr"`
+		if ! lib_check_empty "${limits_descr}"; then
+			escape_limits_descr=`lib_escape_string "${limits_descr}"`
+			limits_set_cmd="${limits_set_cmd} -N \"${escape_limits_descr}\""
+		fi
+
+		limits_rule=`lib_keys_get "${QUICK_KEY_LIMITS}" "${nro}" "rule"`
+		escape_limits_rule=`lib_escape_string "${limits_rule}"`
+
+		lib_debug "limits#${nro}: \"rule:${limits_rule}\" \"descr:${limits_descr}\""
+
+		limits_set_cmd="${limits_set_cmd} -- \"${QUICK_JAILNAME}\" \"${escape_limits_rule}\""
+
+		sh -c "${limits_set_cmd}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "An error occurred while adding the limits rule (${limits_rule}) to ${QUICK_JAILNAME} jail."
+		fi
+	done
+
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.created="appjail limits on \"${name}\""'
+	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail limits off \"${name}\""'
+}
+
+quick_set_limits()
+{
+	if ! lib_check_racct; then
+		lib_err ${EX_UNAVAILABLE} "racct is disable.  Run \`echo kern.racct.enable=1 >> /boot/loader.conf && reboot\` to enable it."
+	fi
+
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "limits syntax: rule [descr:description]"
+	fi
+
+	params=`lib_split_jailparams "${params}"`
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local description=
+	local rule=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		if [ -z "${rule}" ]; then
+			rule="${arg}"
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			descr)
+				description="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (limits): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${rule}"; then
+		quick_set_limits # usage
+	fi
+
+	lib_debug "Using limits option: rule:${rule} descr:${description}"
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_LIMITS}"
+	nro=`lib_keys_append "${QUICK_KEY_LIMITS}" "rule" "${rule}"`
+	lib_keys_set "${QUICK_KEY_LIMITS}" "${nro}" "descr" "${description}"
+
+	QUICK_OPTION_USE_LIMITS=1
+}
+
+quick_run_x11()
+{
+	if [ ${QUICK_OPTION_X11} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Using x11 option ..."
+
+	if [ ! -d "/tmp/.X11-unix" ]; then
+		lib_warn "/tmp/.X11-unix: directory does not seem to exist or is not a directory."
+	fi
+	
+	mkdir -pm 1777 "${JAILDIR}/${QUICK_JAILNAME}/jail/tmp/.X11-unix" || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp/.X11-unix -m /tmp/.X11-unix -p || exit $?
+}
+
+quick_set_x11()
+{
+	if [ ${QUICK_OPTION_TMPDIR} -eq 1 ]; then
+		quick_exclusive "x11" "tmpdir"
+	fi
+
+	QUICK_OPTION_X11=1
+}
+
+quick_run_tmpdir()
+{
+	if [ ${QUICK_OPTION_TMPDIR} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Using tmpdir option ..."
+
+	if [ ! -d "/tmp" ]; then
+		lib_warn "/tmp: directory does not seem to exist or is not a directory."
+	fi
+	
+	mkdir -pm 1777 "${JAILDIR}/${QUICK_JAILNAME}/jail/tmp" || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp -m /tmp -p || exit $?
+}
+
+quick_set_tmpdir()
+{
+	if [ ${QUICK_OPTION_X11} -eq 1 ]; then
+		quick_exclusive "tmpdir" "x11"
+	fi
+
+	QUICK_OPTION_TMPDIR=1
+}
+
+quick_run_linuxfs()
+{
+	if [ ${QUICK_OPTION_LINUXFS} -eq 0 ]; then
+		return 0
+	fi
+	
+	lib_debug "Using linuxfs option ..."
+
+	appjail fstab jail "${QUICK_JAILNAME}" set -d devfs -m /dev -t devfs -o rw,ruleset="${QUICK_OPTION_DEVFS_RULESET}" -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d tmpfs -m /dev/shm -t tmpfs -o rw,size=1g,mode=1777 -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d fdescfs -m /dev/fd -t fdescfs -o rw,linrdlnk -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d linprocfs -m /proc -t linprocfs -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d linsysfs -m /sys -t linsysfs -p || exit $?
+}
+
+quick_set_linuxfs()
+{
+	if [ ${QUICK_OPTION_MOUNT_DEVFS} -eq 1 ]; then
+		quick_exclusive "linuxfs" "mount_devfs"
+	fi
+
+	QUICK_OPTION_LINUXFS=1
+}
+
+quick_run_start_args()
+{
+	if [ -z "${QUICK_OPTION_START_ARGS}" ]; then
+		return 0
+	fi
+
+	quick_args "start" "-s" "${QUICK_OPTION_START_ARGS}"
+}
+
+quick_set_start_args()
+{
+	local start_args
+
+	start_args="$1"; quick_reqoption "start_args" "${start_args}"
+	start_args=`lib_escape_string "${start_args}" "" '"'`
+
+	if [ -z "${QUICK_OPTION_START_ARGS}" ]; then
+		QUICK_OPTION_START_ARGS="\"${start_args}\""
+	else
+		QUICK_OPTION_START_ARGS="${QUICK_OPTION_START_ARGS} \"${start_args}\""
+	fi
+}
+
+quick_run_create_args()
+{
+	if [ -z "${QUICK_OPTION_CREATE_ARGS}" ]; then
+		return 0
+	fi
+
+	quick_args "start" "-c" "${QUICK_OPTION_CREATE_ARGS}"
+}
+
+quick_set_create_args()
+{
+	local create_args
+
+	create_args="$1"; quick_reqoption "create_args" "${create_args}"
+	create_args=`lib_escape_string "${create_args}" "" '"'`
+
+	if [ -z "${QUICK_OPTION_CREATE_ARGS}" ]; then
+		QUICK_OPTION_CREATE_ARGS="\"${create_args}\""
+	else
+		QUICK_OPTION_CREATE_ARGS="${QUICK_OPTION_CREATE_ARGS} \"${create_args}\""
+	fi
+}
+
+quick_run_run_args()
+{
+	if [ -z "${QUICK_OPTION_RUN_ARGS}" ]; then
+		return 0
+	fi
+
+	quick_args "run" "-p" "${QUICK_OPTION_RUN_ARGS}"
+}
+
+quick_set_run_args()
+{
+	local run_args
+
+	run_args="$1"; quick_reqoption "run_args" "${run_args}"
+	run_args=`lib_escape_string "${run_args}" "" '"'`
+
+	if [ -z "${QUICK_OPTION_RUN_ARGS}" ]; then
+		QUICK_OPTION_RUN_ARGS="\"${run_args}\""
+	else
+		QUICK_OPTION_RUN_ARGS="${QUICK_OPTION_RUN_ARGS} \"${run_args}\""
+	fi
+}
+
+quick_run_stop_args()
+{
+	if [ -z "${QUICK_OPTION_STOP_ARGS}" ]; then
+		return 0
+	fi
+
+	quick_args "stop" "-p" "${QUICK_OPTION_STOP_ARGS}"
+}
+
+quick_set_stop_args()
+{
+	local stop_args
+
+	stop_args="$1"; quick_reqoption "stop_args" "${stop_args}"
+	stop_args=`lib_escape_string "${stop_args}" "" '"'`
+
+	if [ -z "${QUICK_OPTION_STOP_ARGS}" ]; then
+		QUICK_OPTION_STOP_ARGS="\"${stop_args}\""
+	else
+		QUICK_OPTION_STOP_ARGS="${QUICK_OPTION_STOP_ARGS} \"${stop_args}\""
+	fi
+}
+
+quick_args()
+{
+	local enable_cmd="$1" enable_param="$2" args="$3"
+	if [ -z "${enable_cmd}" -o -z "${enable_param}" -o -z "${args}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_args enable_cmd enable_param args"
+	fi
+
+	lib_debug "Setting ${enable_cmd} args: ${args}"
+
+	enable_cmd="appjail enable \"${QUICK_JAILNAME}\" ${enable_cmd}"
+
+	local args_list=`lib_split_jailparams "${args}"`
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local current_index=0
+
+	local args enable_cmd_args=
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		arg=`lib_escape_string "${arg}"`
+
+		if [ -z "${enable_cmd_args}" ]; then
+			enable_cmd_args="${enable_param} \"${arg}\""
+		else
+			enable_cmd_args="${enable_cmd_args} ${enable_param} \"${arg}\""
+		fi
+	done
+
+	enable_cmd="${enable_cmd} ${enable_cmd_args}"
+
+	lib_debug "Running: ${enable_cmd}"
+
+	sh -c "${enable_cmd}"
+}
+
+quick_run_start()
+{
+	if [ ${QUICK_OPTION_START} -eq 0 ]; then
+		return 0
+	fi
+		
+	appjail start -- "${QUICK_JAILNAME}" || exit $?
+
+	if [ ${QUICK_OPTION_RESTART} -eq 1 ]; then
+		appjail restart "${QUICK_JAILNAME}" || exit $?
+	fi
+
+	if [ ${QUICK_OPTION_RUN} -eq 1 ]; then
+		appjail run -- "${QUICK_JAILNAME}" || exit $?
+	fi
+
+	if [ ${QUICK_OPTION_LOGIN} -eq 1 ]; then
+		lib_debug "Trying to log in to ${QUICK_JAILNAME} ..."
+
+		appjail login -u "${QUICK_OPTION_LOGIN_USER}" -- "${QUICK_JAILNAME}"
+	fi
+}
+
+quick_set_start()
+{
+	QUICK_OPTION_START=1
+}
+
+quick_set_nostart()
+{
+	QUICK_OPTION_START=0
+}
+
+quick_set_restart()
+{
+	QUICK_OPTION_RESTART=1
+}
+
+quick_set_norestart()
+{
+	QUICK_OPTION_RESTART=0
+}
+
+quick_set_run()
+{
+	QUICK_OPTION_RUN=1
+}
+
+quick_set_norun()
+{
+	QUICK_OPTION_RUN=0
+}
+
+quick_set_login()
+{
+	QUICK_OPTION_LOGIN=1
+}
+
+quick_set_nologin()
+{
+	QUICK_OPTION_LOGIN=0
+}
+
+quick_set_login_user()
+{
+	local login_user
+
+	login_user="$1"; quick_reqoption "login_user" "${login_user}"
+
+	QUICK_OPTION_LOGIN_USER="${login_user}"
+}
+
+quick_run_devfs()
+{
+	if [ ${QUICK_OPTION_MOUNT_DEVFS} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Using devfs option ..."
+
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "mount.devfs"
+	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "devfs_ruleset=${QUICK_OPTION_DEVFS_RULESET}"
+}
+
+quick_set_devfs_ruleset()
+{
+	local devfs_ruleset
+
+	devfs_ruleset="$1"
+
+	quick_reqoption "devfs_ruleset" "${devfs_ruleset}"
+	quick_chknumber "devfs_ruleset" "${devfs_ruleset}"
+
+	if ! lib_check_devfs_ruleset "${devfs_ruleset}"; then
+		lib_warn "${devfs_ruleset}: ruleset number does not seem to exist ..."
+	fi
+
+	QUICK_OPTION_DEVFS_RULESET="${devfs_ruleset}"
+}
+
+quick_set_mount_devfs()
+{
+	if [ ${QUICK_OPTION_LINUXFS} -eq 1 ]; then
+		quick_exclusive "mount_devfs" "linuxfs"
+	fi
+
+	QUICK_OPTION_MOUNT_DEVFS=1
+}
+
+quick_run_boot()
+{
+	if [ ${QUICK_OPTION_BOOT} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Setting the boot flag to the ${QUICK_JAILNAME} jail ..."
+
+	appjail jail boot on "${QUICK_JAILNAME}" || exit $?
+}
+
+quick_set_boot()
+{
+	QUICK_OPTION_BOOT=1
+}
+
+quick_set_noboot()
+{
+	QUICK_OPTION_BOOT=0
+}
+
+quick_run_priority()
+{
+	if [ ${QUICK_OPTION_PRIORITY} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Setting priority ${priority} to the ${QUICK_JAILNAME} jail ..."
+
+	appjail jail priority -p "${priority}" -- "${QUICK_JAILNAME}" || exit $?
+}
+
+quick_set_priority()
+{
+	local priority
+
+	priority="$1"
+
+	quick_reqoption "priority" "${priority}"
+	quick_chknumber "priority" "${priority}"
+
+	QUICK_OPTION_PRIORITY="${priority}"
+}
+
+quick_run_tzdata()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_USE_TZDATA} -eq 0 ]; then
+		return 0
+	fi
+
+	mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+
+	local tzdata="${QUICK_OPTION_TZDATA}"
+	local jail_tzdata="${QUICK_JAILPATH}/jail/etc/localtime"
+
+	if lib_check_empty "${tzdata}"; then
+		if [ -f "/etc/localtime" ]; then
+			lib_debug "Copying /etc/localtime as ${jail_tzdata}"
+
+			cp -a "/etc/localtime" "${jail_tzdata}"
+		else
+			lib_err ${EX_NOINPUT} "/etc/localtime: file does not exist."
+		fi
+	else
+		lib_debug "Linking /usr/share/zoneinfo/${tzdata} -> ${jail_tzdata}"
+
+		ln -s "/usr/share/zoneinfo/${tzdata}" "${jail_tzdata}"
+	fi
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error creating ${jail_tzdata}"
+	fi
+}
+
+quick_set_tzdata()
+{
+	QUICK_OPTION_USE_TZDATA=1
+	QUICK_OPTION_TZDATA="$1"
+}
+
+quick_set_notzdata()
+{
+	QUICK_OPTION_USE_TZDATA=0
+}
+
+quick_run_resolv_conf()
+{
+	local errlevel
+	
+	if [ ${QUICK_OPTION_USE_RESOLV_CONF} -eq 0 ]; then
+		return 0
+	fi
+
+	local resolv_conf jail_resolv_conf
+
+	resolv_conf="${QUICK_OPTION_RESOLV_CONF}"
+	jail_resolv_conf="${QUICK_JAILPATH}/jail/etc/resolv.conf"
+
+	lib_debug "Copying ${resolv_conf} as ${jail_resolv_conf}"
+
+	cp -a -- "${resolv_conf}" "${jail_resolv_conf}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error copying ${resolv_conf} as ${jail_resolv_conf}"
+	fi
+}
+
+quick_set_resolv_conf()
+{
+	local resolv_conf="$1"
+
+	if lib_check_empty "${resolv_conf}"; then
+		# Use default value
+		resolv_conf="${QUICK_OPTION_RESOLV_CONF}"
+	fi
+
+	if [ ! -f "${resolv_conf}" ]; then
+		lib_err ${EX_NOINPUT} -- "${resolv_conf}: file does not exist."
+	fi
+
+	QUICK_OPTION_USE_RESOLV_CONF=1
+	QUICK_OPTION_RESOLV_CONF="${resolv_conf}"
+}
+
+quick_set_noresolv_conf()
+{
+	QUICK_OPTION_USE_RESOLV_CONF=0
+}
+
+quick_run_copy()
+{
+	local errlevel
+
+	if [ -z "${QUICK_OPTION_FILE}" -a -z "${QUICK_OPTION_FILES}" ]; then
+		return 0
+	fi
+
+	local files
+	files="`lib_generate_tempfile`" || exit $?
+
+	local escape_temp_files
+	escape_temp_files=`lib_escape_string "${files}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_files}\""
+
+	if [ -n "${QUICK_OPTION_FILE}" ]; then
+		lib_debug "Adding files (${QUICK_OPTION_FILE}) to the list of files to copy ..."
+
+		lib_split_jailparams "${QUICK_OPTION_FILE}" >> "${files}"
+	fi
+
+	if [ -n "${QUICK_OPTION_FILES}" ]; then
+		lib_debug "Adding files in (${QUICK_OPTION_FILES}) to the list of files to copy ..."
+
+		lib_split_jailparams "${QUICK_OPTION_FILES}" | while IFS= read -r file
+		do
+			lib_debug "Reading ${file} ..."
+
+			# Can be removed at this point.
+			if [ ! -f "${file}" ]; then
+				lib_err ${EX_NOINPUT} -- "${file}: file does not exist."
+			fi
+
+			cat -- "${file}"
+		done >> "${files}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+	fi
+
+	lib_safe_copy_lst -l "${files}" -s "${QUICK_OPTION_COPYDIR}" -d "${QUICK_JAILPATH}/jail"
+}
+
+quick_set_copydir()
+{
+	local copydir
+
+	copydir="$1"; quick_reqoption "copydir" "${copydir}"
+
+	if [ ! -d "${copydir}" ]; then
+		lib_err ${EX_NOINPUT} -- "${copydir}: does not exist or is not a directory."
+	fi
+
+	QUICK_OPTION_COPYDIR="${copydir}"
+}
+
+quick_set_file()
+{
+	local file
+
+	file="$1"; quick_reqoption "file" "${file}"
+	file=`lib_escape_string "${file}" "" '"'`
+
+	if [ -z "${QUICK_OPTION_FILE}" ]; then
+		QUICK_OPTION_FILE="\"${file}\""
+	else
+		QUICK_OPTION_FILE="${QUICK_OPTION_FILE} \"${file}\""
+	fi
+}
+
+quick_set_files()
+{
+	local files
+
+	files="$1"; quick_reqoption "files" "${files}"
+	if [ ! -f "${files}" ]; then
+		lib_err ${EX_NOINPUT} -- "${files}: file does not exist."
+	fi
+
+	files=`lib_escape_string "${files}" "" '"'`
+	if [ -z "${QUICK_OPTION_FILES}" ]; then
+		QUICK_OPTION_FILES="\"${files}\""
+	else
+		QUICK_OPTION_FILES="${QUICK_OPTION_FILES} \"${files}\""
+	fi
+}
+
+quick_set_template()
+{
+	local template
+
+	template="$1"; quick_reqoption "template" "${template}"
+
+	QUICK_OPTION_TEMPLATE="${template}"
+}
+
+quick_set_initscript()
+{
+	local initscript
+
+	initscript="$1"; quick_reqoption "initscript" "${initscript}"
+
+	QUICK_OPTION_INITSCRIPT="${initscript}"
+}
+
+quick_set_osversion()
+{
+	local osversion
+
+	osversion="$1"; quick_reqoption "osversion" "${osversion}"
+
+	QUICK_OPTION_OSVERSION="${osversion}"
+}
+
+quick_set_type()
+{
+	local jail_type
+
+	jail_type="$1"; quick_reqoption "type" "${jail_type}"
+
+	QUICK_OPTION_JAILTYPE="${jail_type}"
+}
+
+quick_set_empty()
+{
+	QUICK_OPTION_INSTALL_METHOD="empty"
+}
+
+quick_set_osarch()
+{
+	local osarch
+
+	osarch="$1"; quick_reqoption "osarch" "${osarch}"
+
+	QUICK_OPTION_OSARCH="${osarch}"
+}
+
+quick_set_overwrite()
+{
+	QUICK_OPTION_OVERWRITE=1
+}
+
+quick_set_nooverwrite()
+{
+	QUICK_OPTION_OVERWRITE=0
+}
+
+quick_vimage()
+{
+	if ! lib_check_vimage; then
+		lib_err ${EX_UNAVAILABLE} "This kernel doesn't support VIMAGE!"
+	fi
+}
+
+quick_vnetiface()
+{
+	local interface="$1"
+	if [ -z "${interface}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_vnetiface interface"
+	fi
+
+	quick_list_vifaces | while IFS= read -r vnet_interface
+	do
+		if [ "${interface}" = "${vnet_interface}" ]; then
+			printf "%s\n" "${vnet_interface}"
+		fi
+	done
+}
+
+quick_list_vifaces()
+{
+	appjail config -glPt "${QUICK_TEMP_TEMPLATE}" -a 'vnet.interface'
+}
+
+quick_iface()
+{
+	local interface="$1"
+	if [ -z "${interface}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_iface interface"
+	fi
+
+	if lib_check_ifacelen "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+	fi
+
+	if ! lib_check_interfacename "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+	fi
+
+	if ! lib_check_iface "${interface}"; then
+		lib_err ${EX_NOINPUT} -- "${interface}: interface does not exist."
+	fi
+}
+
+quick_exclusive()
+{
+	local option="$1" conflict="$2"
+	if [ -z "${option}" -o -z "${conflict}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_exclusive option conflict"
+	fi
+
+	lib_err ${EX_DATAERR} -- "${option}, ${conflict}: options are mutually exclusive."
+}
+
+quick_chknumber()
+{
+	local option="$1" value="$2"
+	if [ -z "${option}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_chknumber option value"
+	fi
+
+	if ! lib_check_number "${value}"; then
+		lib_err ${EX_DATAERR} "${option}: A positive number is required!"
+	fi
+}
+
+quick_reqoption()
+{
+	local option="$1" value="$2"
+	if [ -z "${option}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_reqoption option value"
+	fi
+
+	if lib_check_empty "${value}"; then
+		lib_err ${EX_DATAERR} -- "${option}: option requires an argument."
+	fi
+}
+
+quick_reqoptions()
+{
+	local option="$1" options="$2"
+	if [ -z "${option}" -o -z "${options}" ]; then
+		lib_err ${EX_USAGE} "usage: quick_reqoptions option options"
+	fi
+
+	lib_err ${EX_CONFIG} "${option} requires the following options: ${options}."
+}
+
+quick_help()
+{
+	cat << EOF
+`quick_usage`
+
+${quick_desc}
+
+Options:
+    alias                 -- Syntax: alias
+                                     alias="interface"
+                             Type: options
+                             Parameters:
+			         - interface (str, optional):
+				     A network interface to add the jail's IP addresses to.
+                             Conflicts: bridge, jng or vnet
+			     Requires: ip4, ip4_inherit, ip4_disable, ip6, ip6_inherit or ip6_disable.
+			     Examples:
+			         - alias
+				 - alias=appjail0
+                             Descr: Adds IP addresses to an interface to be used within the jail.
+
+    boot                  -- Syntax: boot
+                             Type: bool
+                             Descr: Set the boot flag. See \`appjail startup\` for more information.
+
+    bridge                -- Syntax: bridge="[type:]interface ... [bridge:bridge_name]"
+                             Parameters:
+				 - type (bool, optional, default:epair): 
+				     The interface type. If \`epair\` is used, an \`if_epair(4)\` will be created by cloning and
+				     the name will use a syntax like \`s[ab]_<interface>\`. The \`sa_<interface>\` is for the
+				     jail. If \`iface\` is used, an existing interface is added as a member of the bridge.
+				 - interface (str, required): 
+				     Interface name. At least one must be specified.
+				 - bridge (str, optional, default:${SHARED_BRIDGE}):
+				     Bridge name.
+			     Conflicts: alias
+			     Examples:
+			         - bridge="iface:em0 nginx"
+				 - bridge="nginx"
+				 - bridge="epair:nginx iface:em0 bridge:public"
+                             Descr: Creates a bridge if it does not exist and attach an epair device or an interface to it.
+
+    copydir               -- Syntax: copydir="directory"
+                             Type: str
+                             Default: ${QUICK_OPTION_COPYDIR}
+			     Examples:
+			         - copydir="/tmp/copydir"
+			     Descr: The directory that acts as the root directory for \`file\` and \`files\` options.
+
+    cpuset                -- Syntax: cpuset="cpu_list"
+                             Type: str
+			     Examples:
+			         - cpuset="0-2"
+				 - cpuset="1,2,6-9"
+			     Descr: Configure processor sets.
+
+    create_args           -- Syntax: create_args="parameter=value"
+                             Type: str
+			     Examples:
+			         - create_args="nginx_conf=/home/op/tmp/nginx.conf"
+                             Descr: Default arguments to *create functions. See \`appjail enable\`.
+
+    devfs_ruleset         -- Syntax: devfs_ruleset=ruleset
+                             Type: number
+                             Default: ${QUICK_OPTION_DEVFS_RULESET}
+			     Requires: mount_devfs or linuxfs
+			     Examples:
+			         - devfs_ruleset=10
+			     Descr: The number of the devfs ruleset that is enforced for mounting devfs in this jail.
+
+    dhcp                  -- Syntax: dhcp="vnet_interface"
+                             Type: str
+			     Requires: bridge, jng or vnet
+			     Examples:
+			         - dhcp="sb_nginx"
+				 - dhcp="ng0_nginx"
+			     Descr: Configure an interface to use DHCP when the jail is started.
+
+    empty                 -- Syntax: empty.
+                             Type: bool
+                             Descr: Create an empty jail.
+
+    expose                -- Syntax: expose="hport[:jport]
+			                     [descr:description]
+					     [ext_if:external_interface]
+					     [logopts:firewall_logopts]
+					     [network:network_name]
+					     [on_if:interface]"
+					     [proto:protocol]
+			     Type: options
+			     Requires: virtualnet
+			     Parameters:
+				 - port (tuple:(str, str), required):
+				     - hport (str, required):
+				         Host port.
+				     - jport (str, optional): 
+				         Jail port. If not defined, \`hport\` will be used.
+				 - network (str, optional):
+				     Network name to be used to obtain the IP address of the jail. If not defined
+				     the default network is used (see \`virtualnet\`).
+				 - descr (str, optional):
+				     Description of the service.
+				 - ext_if (str, optional):
+				     Interface to be used to obtain the external IP address.
+				 - logopts (str, optional):
+				     Firewall-specific options for logging. If this option is used but no arguments
+				     are provided, logging will be used without options.
+				 - proto (str, optional):
+				     Protocol to be used. Valid values: tcp, udp. Default: tcp.
+				 - on_if (str, optional):
+				     Specifies the interface on which the NAT operates.
+			     Examples:
+			         - expose="80"
+				 - expose="8080:80 \"descr:NGINX service\" logopts"
+			     Descr: Expose a port. See \`appjail expose\` for more details.
+
+    file                  -- Syntax: file="file"
+                             Type: str
+                             Examples:
+			         - file="/etc/resolv.conf"
+                             Descr: File to be copied in jail.
+
+    files                 -- Syntax: files="file_lst"
+                             Type: str
+                             Examples:
+			         - files=/tmp/files.lst
+                             Descr: A file containing line by line, the files to be copied.
+
+    fstab                 -- Syntax: fstab="device mountpoint [type] [options] [dump] [pass]"
+                             Type: options
+			     Parameters:
+			         - device (str, required):
+				     Describes the special device or remote file system to be mounted.
+				 - mountpoint (str, required):
+				     Describes the mount point for the file system.
+				 - type (str, optional, default:nullfs):
+				     Describes the type of the file system.
+				 - options (str, optional, default:rw):
+				     Describes the mount options associated with the file system
+				 - dump (str, optional, default:0):
+				      This field is used for these file systems by the dump(8) command to determine
+				      which file systems need to be dumped.
+				 - pass (str, optional, default:0):
+				      This field is used by the fsck(8) and quotacheck(8) programs to determine the
+				      order in which file system and quota checks are done at reboot time.
+                             Examples:
+			         - fstab="/tmp /tmp"
+				 - fstab="/usr/local/www /usr/local/www"
+				 - fstab="/dev/da0s1 /mnt msdosfs"
+                             Descr: Creates an fstab entry.
+
+    initscript            -- Syntax: initscript="path/to/initscript".
+                             Type: str
+                             Examples:
+			         - initscript="/tmp/myinitscript"
+                             Descr: A custom initscript to be used.
+
+    ip4                   -- Syntax: ip4="ipv4_address"
+				     ip4="interface|ipv4_address"
+			     Type: options
+			     Conflicts: ip4_inherit or ip4_disable
+			     Requires: alias
+			     Parameters:
+				 - ipv4_address (IPv4 address, required):
+				 - interface (str, optional):
+			     Examples:
+			         - ip4="jext|192.168.1.120/24"
+			     Descr: IPv4 address to be used as alias.
+
+    ip4_disable           -- Syntax: ip4_disable
+                             Type: bool
+			     Requires: alias
+			     Conflicts: ip4, ip4_inherit or virtualnet
+                             Descr: Stop the jail from using IPv4 entirely.
+
+    ip4_inherit           -- Syntax: ip4_inherit
+                             Type: bool
+			     Requires: alias
+			     Conflicts: ip4, ip4_disable or virtualnet
+                             Descr: Allow unrestricted access to all addresses on the system.
+
+    ip6                   -- Syntax: ip6="ipv6_address"
+                                     ip6="interface|ipv6_adddress"
+			     Type: options
+			     Requires: alias
+                             Descr: Counterpart of ip4.
+
+    ip6_disable           -- Syntax: ip6_disable
+                             Type: bool
+			     Requires: alias
+                             Descr: Counterpart of ip4_disable.
+
+    ip6_inherit           -- Syntax: ip6_inherit
+                             Type: bool
+			     Requires: alias
+                             Descr: Counterpart of ip4_inherit.
+
+    jng                   -- Syntax: jng="name [iface:]interface ... [bridge:bridge_name]"
+                             Type: options
+			     Conflicts: alias
+			     Parameters:
+			         - name (str, required):
+				     Name of the links.
+				 - iface (bool, optional): 
+				     This is the default parameter when no other parameter is given.
+				 - interface (str, required):
+				     An existing interface to use.
+				 - bridge (str, optional):
+				     A secondary bridge is created when the bridge name is different from \`bridge\`.
+                             Descr: Use the jng script to create bridges and epairs using Netgraph.
+
+    limits                -- Syntax: limits="rule [descr:description]"
+                             Type: options
+                             Parameters:
+				 - rule (str, required):
+				     \`rctl(8)\` rule.
+				 - descr: (str, optional):
+				     Rule description.
+			     Examples:
+			         - limits="vmemoryuse:deny=1g"
+			     Descr: Configure resource limits rules.
+
+    linuxfs               -- Syntax: linuxfs
+                             Type: bool
+			     Conflicts: mount_devfs
+                             Descr: Mount the file systems required by many linux distributions to work correctly. You
+			            will probably want to set the devfs_ruleset option to another value because linuxjail will
+			            not work correctly. The following mountpoints are used: /dev, /dev/shm, /dev/fd, /proc and
+				    /sys.
+
+    login                 -- Syntax: login
+                             Type bool
+                             Descr: Run \`appjail login\` after the creation of the jail. If start is not enabled, this option will be
+			            ignored. If start, restart and run fail, login will not be executed.
+
+    login_user            -- Syntax: login_user="username"
+                             Type: str
+                             Default: ${QUICK_OPTION_LOGIN_USER}
+                             Descr: Username used by the login command.
+
+    mount_devfs           -- Syntax: mount_devfs
+                             Type: bool
+			     Conflicts: linuxfs
+			     Descr: Mount a devfs(5) filesystem on the chrooted /dev directory, and apply the ruleset in the devfs_ruleset
+			            parameter (or a default of ruleset ${QUICK_OPTION_DEVFS_RULESET}: devfsrules_jail) to restrict the
+				    devices visible inside the jail.
+
+    nat                   -- Syntax: nat
+                                     nat="[ext_if:external_interface]
+				          [logopts[:firewall_logopts]]
+					  [network:network_name]
+					  [on_if:interface]"
+			     Type: options
+			     Requires: virtualnet
+			     Parameters:
+			         - ext_if (str, optional): See \`expose\`.
+				 - logopts (str, optional): See \`expose\`.
+				 - network (str, optional): See \`expose\`.
+				 - on_if (str, optional): See \`expose\`.
+                             Descr: Mask the IP address of the jail using the IP address of the \`ext_if\` interface on the \`on_if\` interface.
+
+    noboot                -- Syntax: noboot
+                             Type: bool
+                             Descr: Do not use the \`boot\` option. See the \`boot\` option and the \`DEFAULT_BOOT\` variable in
+			            the configuration file.
+
+    nonat                 -- Syntax: nonat
+                                     nonat="[ext_if:external_interface] [network:network_name] [on_if:interface]"
+			     Type: options
+			     Requires: virtualnet
+			     Parameters:
+			         - ext_if (str, optional): See \`nat\`.
+				 - network (str, optional): See \`nat\`.
+				 - on_if (str, optional): See \`nat\`.
+                             Descr: This is useful when NAT is applied to a network and you do not want to apply NAT to a specific
+			            jail.
+
+    nologin               -- Syntax: nologin
+                             Type: bool
+                             Descr: Do not use the \`login\` option. See the \`login\` option and the \`DEFAULT_LOGIN\` variable in
+			            the configuration file.
+
+    nooverwrite           -- Syntax: nooverwrite
+                             Type: bool
+                             Descr: Do not use the \`overwrite\` option. See the \`overwrite\` option and the \`DEFAULT_OVERWRITE\`
+			            variable in the configuration file.
+
+    noresolv_conf         -- Syntax: noresolv_conf
+                             Type: bool
+                             Descr: Do not use the \`resolv_conf\` option. See the \`resolv_conf\` option and the \`USE_RESOLV_CONF\`
+			            variable in the configuration file.
+
+    norestart             -- Syntax: norestart
+                             Type bool
+                             Descr: Do not use the \`norestart\` option. See the \`restart\` option and the \`DEFAULT_RESTART\` variable
+			            in the configuration file.
+
+    norun                 -- Syntax: norun
+                             Type: bool
+                             Descr: Do not use the \`norun\` option. See the \`run\` option and the \`DEFAULT_RUN\` variable in the
+			            configuration file.
+
+    nostart               -- Syntax: nostart
+                             Type: bool
+                             Descr: Do not use the \`start\` option. See the \`start\` option and the \`DEFAULT_START\` variable in the
+			            configuration file.
+
+    notzdata              -- Syntax: notzdata
+                             Type: bool
+                             Descr: Do not use the \`tzdata\` option. See the \`tzdata\` option and the \`USE_TIMEZONE\` variable
+			            in the configuration file.
+
+    osarch                -- Syntax: osarch="architecture"
+                             Type: str
+                             Default: ${QUICK_OPTION_OSARCH}
+                             Descr: Operating system architecture used by the jail.
+
+    osversion             -- Syntax: osversion="version"
+                             Type: str
+                             Default: ${QUICK_OPTION_OSVERSION}
+                             Descr: Operating system version used by the jail.
+
+    overwrite             -- Syntax: overwrite
+                             Type: bool
+                             Descr: If the jail exists, stop it and remove it.
+
+    priority              -- Syntax: priority=priority_number
+                             Type: number
+                             Default: ${QUICK_OPTION_PRIORITY}
+                             Descr: The priority number that affects the order in which this jail is started and stopped. If 0, the
+			            priority is not set because 0 is the default number when the jail is created.
+
+    resolv_conf           -- Syntax: resolv_conf
+                                     resolv_conf="path/to/resolv.conf"
+			     Type: str
+			     Default: ${QUICK_OPTION_RESOLV_CONF}
+                             Descr: Copy the resolver configuration to the jail.
+
+    restart               -- Syntax: restart
+                             Type: bool
+                             Descr: Run \`appjail restart\` after the creation of the jail. If start is not enabled, this option will
+			            be ignored. If start fail, restart will not be executed. This option is useful for testing the
+				    initscript and for testing the commands that are executed when the jail is started and stopped.
+
+    run                   -- Syntax: run
+                             Type: bool
+                             Descr: Run \`appjail run\` after the creation of the jail. If start is not enabled, this option will
+			            be ignored. If start and restart fail, run will not be executed.
+
+    run_args              -- Syntax: run_args="parameter=value"
+                             Type: str
+                             Descr: Default arguments to *cmd functions. See \`appjail enable\`.
+
+    slaac                 -- Syntax: slaac="vnet_interface"
+                             Type: str
+			     Requires: bridge, jng or vnet
+			     Examples:
+			         - slaac="sb_mariadb"
+				 - slaac="ng1_httpd"
+			     Descr: Configure an interface to use SLAAC when the jail is started.
+
+    start                 -- Syntax: start
+                             Type: bool
+                             Descr: Start the jail after its creation.
+
+    start_args            -- Syntax: start_args="parameter=value"
+                             Type: str
+                             Descr: Default arguments to *start functions. See \`appjail enable\`.
+
+    stop_args             -- Syntax: stop_args="parameter=value"
+                             Type: str
+                             Descr: Default arguments to *stop functions. See \`appjail enable\`.
+
+    template              -- Syntax: template="path/to/template.conf"
+                             Type: str
+                             Default: ${QUICK_OPTION_TEMPLATE}
+			     Examples:
+			         - template=/tmp/linux.conf
+                             Descr: Template used by this jail. It is important to note that the quick command does not
+			            parse this template, so be careful when there are parameters that may create
+				    unexpected behavior.
+
+    tmpdir                -- Syntax: tmpdir
+                             Type: bool
+			     Conflicts: x11
+			     Descr: Create a directory inside the jail with permissions 1777 and create an fstab entry to
+			            mount \`/tmp\`.
+
+    type                  -- Syntax: type="jail_type"
+                             Type: str
+                             Default: ${QUICK_OPTION_JAILTYPE}
+                             Descr: Jail type to use. See \`appjail jail\` for more information.
+
+    tzdata                -- Syntax: tzdata
+                                     tzdata="zone_name"
+			     Type: str
+			     Default: ${QUICK_OPTION_TIMEZONE}
+			     Examples:
+			         - tzdata="America/Caracas"
+                             Descr: If empty, copy /etc/localtime from the host to the jail. If set, use a symbolic link
+			            from /usr/share/zoneinfo inside the jail.
+
+    virtualnet            -- Syntax: virtualnet:interface [default] [address:ipv4_address] [interface_desc:interface_description] 
+                             Type: options
+			     Parameters:
+			         - virtualnet (str, required):
+				     Network name.
+				 - interface (str, required):
+				     \`if_epair(4)\` interface to create.
+				 - default (bool, optional):
+				     Mark this network as the default router and use it in other options such as \`expose\`, \`nat\`
+				     or \`nonat\`.
+				 - address (IPv4 address, optional):
+				     An optional IPv4 address that must be in the network range. If not used, AppJail will
+				     automatically obtain an IPv4 address from the network pool.
+				 - interface_desc (str, optional):
+				     Interface description.
+			     Examples:
+			         - virtualnet="web:nginx default \"interface_desc:Interface used by the nginx jail.\""
+				 - virtualnet="db:mariadb address:10.42.0.17"
+                             Descr: Create a bridge and attach the interface to it. In addition, assign the jail an IPv4 address
+			            from the network pool.
+
+    vnet                  -- Syntax: vnet="interface"
+                             Type: str
+			     Conflicts: alias
+			     Descr: A network interface to give to a vnet-enabled jail after is it created. The interface will automatically
+			            be released when the jail is removed.
+
+    x11                   -- Syntax: x11
+                             Type: bool
+			     Conflicts: tmpdir
+                             Descr: Create a directory inside the jail with permissions 1777 and create an fstab entry to
+			            mount \`/tmp/.X11-unix\`.
+EOF
+}
+
+quick_usage()
+{
+	echo "usage: quick jail_name [options ...]"
+}

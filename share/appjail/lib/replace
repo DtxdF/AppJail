@@ -1,63 +1,389 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/sysexits"
+lib_load "${LIBDIR}/tempfile"
+lib_load "${LIBDIR}/whitespaces"
+
+lib_escape_string()
+{
+	local str="$1" level="$2" chars2escape="$3"
+
+	if [ -z "${str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_escape_string str [level] [chars2escape]"
+	fi
+
+	level="${level:-1}"
+	level=$((level*2))
+
+	chars2escape="${chars2escape:-$\`\"\\}"
+
+	local escape_chars
+	escape_chars=`lib_generate_char "${level}" '\\'`
+
+	printf "%s\n" "${str}" | sed -Ee "s/([${chars2escape}])/${escape_chars}\\1/g"
+}
+
+lib_replace_escape_shellvars()
+{
+	local str="$1"
+	if [ -z "${str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_escape_shellvars str"
+	fi
+
+	printf "%s\n" "${str}" | sed -Ee 's/\\(.)/\\\\\\\1/g; s/(^|[^\\])([`"])/\1\\\2/g; s/(\\["`])(["`])/\1\\\2/g'
+}
+
+lib_replace_changevars()
+{
+	local str="$1" new_name="$2"
+	if [ -z "${str}" -o -z "${new_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_changevars str new_name"
+	fi
+
+	printf "%s\n" "${str}" | sed -Ee "s/(^\\$|[^\\\\]\\$)(\{([a-zA-Z_][a-zA-Z0-9_]*)\}|([a-zA-Z_][a-zA-Z0-9_]*))/\1{__${new_name}__\3\4}/g"
+}
+
+lib_replace_var()
+{
+	local file="$1" old="$2" new="$3" output="$4"
+	if [ -z "${file}" -o -z "${old}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_var file old [new] [output]"
+	fi
+
+	if ! printf "%s" "${old}" | grep -qEe '^[a-zA-Z_][a-zA-Z0-9_]*$'; then
+		lib_err ${EX_DATAERR} -- "${old}: Invalid variable name."
+	fi
+
+	if ! _lib_replace_chk_var "${file}" "${old}"; then
+		lib_err ${EX_DATAERR} -- "${old}: variable is not defined in the ${file} file."
+	fi
+
+	local errlevel
+
+	output="${output:-${file}}"
+
+	local temp_file
+	temp_file="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_temp_file
+	escape_temp_file=`lib_escape_string "${temp_file}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_file}\""
+
+	if [ -n "${new}" ]; then
+		new=`lib_escape_string "${new}" "" '\#'`
+	fi
+
+	if ! cat -- "${file}" | sed -Ee "s#(^%\{${old}\}|([^%])%\{${old}\})#\\2${new}#g" > "${temp_file}"; then
+		lib_err ${EX_IOERR} "Error editing ${file}."
+	fi
+
+	if ! cat -- "${temp_file}" > "${output}"; then
+		lib_err ${EX_IOERR} "Error writing ${temp_file} in ${output}."
+	fi
+}
+
+lib_replace_macrovars()
+{
+	local file="$1" output="$2"
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_macrovars file [output]"
+	fi
+
+	local errlevel
+
+	output="${output:-${file}}"
+
+	local temp_output
+	temp_output="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_temp_output
+	escape_temp_output=`lib_escape_string "${temp_output}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_output}\""
+
+	if ! cat -- "${file}" > "${temp_output}"; then
+		lib_err ${EX_IOERR} "Error writing ${file} to ${temp_output}."
+	fi
+
+	local tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_tempdir
+	escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	local priority=0
+	cat -- "${file}" | grep -Eoe '(^%|[^%]%)\{[a-zA-Z_][a-zA-Z0-9_]*(!|:)(([^}]|\\\})+)?\}' | sed -Ee 's/.*%\{([a-zA-Z_][a-zA-Z0-9_]*(!|:)(([^}]|\\\})+)?)\}.*/\1/' | sed -Ee 's/\\\}/}/g' | while IFS= read -r macrovar
+	do
+		if printf "%s" "${macrovar}" | grep -qEe '^[a-zA-Z_][a-zA-Z0-9_]*:.*$'; then
+			sep=":"
+		else
+			sep="!"
+		fi
+
+		name=`lib_jailparam_name "${macrovar}" "${sep}"`
+		value=`lib_jailparam_value "${macrovar}" "${sep}"`
+
+		if [ "${sep}" = "!" ]; then
+			lib_err ${EX_DATAERR} "${name}: macrovar is mandatory (${value})."
+		fi
+
+		if [ -f "${tempdir}/${name}" ]; then
+			lib_warn "${name}: ignoring duplicate macrovar ..."
+			continue
+		else
+			touch -- "${tempdir}/${name}"
+		fi
+
+		if ! _lib_replace_chk_var "${temp_output}" "${name}"; then
+			continue
+		fi
+
+		lib_replace_var "${temp_output}" "${name}" "${value}"
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	# Wipe
+	if ! sed -i '' -Ee 's/(^%|([^%])%)\{([a-zA-Z_][a-zA-Z0-9_]*(!|:)(([^}]|\\\})+)?)\}/\2/g' -- "${temp_output}"; then
+		lib_err ${EX_IOERR} "Error removing macrovars in ${temp_output}."
+	fi
+
+	# Wipe empty lines
+	if ! sed -i '' -Ee '/^$/d' -- "${temp_output}"; then
+		lib_err ${EX_IOERR} "Error removing empty lines in ${temp_output}."
+	fi
+
+	# The end
+	if ! cat -- "${temp_output}" > "${output}"; then
+		lib_err ${EX_IOERR} "Error writing ${temp_output} in ${output}."
+	fi
+}
+
+lib_replace_macrovar()
+{
+	local file="$1" name="$2" value="$3" output="$4"
+	if [ -z "${file}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_macrovar file name [value] [output]"
+	fi
+
+	if ! printf "%s" "${name}" | grep -qEe '^[a-zA-Z_][a-zA-Z0-9_]*$'; then
+		lib_err ${EX_DATAERR} -- "${name}: Invalid variable name."
+	fi
+
+	if ! _lib_replace_chk_macrovar "${file}" "${name}"; then
+		lib_err ${EX_DATAERR} -- "${name}: macrovar is not defined in the ${file} file."
+	fi
+
+	local errlevel
+
+	output="${output:-${file}}"
+
+	local temp_file
+	temp_file="`lib_generate_tempfile`"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_temp_file
+	escape_temp_file=`lib_escape_string "${temp_file}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_file}\""
+
+	if [ -n "${value}" ]; then
+		value=`lib_escape_string "${value}" "" '}'`
+		value=`lib_escape_string "${value}" "" '\/'`
+	fi
+
+	if ! cat -- "${file}" | sed -Ee "s/(^%|([^%])%)\{(${name}(!|:)(([^}]|\\\})+)?)\}/%{${name}:${value}}/g" > "${temp_file}"; then
+		lib_err ${EX_IOERR} "Error editing ${file}."
+	fi
+
+	if ! cat -- "${temp_file}" > "${output}"; then
+		lib_err ${EX_IOERR} "Error writing ${temp_file} in ${output}."
+	fi
+}
+
+lib_replace_escape_macrovar()
+{
+	local str="$1"
+	if [ -z "${str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_escape_macrovar str"
+	fi
+
+	if ! printf "%s" "${str}" | sed -Ee 's/(%\{[a-zA-Z_][a-zA-Z0-9_]*\})/%\1/g'; then
+		lib_err ${EX_IOERR} "Error escaping % in ${str}."
+	fi
+}
+
+lib_replace_escaped_macrovars()
+{
+	local file="$1" name="$2"
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace_escaped_macrovars file [name]"
+	fi
+
+	if [ -z "${name}" ]; then
+		name="[a-zA-Z_][a-zA-Z0-9_]*"
+	fi
+
+	if ! sed -i '' -Ee "s/%%\{(${name})\}/%{\1}/g" -- "${file}"; then
+		lib_err ${EX_IOERR} "Error removing escaped % in ${file}."
+	fi
+}
+
+_lib_replace_chk_macrovar()
+{
+	local file="$1" name="$2"
+	if [ -z "${file}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_replace_chk_macrovar file name"
+	fi
+
+	if grep -qEe "(^%|[^%]%)\{(${name}(!|:)(([^}]|\\\})+)?)\}" -- "${file}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_replace_chk_var()
+{
+	local file="$1" name="$2"
+	if [ -z "${file}" -o -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_replace_chk_var file name"
+	fi
+
+	if grep -qEe "(^%|[^%]%)\{${name}\}" -- ${file}; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_mk_replace_var()
+{
+	local file="$1" old="$2" new="$3" output="$4"
+
+	if lib_check_empty "${file}"; then
+		lib_err ${EX_DATAERR} "REPLACE: the file to be edited is mandatory."
+	fi
+
+	if [ ! -f "${file}" ]; then
+		lib_err ${EX_NOINPUT} "REPLACE: the file \`${file}\` does not exist."
+	fi
+
+	if lib_check_empty "${old}"; then
+		lib_err ${EX_DATAERR} "REPLACE: the variable name is mandatory."
+	fi
+
+	if lib_check_empty "${output}"; then
+		output="${file}"
+	fi
+
+	lib_debug -- "REPLACE: ${old} -> ${new}"
+
+	lib_replace_var "${file}" "${old}" "${new}" "${output}" &&
+	lib_replace_escaped_macrovars "${file}" "${old}"
+}
 
 lib_replace()
 {
-	local _old _new _str
-
-	_old="$1"
-	_new="$2"
-	_str="$3"
-
-	if [ -z "${_old}" -o -z "${_new}" -o -z "${_str}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_replace old new string"
+	local str="$1" old="$2" new="$3"
+	if [ -z "${str}" -o -z "${old}" -o -z "${new}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_replace str old new"
 	fi
 
-	echo "${_str}" | sed -Ee "s|${_old}|${_new}|g"
+	# Replaces
+	str=`echo "${str}" | sed -Ee "s#(^%${old}|([^%])%${old})#\2${new}#g"`
+
+	# Escape %%
+	echo "${str}" | sed -Ee "s#%%#%#g"
 }
 
-lib_replace_componentsdir()
+lib_multi_replace()
 {
-	COMPONENTSDIR="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${COMPONENTSDIR}\"`"
-	COMPONENTSDIR="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${COMPONENTSDIR}\"`"
-}
+	local str old new
 
-lib_replace_downloadurl()
-{
-	DOWNLOADURL="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${DOWNLOADURL}\"`"
-	DOWNLOADURL="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${DOWNLOADURL}\"`"
-}
+	str="$1"; shift
 
-lib_replace_jaildir()
-{
-	JAILDIR="`lib_replace %ARCH% \"${FREEBSD_ARCH}\" \"${JAILDIR}\"`"
-	JAILDIR="`lib_replace %VERSION% \"${FREEBSD_VERSION}\" \"${JAILDIR}\"`"
-}
-
-lib_filter_jail()
-{
-	local tempfile
-	local jail_name jail_conf jail_root
-
-	jail_name="$1"
-	jail_conf="$2"
-	jail_root="$3"
-
-	if [ -z "${jail_name}" -o -z "${jail_conf}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_filter_jail jail_name jail_conf jail_root"
+	if [ -z "${str}" -o $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_multi_replace str [[old new] ...]"
 	fi
 
-	tempfile="`lib_generate_tempfile`"
+	while [ $# -gt 0 ]; do
+		old="$1"
+		new="$2"
 
-	cat "${jail_conf}" | sed \
-				-E \
-				-e "s|%ROOTDIR%|`dirname \"${jail_root}\"`|g" \
-				-e "s|%JAILDIR%|${jail_root}|g" \
-				-e "s|%JAILNAME%|${jail_name}|g" > "${tempfile}"
+		shift 2
 
-	echo "${tempfile}"
+		if [ -z "${old}" -o -z "${new}" ]; then
+			lib_multi_replace
+		fi
+
+		str=`lib_replace "${str}" "${old}" "${new}"`
+	done
+
+	echo "${str}"
+}
+
+lib_remove_ltrim()
+{
+	local str="$1"
+
+	if [ -z "${str}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_remove_spaces str"
+	fi
+
+	printf "%s\n" | sed -Ee 's/^[\t ]*//'
 }

@@ -1,0 +1,684 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/kern_modules"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mksum"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/zfs"
+
+FETCH_MANIFEST_FILE="MANIFEST"
+
+fetch_desc="Fetch and extract components to create jails."
+
+fetch_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		entity="${DEFAULT_FETCH_METHOD}"
+	fi
+
+	case "${entity}" in
+		debootstrap|destroy|list|local|www) ;;
+		*) fetch_usage; exit ${EX_USAGE} ;;
+	esac
+
+	fetch_${entity} "$@"
+}
+
+fetch_list()
+{
+	local _o
+	local file
+	local osarch osversion name
+	local opt_escape=1
+	local opt_columns=1
+	local opt_pretty=1
+
+	while getopts ":eHp" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			p)
+				opt_pretty=0
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+	
+	file="$1"
+
+	osarch=`printf "%s" "${file}" | awk -F/ '{print $1}'`
+	osversion=`printf "%s" "${file}" | awk -F/ '{print $2}'`
+
+	if [ -n "${osversion}" ]; then
+		keywords="NAME"
+
+		if [ ! -d "${RELEASEDIR}/${osarch}/${osversion}" ]; then
+			lib_err ${EX_NOINPUT} "Version ${osversion} not found."
+		fi
+	elif [ -n "${osarch}" ]; then
+		keywords="VERSION\tNAME"
+
+		if [ ! -d "${RELEASEDIR}/${osarch}" ]; then
+			lib_err ${EX_NOINPUT} "Arch ${osarch} not found."
+		fi
+	else
+		keywords="ARCH\tVERSION\tNAME"
+
+		if ! lib_zfs_mkdir "${RELEASEDIR}" "${ZFS_RELEASE_NAME}"; then
+			lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}"
+		fi
+	fi
+
+	if [ -n "${osversion}" ]; then
+		(cd "${RELEASEDIR}/${osarch}/${osversion}"; find . -depth 1)
+	elif [ -n "${osarch}" ]; then
+		(cd "${RELEASEDIR}/${osarch}"; find . -depth 2)
+	else
+		(cd "${RELEASEDIR}"; find . -depth 3)
+	fi |\
+		sed -Ee 's#\./##' |\
+		{
+			if [ ${opt_columns} -eq 1 ]; then
+				echo -e "${keywords}"
+			fi
+			while IFS= read -r file; do
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					file=`printf "%s" "${file}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+
+				file=`printf "%s" "${file}" | tr '/' '\t'`
+
+				printf "%s\n" "${file}"
+			done
+		} | \
+			if [ ${opt_pretty} -eq 1 ]; then
+				column -ts $'\t'
+			else
+				cat
+			fi
+}
+
+fetch_debootstrap()
+{
+	# Load linux kernel modules
+	lib_modules_linuxmods
+
+	local _o
+	local opt_apt_cache_start=1 apt_cache_start="${APT_CACHE_START}"
+	local osarch="${DEBOOTSTRAP_ARCH}"
+	local mirror="${DEBOOTSTRAP_MIRROR}"
+	local release_name="${DEFAULT_RELEASE}"
+	local script="${DEBOOTSTRAP_SCRIPT}"
+	local errlevel=0
+
+	while getopts ":Aa:c:m:r:S:" _o; do
+		case "${_o}" in
+			a|c|m|r|S)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			A)
+				opt_apt_cache_start=0
+				;;
+			a)
+				osarch="${OPTARG}"
+				;;
+			c)
+				apt_cache_start="${OPTARG}"
+				;;
+			m)
+				mirror="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			S)
+				script="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if ! which -s "debootstrap"; then
+		lib_err ${EX_UNAVAILABLE} "debootstrap(8) is not installed. Cannot continue ..."
+	fi
+
+	local suite_name="$1"
+	if lib_check_empty "${suite_name}"; then
+		fetch_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${apt_cache_start}"; then
+		lib_err ${EX_DATAERR} "Invalid number: ${apt_cache_start}"
+	fi
+
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
+	local releasedir="${RELEASEDIR}/${osarch}/${suite_name}/${release_name}"
+
+	_fetch_atomic_init -a "${osarch}" -r "${release_name}" -v "${suite_name}"
+
+	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${osarch}/${suite_name}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	_fetch_atomic_mid "${releasedir}"
+
+	if ! lib_zfs_mkdir "${releasedir}/linux_debootstrap" "${ZFS_RELEASE_NAME}/${osarch}/${suite_name}/${release_name}/linux_debootstrap"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/linux_debootstrap"
+	fi
+
+	local escape_osarch=`lib_escape_string "${osarch}"`
+	local escape_releasedir=`lib_escape_string "${releasedir}"`
+	local escape_suite_name=`lib_escape_string "${suite_name}"`
+	local debootstrap_cmd=`lib_multi_replace "${DEBOOTSTRAP_CMD}" a "\"${escape_osarch}\"" o "\"${escape_releasedir}/linux_debootstrap\"" s "\"${escape_suite_name}\""`
+
+	if [ -n "${mirror}" -a -n "${script}" ]; then
+		debootstrap_cmd="${debootstrap} \"${mirror}\" \"${script}\""
+	elif [ -n "${mirror}" ]; then
+		debootstrap_cmd="${debootstrap} \"${mirror}\""
+	fi
+
+	sh -c "${debootstrap_cmd}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "\`${debootstrap_cmd}\` exits with a non-zero exit status."
+	fi
+
+	if [ ${opt_apt_cache_start} -eq 1 ]; then
+		lib_debug "Increasing APT::Cache-Start to ${apt_cache_start}"
+
+		echo "APT::Cache-Start ${apt_cache_start};" > "${releasedir}/linux_debootstrap/etc/apt/apt.conf.d/00aptitude"
+	fi
+
+	_fetch_atomic_end "${releasedir}"
+
+	lib_debug "Done."
+}
+
+fetch_destroy()
+{
+	local _o
+	local opt_force=0 fflag=
+	local opt_all_dependents=0 Rflag=
+	local osarch="${FREEBSD_ARCH}"
+	local osversion="${FREEBSD_VERSION}"
+	local release_name
+
+	if [ $# -eq 0 ]; then
+		fetch_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":fRa:v:" _o; do
+		case "${_o}" in
+			a|v)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			R)
+				opt_all_dependents=1
+				;;
+			a)
+				osarch="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	release_name="$1"
+	if lib_check_empty "${release_name}"; then
+		fetch_usage
+		exit ${EX_USAGE}
+	fi
+
+	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
+
+	releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+	if [ ! -d "${releasedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the release \`${release_name}\`."
+	fi
+
+	used_by=`lib_mountpoint_mounted -p "${releasedir}"`
+	if [ -n "${used_by}" ]; then
+		lib_warn "The release directory (${releasedir}) has been used by:"
+		printf "%s\n" "${used_by}" | while IFS= read -r line; do
+			lib_warn "    - ${line}"
+		done
+		return ${EX_NOPERM}
+	fi
+
+	lib_debug "Removing \`${release_name}\` release..."
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		lib_debug "Using zfs-destroy(8) ..."
+
+		if [ ${opt_force} -eq 1 ]; then
+			fflag="-f"
+		fi
+
+		if [ ${opt_all_dependents} -eq 1 ]; then
+			Rflag="-R"
+		fi
+
+		if ! lib_zfs_rrmfs ${fflag} ${Rflag} "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}"; then
+			lib_err ${EX_IOERR} "Error destroying ${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}"
+		fi
+	else
+		lib_debug "Removing \`noschg\` flag..."
+		if ! chflags -R noschg "${releasedir}"; then
+			lib_err ${EX_IOERR} "Error removing the \`noschg\` flag to ${releasedir}"
+		fi
+	fi
+
+	lib_debug "Removing files..."
+	if ! rm -rf "${releasedir}"; then
+		lib_err ${EX_IOERR} "Error removing ${releasedir}"
+	fi
+
+	lib_debug -- "${release_name} was removed."
+}
+
+fetch_local()
+{
+	_fetch_cmd -m local "$@"
+}
+
+fetch_www()
+{
+	_fetch_cmd -m www "$@"
+}
+
+_fetch_cmd()
+{
+	local _o
+	local opt_chk_manifest=1
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local method="${DEFAULT_METHOD}"
+	local release_name="${DEFAULT_RELEASE}"
+	local downloadurl="${DOWNLOADURL}"
+	local freebsd_version="${FREEBSD_VERSION}"
+	local errlevel=0
+	local component
+
+	while getopts ":Ca:m:r:u:v:" _o; do
+		case "${_o}" in
+			a|m|r|u|v)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			C)
+				opt_chk_manifest=0
+				;;
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			m)
+				method="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			u)
+				downloadurl="${OPTARG}"
+				;;
+			v)
+				freebsd_version="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -eq 0 ]; then
+		local args_list=`lib_split_jailparams "${COMPONENTS}"`
+		local total_items=`printf "%s\n" "${args_list}" | wc -l`
+		local current_index=0
+
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+			component=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+
+			set -- "$@" "${component}"
+		done
+	fi
+
+	if [ $# -eq 0 ]; then
+		fetch_usage
+		exit ${EX_USAGE}
+	fi
+	
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${COMPONENTSDIR}" "${ZFS_COMPONENTS_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${COMPONENTSDIR}"
+	fi
+
+	if ! lib_zfs_mkdir "${RELEASEDIR}" "${ZFS_RELEASE_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}"
+	fi
+
+	local downloadurl=`lib_multi_replace "${downloadurl}" a "${freebsd_arch}" v "${freebsd_version}"`
+	local componentsdir="${COMPONENTSDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
+	local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
+
+	if ! lib_zfs_mkdir "${componentsdir}" "${ZFS_COMPONENTS_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${componentsdir}"
+	fi
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
+	fi
+
+	_fetch_atomic_init -a "${freebsd_arch}" -r "${release_name}" -v "${freebsd_version}"
+
+	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	# Download the MANIFEST
+	if [ ${opt_chk_manifest} -eq 1 ]; then
+		_fetch "${method}" "${downloadurl}" "${FETCH_MANIFEST_FILE}" "${componentsdir}/${FETCH_MANIFEST_FILE}"
+
+		for component in "$@"; do
+			local checksum
+			checksum=`_fetch_gethash_manifest "${component}" "${componentsdir}/${FETCH_MANIFEST_FILE}"`
+
+			if lib_check_empty "${checksum}"; then
+				lib_err ${EX_DATAERR} -- "${component}: hash not found in the MANIFEST file."
+			fi
+		done
+	fi
+
+	for component in "$@"; do
+		_fetch "${method}" "${downloadurl}" "${component}" "${componentsdir}/${component}"
+
+		if [ ${opt_chk_manifest} -eq 1 ]; then
+			_fetch_chk_manifest "${componentsdir}" "${component}" "${componentsdir}/${FETCH_MANIFEST_FILE}"
+		fi
+
+		_fetch_atomic_mid "${releasedir}"
+
+		lib_debug "Extracting ${component}: tar ${TAR_DECOMPRESS_ARGS} -xf \"${componentsdir}/${component}\" -C \"${releasedir}/release\""
+
+		if ! tar ${TAR_DECOMPRESS_ARGS} -xf "${componentsdir}/${component}" -C "${releasedir}/release"; then
+			lib_err ${EX_IOERR} "Error extracting ${component}."
+		fi
+
+		lib_debug "Done: ${component}"
+	done
+
+	_fetch_atomic_end "${releasedir}"
+}
+
+_fetch_chk_manifest()
+{
+	local dir="$1" file="$2" manifest_file="$3"
+	if [ -z "${file}" -o -z "${manifest_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _fetch_chk_manifest dir file manifest_file"
+	fi
+
+	lib_debug "Checking checksum for ${file} ..."
+
+	local checksum
+	checksum=`_fetch_gethash_manifest "${file}" "${dir}/${FETCH_MANIFEST_FILE}"`
+
+	lib_debug "MANIFEST: ${checksum}"
+
+	local file_checksum
+	file_checksum=`lib_mksum "${dir}/${file}"`
+
+	lib_debug "FILE: ${file_checksum}"
+
+	if [ "${checksum}" != "${file_checksum}" ]; then
+		lib_err ${EX_DATAERR} -- "${file}: checksum error: ${checksum} != ${file_checksum}"
+	fi
+}
+
+_fetch_gethash_manifest()
+{
+	local file="$1" manifest_file="$2"
+	if [ -z "${file}" -o -z "${manifest_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _fetch_gethash_manifest file manifest_file"
+	fi
+
+	grep -F "${file}" "${manifest_file}" | awk '{print $2}'
+}
+
+_fetch()
+{
+	local errlevel
+	local method downloadurl file output
+
+	method="$1"
+	downloadurl="$2"
+	file="$3"
+	output="$4"
+
+	case "${method}" in
+		local)
+			if [ ! -f "${downloadurl}/${file}" ]; then
+				lib_err ${EX_NOINPUT} "${file} is not a file or cannot be read."
+			fi
+
+			cp -a -- "${downloadurl}/${file}" "${output}"
+			
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "Error copying ${downloadurl}/${file}"
+			fi
+			;;
+		www)
+			local escape_file=`lib_escape_string "${file}"`
+			local escape_downloadurl=`lib_escape_string "${downloadurl}"`
+			local escape_output=`lib_escape_string "${output}"`
+			local fetch_cmd=`lib_multi_replace "${WWW_CMD}" c "\"${escape_file}\"" o "\"${escape_output}\"" u "\"${escape_downloadurl}\""`
+
+			lib_debug "Running (${method}): ${fetch_cmd}"
+
+			sh -c "${fetch_cmd}"
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "\`${fetch_cmd}\` exits with a non-zero exit status."
+			fi
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid method: ${method}"
+			;;
+	esac
+}
+
+_fetch_atomic_init()
+{
+	local _o
+	local osarch=
+	local release_name=
+	local osversion=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: _fetch_atomic_init -a osarch -r release_name -v osversion"
+	fi
+
+	while getopts ":a:r:v:" _o; do
+		case "${_o}" in
+			a)
+				osarch="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				_fetch_atomic_init # usage
+				;;
+		esac
+	done
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if [ -f "${releasedir}/.done" ]; then
+		lib_warn "The ${osarch}/${osversion}/${release_name} release is already created."
+		exit 0
+	fi
+
+	if [ -f "${releasedir}/.inprogress" ]; then
+		lib_warn -- "${releasedir} is dirty. Removing..."
+		if ! fetch_destroy -a "${osarch}" -v "${osversion}" -- "${release_name}"; then
+			lib_err ${EX_SOFTWARE} "There was a problem destroying the dirty release \`${release_name}\`. You must remove it using \`appjail fetch destroy\`."
+		fi
+	fi
+}
+
+_fetch_atomic_mid()
+{
+	local releasedir="$1"
+
+	if [ -z "${releasedir}" ]; then
+		lib_err ${EX_USAGE} "usage: _fetch_atomic_mid releasedir"
+	fi
+
+	if ! touch "${releasedir}/.inprogress"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/.inprogress"
+	fi
+}
+
+_fetch_atomic_end()
+{
+	local releasedir="$1"
+
+	if [ -z "${releasedir}" ]; then
+		lib_err ${EX_USAGE} "usage: _fetch_atomic_end releasedir"
+	fi
+
+	if ! mv "${releasedir}/.inprogress" "${releasedir}/.done"; then
+		lib_err ${EX_IOERR} "Error when renaming \`${releasedir}/.inprogress\` to \`${releasedir}/.done\`"
+	fi
+}
+
+fetch_help()
+{
+	cat << EOF
+`fetch_usage`
+
+${fetch_desc}
+
+Parameters:
+    list                      -- List installed releases.
+    debootstrap               -- Use debootstrap(8) to bootstrap a basic Debian system.
+    destroy                   -- Destroy a release.
+    local                     -- Copy components from local filesystem.
+    www                       -- Default. Use {WWW_CMD} to get FreeBSD components.
+
+Options:
+    -r release_name           -- Release name to use as the new jail or base for thinjails. Default: ${DEFAULT_RELEASE}
+
+Options for debootstrap:
+    -A                        -- By default, APT::Cache-Start is incremented. This option disables it.
+    -a arch                   -- See --arch in debootstrap(8). Default: ${DEBOOTSTRAP_ARCH}
+    -c apt_cache_start        -- See Cache-Start in apt.conf(5). Default: ${APT_CACHE_START}
+    -m mirror                 -- See MIRROR in debootstrap(8).
+    -S script                 -- See SCRIPT in debootstrap(8).
+
+Options for destroy:
+    -f                        -- See -f in zfs-destroy(8).
+    -R                        -- See -R in zfs-destroy(8).
+
+Options for local and www:
+    -C                        -- By default, appjail tries to download the MANIFEST file and use it to verify the
+                                 downloaded components. This option disables it.
+    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
+    -u downloadurl            -- Website where the components will be downloaded. Default: ${DOWNLOADURL}
+    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+EOF
+}
+
+fetch_usage()
+{
+cat << EOF
+usage: fetch list arch[/version]
+       fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
+       fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r release_name] [-S script] suite_name
+       fetch destroy [-f] [-a osarch] [-v osversion] release_name
+       fetch www [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
+EOF
+}

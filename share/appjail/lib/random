@@ -1,0 +1,94 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/sysexits"
+
+random_hexstring()
+{
+	local size begin end
+
+	size="$1"; begin="$2"; end="$3"
+
+	if [ -z "${size}" -o -z "${begin}" -o -z "${end}" ]; then
+		lib_err ${EX_USAGE} "usage: random_hexstring size begin end"
+	fi
+
+	jot -r -w %x "${size}" "${begin}" "${end}"
+}
+
+random_number()
+{
+	local begin end
+
+	begin="$1"; end="$2"
+
+	if [ -z "${begin}" -o -z "${end}" ]; then
+		lib_err ${EX_USAGE} "usage: random_number begin end"
+	fi
+
+	jot -r 1 "${begin}" "${end}"
+}
+
+random_color()
+{
+	local n1 n2
+	local clr
+	local bold
+
+	if [ "${ENABLE_RANDOM_COLORS}" = "0" ]; then
+		return 0
+	fi
+
+	# Colors
+
+	n1=`random_number 1 7`
+
+	# Intensity or regular
+
+	n2=`random_number 0 100`
+
+	if [ ${n2} -le 50 ]; then
+		clr=3
+	else
+		clr=9
+	fi
+
+	# Bold
+
+	n3=`random_number 0 100`
+
+	if [ ${n3} -le 50 ]; then
+		bold=1
+	else
+		bold=0
+	fi
+
+	echo "\033[${bold};${clr}${n1}m"
+}

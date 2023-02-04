@@ -1,34 +1,157 @@
 #
-# Copyright (c) 2022, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-_lib_time()
+lib_load "${LIBDIR}/colors"
+
+LOG_DEBUG="debug"
+LOG_ERROR="error"
+LOG_WARN="warn"
+LOG_INFO="info"
+
+lib_log()
 {
-	echo -n `date +"[%H:%M:%S]"` >&2
+	local _o
+	local errlevel
+	local current_color
+	local current_seconds
+	local pretty_elapsed
+	local echo_cmd="echo"
+	local spaces=
+
+	errlevel="$1"; shift
+
+	if [ -z "${errlevel}" ]; then
+		lib_log ${LOG_ERROR} "usage: lib_log errlevel [-e] -- message ..."
+		exit ${EX_USAGE}
+	fi
+
+	case "${errlevel}" in
+		${LOG_DEBUG})
+			current_color="${COLOR_DEBUG}"
+			;;
+		${LOG_ERROR})
+			current_color="${COLOR_ERROR}"
+			;;
+		${LOG_INFO})
+			current_color="${COLOR_INFO}"
+			spaces=" "
+			;;
+		${LOG_WARN})
+			current_color="${COLOR_WARN}"
+			spaces=" "
+			;;
+		*)
+			lib_err ${EX_DATAERR} "Invalid log level: ${errlevel}"
+			;;
+	esac
+
+	while getopts ":e" _o; do
+		case "${_o}" in
+			e)
+				echo_cmd="echo -e"
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	lib_init_logtime
+
+	current_seconds=`date +"%s"`
+	current_seconds=$((current_seconds-AJ_LOG_INIT_TIME))
+
+	pretty_elapsed=`printf "%02d:%02d:%02d" $((current_seconds/3600)) $((current_seconds%3600/60)) $((current_seconds%60))`
+
+	echo -n "`echo -e "${current_color}[${pretty_elapsed}]${COLOR_DEFAULT} [ ${current_color}${errlevel}${COLOR_DEFAULT}${spaces} ]${AJ_LOG_PREFIX}"`" >&2
+	${echo_cmd} " $@" >&2
+}
+
+lib_init_logtime()
+{
+	AJ_LOG_INIT_TIME=`printenv AJ_LOG_INIT_TIME`
+	if [ -z "${AJ_LOG_INIT_TIME}" ]; then
+		# For scripts (SCRIPTSDIR/*.sh) and related tools.
+		export AJ_LOG_INIT_TIME=`date +"%s"`
+	fi
+}
+
+lib_set_logprefix()
+{
+	export AJ_LOG_PREFIX="$1"
 }
 
 lib_debug()
 {
-	_lib_time
-	echo " $*" >&2
-}
+	if [ "${ENABLE_DEBUG}" = "0" ]; then
+		return 0
+	fi
 
-lib_warn()
-{
-	_lib_time
-	echo " WARN: $*" >&2
+	lib_log ${LOG_DEBUG} "$@"
 }
 
 lib_err()
 {
-	local errcode
+	local errcode="$1"; shift
 
-	errcode="$1"
-	shift
-	_lib_time
-	echo " FATAL: $*" >&2
-	exit $errcode
+	if [ -z "${errcode}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_err [errcode | -] message ..."
+	fi
+
+	lib_log ${LOG_ERROR} "$@"
+
+	if [ "${errcode}" != "-" ]; then
+		exit ${errcode}
+	fi
+}
+
+lib_warn()
+{
+	lib_log ${LOG_WARN} "$@"
+}
+
+lib_info()
+{
+	lib_log ${LOG_INFO} "$@"
+}
+
+lib_debug_read()
+{
+	local file="$1"
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_debug_read file"
+	fi
+
+	if [ ${ENABLE_DEBUG} = "0" ]; then
+		return
+	fi
+
+	local line
+	while IFS= read -r line; do
+		lib_debug "    ${line}"
+	done < "${file}"
 }

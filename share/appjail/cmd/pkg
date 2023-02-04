@@ -1,0 +1,272 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/colors"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
+
+pkg_desc="Manipulate packages within a jail."
+
+pkg_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		pkg_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		all|chroot|jail) ;;
+		*) pkg_usage; exit ${EX_USAGE} ;;
+	esac
+
+	pkg_${entity} "$@"
+}
+
+pkg_all()
+{
+	local _o
+	local opt_failsafe=0
+	local input_file="/dev/null"
+	local jail_name
+	local errlevel=0
+
+	while getopts ":ei:" _o; do
+		case "${_o}" in
+			e)
+				opt_failsafe=1
+				;;
+			i)
+				input_file="${OPTARG}"
+				;;
+			*)
+				pkg_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local cmd="$1"
+	if lib_check_empty "${cmd}"; then
+		pkg_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${cmd}" in
+		chroot|jail) ;;
+		*) pkg_usage; exit ${EX_USAGE}
+	esac
+
+	"${APPJAIL_PROGRAM}" jail list -HIpt name | while IFS= read -r jail_name
+	do
+		lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+		
+		lib_debug "pkg(8) args: $@"
+
+		(pkg_${cmd} "${jail_name}" "$@" < "${input_file}")
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			if [ ${opt_failsafe} -eq 1 ]; then
+				lib_err ${errlevel} "Stop caused by a non-zero value."
+			fi
+		fi
+	done
+}
+
+pkg_chroot()
+{
+	local jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		pkg_usage
+		exit ${EX_USAGE}
+	fi
+
+	_chk_jail "${jail_name}"
+
+	local jail_type
+	jail_type=`_pkg_getjailtype "${jail_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THIN})
+			if ! lib_jail_exists "${jail_name}"; then
+				lib_warn -- "${jail_name} is not running."
+				exit 0
+			fi
+
+			if ! lib_jail_created_by_appjail "${jail_name}"; then
+				lib_warn -- "${jail_name} was not been created by appjail."
+				exit 0
+			fi
+			;;
+		${JAIL_TYPE_THICK})
+			;;
+		*) lib_err ${EX_DATAERR} "You cannot use pkg(8) when this jail is a ${jail_type} jail."
+	esac
+
+	pkg -c "${JAILDIR}/${jail_name}/jail" "$@"
+}
+
+pkg_jail()
+{
+	local _o
+	local opt_jail=0
+	local errlevel=0
+	local jail_name
+
+	jail_name="$1"; shift
+	if [ -z "${jail_name}" ]; then
+		pkg_usage
+		exit ${EX_USAGE}
+	fi
+
+	while getopts ":j" _o; do
+		case "${_o}" in
+			j)
+				opt_jail=1
+				;;
+			*)
+				pkg_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	_chk_jail "${jail_name}"
+
+	if ! lib_jail_exists "${jail_name}"; then
+		lib_warn -- "${jail_name} is not running."
+		exit 0
+	fi
+
+	if ! lib_jail_created_by_appjail "${jail_name}"; then
+		lib_warn -- "${jail_name} was not been created by appjail."
+		exit 0
+	fi
+
+	local jail_type
+	jail_type=`_pkg_getjailtype "${jail_name}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	case "${jail_type}" in
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
+		*) lib_err ${EX_DATAERR} "You cannot use pkg(8) when this jail is a ${jail_type} jail."
+	esac
+
+	if [ ${opt_jail} -eq 1 ]; then
+		jexec -l -U root "${jail_name}" pkg "$@"
+	else
+		pkg -j "${jail_name}" "$@"
+	fi
+}
+
+_pkg_getjailtype()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _pkg_getjailtype jail_name"
+	fi
+
+	local jail_path
+	jail_path="${JAILDIR}/${jail_name}"
+
+	local jail_type
+	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	if lib_check_empty "${jail_type}"; then
+		lib_err ${EX_CONFIG} "Jail type is empty!"
+	fi
+
+	printf "%s\n" "${jail_type}"
+}
+
+_chk_jail()
+{
+	local jail_name="$1"
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "usage: _chk_jail jail_name"
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	if [ ! -d "${jail_path}/jail" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+pkg_help()
+{
+	cat << EOF
+`pkg_usage`
+
+${pkg_desc}
+
+Parameters:
+    all                   -- Run pkg(8) in all jails.
+    chroot                -- pkg(8) will chroot in the (chroot path) environment.
+    jail                  -- Run pkg(8) in a jail.
+
+Options jail:
+    -j                   -- Use pkg(8) from jail instead of host.
+
+Options for all:
+    -e                   -- Exits when a command returns a non-zero value.
+    -i input_file        -- File to use as input for all commands.
+EOF
+}
+
+pkg_usage()
+{
+cat << EOF
+usage: pkg all [-e] [-i input_file] [chroot | jail] args ... -- pkg_args ...
+       pkg chroot jail_name pkg_args ...
+       pkg jail jail_name [-j] pkg_args ...
+EOF
+}
