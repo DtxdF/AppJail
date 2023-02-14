@@ -2,6 +2,8 @@
 
 AppJail is an open source framework entirely written in `sh(1)` and C to create isolated, portable and easy to deploy environments using FreeBSD jails that behaves like an application.
 
+Contribute your Makejail: https://github.com/AppJail-makejails
+
 ## Features
 
 * Easy to use.
@@ -3452,8 +3454,8 @@ AppJail is not focused on building software. There are very interesting projects
 ## TODO
 
 - [ ] Add support for `ipfw` and `ipfilter`.
-- [ ] Although Makejails can be retrieved anywhere by the methods described in `INCLUDE`, a centralized repository to easily retrieve generic Makejails is useful. This can be done on Github or Gitlab.
-- [ ] Create Makejails for applications. It is a difficult job to do alone, but with many people it is feasible.
+- [x] Although Makejails can be retrieved anywhere by the methods described in `INCLUDE`, a centralized repository to easily retrieve generic Makejails is useful. This can be done on Github or Gitlab. (See https://github.com/AppJail-makejails).
+- [x] Create Makejails for applications. It is a difficult job to do alone, but with many people it is feasible. (Done using the centralized repository, of course this is in progress anyway).
 - [ ] rc scripts to start resource limitation rules, nat for jails and to expose ports. `appjail quick` and `appjail config` do this job, but it can be useful to spend less time starting/stopping jails.
 - [ ] Implement a supervisor.
 - [ ] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`.
