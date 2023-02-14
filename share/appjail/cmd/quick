@@ -172,7 +172,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tmpdir|type|tzdata|virtualnet|vnet|x11) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tmpdir|type|tzdata|virtualnet|vnet|x11) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -2239,6 +2239,11 @@ quick_set_mount_devfs()
 	QUICK_OPTION_MOUNT_DEVFS=1
 }
 
+quick_set_nomount_devfs()
+{
+	QUICK_OPTION_MOUNT_DEVFS=0
+}
+
 quick_run_boot()
 {
 	if [ "${QUICK_OPTION_BOOT}" = 0 ]; then
@@ -2880,6 +2885,11 @@ Options:
                              Type: bool
                              Descr: Do not use the \`boot\` option. See the \`boot\` option and the \`DEFAULT_BOOT\` variable in
 			            the configuration file.
+
+    nomount_devfs         -- Syntax: nomount_devfs
+                             Type: bool
+			     Descr: Do not use the \`mount_devfs\` option. See the \`mount_devfs\` option and the \`DEFAULT_MOUNT_DEVFS\` variable
+			            in the configuration file.
 
     nonat                 -- Syntax: nonat
                                      nonat="[ext_if:external_interface] [network:network_name] [on_if:interface]"
