@@ -75,7 +75,6 @@ main()
 
 	. "${config}"
 	. "${LIBDIR}/load"
-	lib_load "${SCRIPTSDIR}/default_env.sh"
 	lib_load "${LIBDIR}/log"
 	lib_load "${LIBDIR}/check_func"
 

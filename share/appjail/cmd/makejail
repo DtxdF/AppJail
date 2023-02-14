@@ -470,7 +470,6 @@ _makejail_config()
 . "\${APPJAIL_CONFIG}"
 . "\${LIBDIR}/load"
 
-lib_load "\${SCRIPTSDIR}/default_env.sh"
 lib_load "\${LIBDIR}/sysexits"
 lib_load "\${LIBDIR}/atexit"
 lib_load "\${LIBDIR}/log"

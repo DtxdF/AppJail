@@ -28,60 +28,13 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-APPJAIL_PROGRAM=`realpath "$0"`
-CONFIG="`dirname \`realpath "${APPJAIL_PROGRAM}"\``/etc/appjail/appjail.conf"
+APPJAIL_PROGRAM="%%PREFIX%%/bin/appjail"
+CONFIG="%%PREFIX%%/share/appjail/files/config.conf"
 
 main()
 {
-	local _o
-
-	if [ $# -eq 0 ]; then
-		usage
-	fi
-
-	while getopts ":c:" _o; do
-		case "${_o}" in
-			c)
-				CONFIG="${OPTARG}"
-				;;
-			*)
-				usage
-				;;
-		esac
-	done
-	shift $((OPTIND-1))
-
-	if [ ! -f "${CONFIG}" ]; then
-		echo "Unable to open configuration file." >&2
-		exit 66 # EX_NOINPUT
-	fi
-
 	. "${CONFIG}"
-
-	if [ -z "${LIBDIR}" ]; then
-		echo "LIBDIR is not defined!"
-		exit 78 # EX_CONFIG
-	fi
-
-	if [ ! -f "${LIBDIR}/load" ]; then
-		echo "AppJail needs the following file: ${LIBDIR}/load"
-		exit 69 # EX_UNAVAILABLE
-	fi
-
 	. "${LIBDIR}/load"
-
-	if [ -z "${SCRIPTSDIR}" ]; then
-		echo "SCRIPTSDIR is not defined!"
-		exit 78 # EX_CONFIG
-	fi
-
-	if [ ! -f "${SCRIPTSDIR}/default_env.sh" ]; then
-		echo "AppJail needs the following file: ${SCRIPTSDIR}/default_env.sh"
-		exit 69 # EX_UNAVAILABLE
-	fi
-
-	# Overwrite config using the environment variables
-	lib_load "${SCRIPTSDIR}/default_env.sh"
 
 	# For convenience, these will be loaded.
 	lib_load "${LIBDIR}/sysexits"
@@ -149,7 +102,7 @@ main()
 
 usage()
 {
-	echo "usage: appjail [-c config] cmd [args ...]" >&2
+	echo "usage: appjail cmd [args ...]" >&2
 	exit 64 # EX_USAGE
 }
 

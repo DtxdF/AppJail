@@ -46,7 +46,6 @@ NETWORK_GENERIC_BRG="bridge"
 NETWORK_GENERIC_EPR="epair"
 NETWORK_GENERIC_LO="lo"
 
-
 network_desc="Create, remove or manage virtual networks (IPv4 only) for jails."
 
 network_main()

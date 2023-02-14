@@ -86,13 +86,13 @@ QUICK_JAILPATH=
 # Options
 QUICK_OPTION_ALIAS=0
 QUICK_OPTION_ALIAS_IFACE=
-QUICK_OPTION_BOOT=${DEFAULT_BOOT}
+QUICK_OPTION_BOOT="${DEFAULT_BOOT}"
 QUICK_OPTION_BRIDGE=0
 QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
 QUICK_OPTION_CPUSET=
 QUICK_OPTION_CREATE_ARGS=
 QUICK_OPTION_DEFNET=
-QUICK_OPTION_DEVFS_RULESET=${DEFAULT_DEVFS_RULESET}
+QUICK_OPTION_DEVFS_RULESET="${DEFAULT_DEVFS_RULESET}"
 QUICK_OPTION_DHCP=0
 QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
@@ -109,27 +109,27 @@ QUICK_OPTION_IP6_INHERIT=0
 QUICK_OPTION_JAILTYPE="${JAIL_TYPE_THIN}"
 QUICK_OPTION_JNG=0
 QUICK_OPTION_LINUXFS=0
-QUICK_OPTION_LOGIN=${DEFAULT_LOGIN}
-QUICK_OPTION_LOGIN_USER=${DEFAULT_LOGIN_USER}
-QUICK_OPTION_MOUNT_DEVFS=${DEFAULT_MOUNT_DEVFS}
+QUICK_OPTION_LOGIN="${DEFAULT_LOGIN}"
+QUICK_OPTION_LOGIN_USER="${DEFAULT_LOGIN_USER}"
+QUICK_OPTION_MOUNT_DEVFS="${DEFAULT_MOUNT_DEVFS}"
 QUICK_OPTION_NAT=0
 QUICK_OPTION_NONAT=0
 QUICK_OPTION_OSARCH="${FREEBSD_ARCH}"
 QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
-QUICK_OPTION_OVERWRITE=${DEFAULT_OVERWRITE}
-QUICK_OPTION_PRIORITY=${DEFAULT_PRIORITY}
-QUICK_OPTION_RESTART=${DEFAULT_RESTART}
-QUICK_OPTION_RUN=${DEFAULT_RUN}
+QUICK_OPTION_OVERWRITE="${DEFAULT_OVERWRITE}"
+QUICK_OPTION_PRIORITY="${DEFAULT_PRIORITY}"
+QUICK_OPTION_RESTART="${DEFAULT_RESTART}"
+QUICK_OPTION_RUN="${DEFAULT_RUN}"
 QUICK_OPTION_RUN_ARGS=
 QUICK_OPTION_SLAAC=0
-QUICK_OPTION_START=${DEFAULT_START}
+QUICK_OPTION_START="${DEFAULT_START}"
 QUICK_OPTION_START_ARGS=
 QUICK_OPTION_STOP_ARGS=
 QUICK_OPTION_TEMPLATE="${DEFAULT_TEMPLATE}"
 QUICK_OPTION_TMPDIR=0
 QUICK_OPTION_USE_LIMITS=0
-QUICK_OPTION_USE_RESOLV_CONF=${USE_RESOLV_CONF}; QUICK_OPTION_RESOLV_CONF="${DEFAULT_RESOLV_CONF}"
-QUICK_OPTION_USE_TZDATA=${USE_TIMEZONE}; QUICK_OPTION_TZDATA="${DEFAULT_TIMEZONE}"
+QUICK_OPTION_USE_RESOLV_CONF="${USE_RESOLV_CONF}"; QUICK_OPTION_RESOLV_CONF="${DEFAULT_RESOLV_CONF}"
+QUICK_OPTION_USE_TZDATA="${USE_TIMEZONE}"; QUICK_OPTION_TZDATA="${DEFAULT_TIMEZONE}"
 QUICK_OPTION_VIRTUALNET=0
 QUICK_OPTION_VNET=0
 QUICK_OPTION_VNET_INTERFACES=
@@ -255,7 +255,7 @@ quick_temp_template()
 
 quick_create_jail()
 {
-	if [ "${QUICK_OPTION_OVERWRITE}" -eq 1 ]; then
+	if [ "${QUICK_OPTION_OVERWRITE}" != 0 ]; then
 		if [ -d "${JAILDIR}/${QUICK_JAILNAME}" ]; then
 			lib_debug "Trying to remove ${QUICK_JAILNAME} ..."
 
@@ -1990,7 +1990,7 @@ quick_run_linuxfs()
 
 quick_set_linuxfs()
 {
-	if [ ${QUICK_OPTION_MOUNT_DEVFS} -eq 1 ]; then
+	if [ "${QUICK_OPTION_MOUNT_DEVFS}" != 0 ]; then
 		quick_exclusive "linuxfs" "mount_devfs"
 	fi
 
@@ -2130,21 +2130,21 @@ quick_args()
 
 quick_run_start()
 {
-	if [ ${QUICK_OPTION_START} -eq 0 ]; then
+	if [ "${QUICK_OPTION_START}" = 0 ]; then
 		return 0
 	fi
 		
 	appjail start -- "${QUICK_JAILNAME}" || exit $?
 
-	if [ ${QUICK_OPTION_RESTART} -eq 1 ]; then
+	if [ "${QUICK_OPTION_RESTART}" != 0 ]; then
 		appjail restart "${QUICK_JAILNAME}" || exit $?
 	fi
 
-	if [ ${QUICK_OPTION_RUN} -eq 1 ]; then
+	if [ "${QUICK_OPTION_RUN}" != 0 ]; then
 		appjail run -- "${QUICK_JAILNAME}" || exit $?
 	fi
 
-	if [ ${QUICK_OPTION_LOGIN} -eq 1 ]; then
+	if [ "${QUICK_OPTION_LOGIN}" != 0 ]; then
 		lib_debug "Trying to log in to ${QUICK_JAILNAME} ..."
 
 		appjail login -u "${QUICK_OPTION_LOGIN_USER}" -- "${QUICK_JAILNAME}"
@@ -2206,6 +2206,8 @@ quick_run_devfs()
 		return 0
 	fi
 
+	quick_chknumber "devfs_ruleset" "${QUICK_OPTION_DEVFS_RULESET}"
+
 	lib_debug "Using devfs option ..."
 
 	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "mount.devfs"
@@ -2239,7 +2241,7 @@ quick_set_mount_devfs()
 
 quick_run_boot()
 {
-	if [ ${QUICK_OPTION_BOOT} -eq 0 ]; then
+	if [ "${QUICK_OPTION_BOOT}" = 0 ]; then
 		return 0
 	fi
 
@@ -2260,13 +2262,15 @@ quick_set_noboot()
 
 quick_run_priority()
 {
-	if [ ${QUICK_OPTION_PRIORITY} -eq 0 ]; then
+	if [ "${QUICK_OPTION_PRIORITY}" = 0 ]; then
 		return 0
 	fi
 
-	lib_debug "Setting priority ${priority} to the ${QUICK_JAILNAME} jail ..."
+	quick_chknumber "priority" "${QUICK_OPTION_PRIORITY}"
 
-	appjail jail priority -p "${priority}" -- "${QUICK_JAILNAME}" || exit $?
+	lib_debug "Setting priority ${QUICK_OPTION_PRIORITY} to the ${QUICK_JAILNAME} jail ..."
+
+	appjail jail priority -p "${QUICK_OPTION_PRIORITY}" -- "${QUICK_JAILNAME}" || exit $?
 }
 
 quick_set_priority()
@@ -2285,7 +2289,7 @@ quick_run_tzdata()
 {
 	local errlevel
 
-	if [ ${QUICK_OPTION_USE_TZDATA} -eq 0 ]; then
+	if [ "${QUICK_OPTION_USE_TZDATA}" = 0 ]; then
 		return 0
 	fi
 

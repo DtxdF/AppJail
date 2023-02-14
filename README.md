@@ -36,10 +36,11 @@ AppJail is an open source framework entirely written in `sh(1)` and C to create 
 git clone https://github.com/DtxdF/AppJail.git
 cd AppJail
 make install
-cp /usr/local/etc/appjail/appjail.conf.sample /usr/local/etc/appjail/appjail.conf
 sysrc appjail_enable="YES"
 sysrc appjail_natnet_enable="YES"
 ```
+
+If you want to use a custom configuration file, create one in `/usr/local/etc/appjail/appjail.conf`. See more details in `/usr/local/share/appjail/files/default.conf`.
 
 ## Getting started
 
