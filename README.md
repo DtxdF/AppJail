@@ -1825,7 +1825,7 @@ INCLUDE file+/home/op/tmp/xeyes+debian-bullseye.makejail
 ##### #3
 
 ```
-INCLUDE gh+DtxdF/python-makejail
+INCLUDE gh+AppJail-makejails/python
 ```
 
 ##### #4
@@ -2582,7 +2582,7 @@ A good example is when using Python. The Python executable is called `pythonx.y`
 
 Arguments can use other arguments as a value, but the `}` character must be escaped using `\`
 
-There is a Makejail for Python that we use to explain the above process: [DtxdF/python-makejail](https://github.com/DtxdF/python-makejail).
+There is a Makejail for Python that we use to explain the above process: [AppJail-makejails/python](https://github.com/AppJail-makejails/python).
 
 ```
 %{PYTHON_EXECUTABLE:python%{PYTHON_MAJOR\}.%{PYTHON_MINOR\}}
@@ -2733,8 +2733,6 @@ For details of how to run a GUI application in a jail, I recommend [JailGUIAppli
 
 I recommend using `Xephyr`.
 
-There is Makejail to run xeyes in linux: [DtxdF/xeyes-linux-makejail](https://github.com/DtxdF/xeyes-linux-makejail).
-
 ### Makejail and Initscripts
 
 One problem that can occur when using a custom initscript with the `initscript` option and using Makejails is that the `start`, `stop` or `create` stages cannot be executed unless we are a little careful.
@@ -2791,7 +2789,7 @@ If you need to use a custom initscript, remember that it will be overwritten aft
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.
 
-There is a good example of Makejail for Alpine Linux: [DtxdF/alpine-linux-makejail](https://github.com/DtxdF/alpine-linux-makejail). However, Alpine Linux is not widely tested.
+There is a good example of Makejail for Alpine Linux: [AppJail-makejails/alpine-linux](https://github.com/AppJail-makejails/alpine-linux). However, Alpine Linux is not widely tested.
 
 ## Tinyjails
 
