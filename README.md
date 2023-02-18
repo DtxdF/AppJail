@@ -2193,7 +2193,7 @@ The user that the `RUN` command will use to execute a command as the given user.
 #### Examples
 
 ```
-USER nobody
+USER xclock
 ```
 
 ### VAR
@@ -2704,6 +2704,10 @@ clear_tmp_X="NO"
 ```
 PKG xclock
 
+CMD pw useradd -n xclock -c "Analog and digital clock for X" -d /home/xclock -s /bin/sh
+CMD mkdir -p /home/xclock
+CMD chown xclock:xclock /home/xclock
+
 STAGE create
 
 CMD --local xhost +
@@ -2713,7 +2717,7 @@ STAGE cmd
 ARG display=:0
 
 ENV DISPLAY=${display}
-USER nobody
+USER xclock
 RUN xclock
 ```
 
