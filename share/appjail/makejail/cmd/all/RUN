@@ -148,8 +148,7 @@ main()
 		jexec_args="${jexec_args} -u \"${escape_juser}\""
 	fi
 
-
-	echo "cat << \"EOF\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} env -i ${env_vars} su -m \"${username}\" -c \"sh -s\""
+	echo "cat << \"EOF\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su -l \"${username}\" -c \"env ${env_vars} sh -s\""
 
 	local workdir_escape_chars
 	workdir_escape_chars='`"\$'

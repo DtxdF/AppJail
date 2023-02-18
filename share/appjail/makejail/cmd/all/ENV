@@ -60,9 +60,9 @@ main()
 	local escape_chars
 	escape_chars='`"\'
 
-	env=`lib_escape_string "${env}" "" "${escape_chars}"`
+	env=`lib_escape_string "${env}" 3 "${escape_chars}"`
 
-	if ! printf "%s " "\"${env}\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
+	if ! printf "%s " "\\\"${env}\\\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
 		lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
 	fi
 }
