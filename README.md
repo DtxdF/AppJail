@@ -469,6 +469,8 @@ appjail quick jpriv \
 `jpub` is on both `private` and `public` bridges, so it can connect to the outside and can communicate with other jails on the `private` bridge. `jpriv` cannot make connections to the outside, so we need a private DHCP server.
 
 ```sh
+# AppJail can create a bridge if it does not exist, but dnsmasq requires the interface to have an IP address.
+ifconfig bridge create name private
 ifconfig private inet 129.0.0.1/24
 dnsmasq --interface=private --dhcp-range=129.0.0.2,129.0.0.150,12h -d
 ```
