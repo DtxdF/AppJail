@@ -1120,12 +1120,27 @@ _makejail_check_stages()
 		lib_err ${EX_USAGE} "usage: _makejail_check_stages stage2chk"
 	fi
 
-	local stage
-	for stage in ${MAKEJAIL_STAGES}; do
-		if [ "${stage}" = "${stage2chk}" ]; then
-			return 0
+	# Check if a custom stage
+	if printf "%s" "${stage2chk}" | grep -qEe '^custom:'; then
+		local custom_stage
+		custom_stage=`printf "%s" "${stage2chk}" | sed -Ee 's/^custom:(.+)/\1/'`
+
+		if ! lib_check_stagename "${custom_stage}"; then
+			lib_err ${EX_DATAERR} -- "${custom_stage}: Invalid custom stage."
 		fi
-	done
+
+		# Add as a new stage for the initscript.
+		MAKEJAIL_INIT_STAGES="${MAKEJAIL_INIT_STAGES} ${stage2chk}"
+
+		return 0
+	else
+		local stage
+		for stage in ${MAKEJAIL_STAGES}; do
+			if [ "${stage}" = "${stage2chk}" ]; then
+				return 0
+			fi
+		done
+	fi
 
 	return 1
 }

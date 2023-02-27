@@ -41,10 +41,11 @@ run_main()
 	local jail_name
 	local initscript=
 	local args=
+	local custom_stage=
 
-	while getopts ":i:p:" _o; do
+	while getopts ":i:p:s:" _o; do
 		case "${_o}" in
-			i|p)
+			i|p|s)
 				if lib_check_empty "${OPTARG}"; then
 					run_usage
 					exit ${EX_USAGE}
@@ -61,6 +62,9 @@ run_main()
 				arg=`lib_escape_string "${arg}" "" '"'`
 
 				args="${args} \"${arg}\""
+				;;
+			s)
+				custom_stage="${OPTARG}"
 				;;
 			*)
 				run_usage
@@ -110,7 +114,7 @@ run_main()
 		APPJAIL_JAILNAME="${jail_name}" \
 		APPJAIL_ROOTDIR="${jail_path}" \
 		APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
-			"${SCRIPTSDIR}/run_jail.sh" -Cf "${CONFIG}" -a "${args}" -- "${initscript}"
+			"${SCRIPTSDIR}/run_jail.sh" -C -F "${custom_stage}" -f "${CONFIG}" -a "${args}" -- "${initscript}"
 }
 
 run_help()
@@ -122,11 +126,12 @@ ${run_desc}
 
 Options:
     -i initscript             -- Use a custom initscript.
-    -p parameter=value        -- Parameters for *cmd functions.
+    -p parameter=value        -- Parameters for *cmd or a custom stage.
+    -s custom_stage           -- Run a custom stage instead of *cmd.
 EOF
 }
 
 run_usage()
 {
-	echo "usage: run [-i initscript] [[-p parameter=value] ...] jail"
+	echo "usage: run [-i initscript] [[-p parameter=value] ...] [-s custom_stage] jail"
 }

@@ -867,6 +867,7 @@ Initscripts are another useful feature of AppJail that are the core of Makejail.
 * `start`: `appjail start` will run this `stage` after the jail starts.
 * `stop`: `appjail stop` will run this `stage` after the jail is stopped.
 * `cmd`: `appjail run` will run this `stage` only when the jail is running.
+* `custom:<custom stage>`: `appjail run` will run this `stage` only when the jail is running. This stage is special because you can use any name you want (of course, not all characters are allowed).
 
 Each `stage` has `pre-` and `post-` functions. `pre-` is executed before `stage` is executed and if it fails, `stage` will not be executed. `post-` will be executed after `pre-` and `stage` even if they fail. `pre-` and `stage` affect the exit status, but `post-` does not. `stage` and functions in a initscript are all optional, AppJail will execute them if they exist.
 
@@ -1085,6 +1086,36 @@ cmd()
 Hello, world!
 [00:00:06] [ debug ] [myjail] cmd() exits with status code 0
 [00:00:07] [ debug ] [myjail] `/usr/local/appjail/jails/myjail/init` exits with status code 0
+```
+
+As mentioned above, you can use a custom stage. This is very useful when many Makejails are included so as not to overlap stages.
+
+```sh
+custom:python()
+{
+        "${APPJAIL_SCRIPT}" cmd jexec "${APPJAIL_JAILNAME}" python3.9
+}
+
+custom:php()
+{
+        "${APPJAIL_SCRIPT}" cmd jexec "${APPJAIL_JAILNAME}" php -a
+}
+
+custom:top()
+{
+        "${APPJAIL_SCRIPT}" cmd jexec "${APPJAIL_JAILNAME}" top -a
+}
+```
+
+The above initscript has three custom stages: `python`, `php` and `top`. To run any of them, use `appjail run` with the `-s` parameter.
+
+```sh
+# python
+appjail run -s python pyapp
+# php
+appjail run -s php pyapp
+# top
+appjail run -s top pyapp
 ```
 
 Initscripts are a bit complex and there are some ways to create them much easier (See `Makejail`).
@@ -2126,8 +2157,16 @@ The default stage is `build`.
 
 #### Examples
 
+##### #1
+
 ```
 STAGE start
+```
+
+##### #2
+
+```
+STAGE custom:python
 ```
 
 ### SYSRC
@@ -3443,7 +3482,7 @@ NRO  ENABLED  NAME  DEVICE      MOUNTPOINT  TYPE    OPTIONS  DUMP  PASS
 
 ## Design decisions
 
-Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`. Network names use the same regex. For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`. For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.
+Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`. Network names and custom stage names use the same regex. For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`. For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.
 
 AppJail tries to not modify the host, such as making changes to `rc.conf(5)`, `sysctl.conf(5)`, the firewall configuration file, etc. I prefer the user to be aware of such changes, this simplifies a lot.
 

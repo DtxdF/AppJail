@@ -33,6 +33,7 @@ main()
 	local _o
 	local cmd
 	local args
+	local custom_stage
 	local config
 	local initscript
 	# For argument parsing
@@ -45,13 +46,16 @@ main()
 		exit 64 # EX_USAGE
 	fi
 
-	while getopts ":CcSsa:f:" _o; do
+	while getopts ":CcSsa:F:f:" _o; do
 		case "${_o}" in
 			C|c|S|s)
 				cmd="-${_o}"
 				;;
 			a)
 				args="${OPTARG}"
+				;;
+			F)
+				custom_stage="${OPTARG}"
 				;;
 			f)
 				config="${OPTARG}"
@@ -107,13 +111,13 @@ main()
 		done
 	fi
 
-	"${SCRIPTSDIR}/run_init.sh" -f "${config}" ${cmd} "${initscript}" "$@"
+	"${SCRIPTSDIR}/run_init.sh" -f "${config}" ${cmd} -F "${custom_stage}" "${initscript}" "$@"
 
 }
 
 usage()
 {
-	echo "usage: run_jail.sh [-C | -c | -S | -s] -f config [-a args] initscript"
+	echo "usage: run_jail.sh [[-C | -c | -S | -s] | -F custom_stage] -f config [-a args] initscript"
 }
 
 main "$@"

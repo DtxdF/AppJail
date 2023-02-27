@@ -31,14 +31,14 @@
 main()
 {
 	local _o
-	local config function script
+	local config custom_stage function script
 
 	if [ $# -eq 0 ]; then
 		usage
 		exit 64 # EX_USAGE
 	fi
 
-	while getopts ":CcSsf:" _o; do
+	while getopts ":CcSsF:f:" _o; do
 		case "${_o}" in
 			C)
 				function="cmd"
@@ -52,6 +52,9 @@ main()
 			s)
 				function="start"
 				;;
+			F)
+				custom_stage="${OPTARG}"
+				;;
 			f)
 				config="${OPTARG}"
 				;;
@@ -63,6 +66,10 @@ main()
 	shift $((OPTIND-1))
 
 	script="$1"; shift
+
+	if [ -n "${custom_stage}" ]; then
+		function="custom:${custom_stage}"
+	fi
 
 	if [ -z "${config}" -o -z "${function}" -o -z "${script}" ]; then
 		main # usage
@@ -78,12 +85,18 @@ main()
 	lib_load "${LIBDIR}/log"
 	lib_load "${LIBDIR}/check_func"
 
+	if [ -n "${custom_stage}" ]; then
+		if ! lib_check_stagename "${custom_stage}"; then
+			lib_err ${EX_DATAERR} -- "${custom_stage}: Invalid stage name."
+		fi
+	fi
+
 	run_cmd "${script}" "${function}" "$@"
 }
 
 usage()
 {
-	echo "usage: run_init.sh [-C | -c | -S | -s] -f config init_script [args ...]"
+	echo "usage: run_init.sh [[-C | -c | -S | -s] | -F custom_stage] -f config init_script [args ...]"
 }
 
 run_cmd()

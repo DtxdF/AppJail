@@ -110,6 +110,21 @@ lib_check_interfacename()
 	fi
 }
 
+lib_check_stagename()
+{
+	local stage_name="$1"
+
+	if [ -z "${stage_name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_stagename stage_name"
+	fi
+
+	if _lib_check_humanname "${stage_name}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 _lib_check_humanname()
 {
 	local name="$1"
