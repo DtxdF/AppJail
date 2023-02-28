@@ -57,7 +57,7 @@ network_main()
 	fi
 
 	case "${entity}" in
-		add|assign|get|hosts|list|remove|reserve) ;;
+		add|assign|fix|get|hosts|list|remove|reserve) ;;
 		attach|detach|plug|unplug) _network_load_modules ;;
 		*) network_usage; exit ${EX_USAGE} ;;
 	esac
@@ -644,6 +644,195 @@ network_detach()
 	if [ ${opt_destroy_bridge} -eq 1 ]; then
 		ifconfig -- "${bridge}" destroy || exit $?
 	fi
+}
+
+network_fix()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		network_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		all|dup|addr) ;;
+		*) network_usage; exit ${EX_USAGE} ;;
+	esac
+
+	network_fix_${entity} "$@"
+}
+
+network_fix_all()
+{
+	network_fix_addr "$@"
+	network_fix_dup "$@"
+}
+
+network_fix_dup()
+{
+	local _o
+	local network_name=
+
+	while getopts ":n:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	# all networks.
+	if [ -z "${network_name}" ]; then
+		network_list -ptHI name | while read -r name; do
+			network_fix_dup -n "${name}"
+		done
+
+		return $?
+	fi
+
+	_network_chk_basicnet "${network_name}"
+
+	lib_debug "Fixing duplicate IPv4 addresses in the ${network_name} network ..."
+
+	local hosts
+	hosts=`lib_generate_tempfile`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_hosts=`lib_escape_string "${hosts}"`
+
+	lib_atexit_add "rm -f \"${escape_hosts}\""
+
+	network_hosts -rNn "${network_name}" > "${hosts}"
+
+	local nlines
+	nlines=`cat -- "${hosts}" | wc -l`
+	nlines=$((nlines-1))
+
+	local tempdir
+	tempdir=`lib_generate_tempdir`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_tempdir=`lib_escape_string "${tempdir}"`
+
+	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
+
+	head -${nlines} -- "${hosts}" | tail -n +2 | while read -r jaddr jname
+	do
+		printf "%s\n" "${jname}" >> "${tempdir}/${jaddr}"
+	done
+
+	ls -A -- "${tempdir}" | while read -r jaddr
+	do
+		jails=`cat -- "${tempdir}/${jaddr}"`
+
+		ndup=`printf "%s\n" "${jails}" | wc -l`
+		if [ ${ndup} -eq 1 ]; then
+			continue
+		fi
+
+		jails=`printf "%s\n" "${jails}" | tr '\n' ' '`
+
+		lib_debug -- "${jaddr}: duplicate IPv4 addresses detected: ${jails}"
+
+		for jname in ${jails}; do
+			new_jaddr=`network_reserve -j "${jname}" -n "${network_name}" -a forceauto`
+
+			lib_debug "Fixed: jail:${jname}, new:${new_jaddr}"
+		done
+	done
+}
+
+network_fix_addr()
+{
+	local _o
+	local network_name=
+
+	while getopts ":n:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					network_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			n)
+				network_name="${OPTARG}"
+				;;
+			*)
+				network_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+
+	# all networks.
+	if [ -z "${network_name}" ]; then
+		network_list -ptHI name | while read -r name; do
+			network_fix_addr -n "${name}"
+		done
+
+		return $?
+	fi
+
+	_network_chk_basicnet "${network_name}"
+
+	lib_debug "Fixing IPv4 addresses that are not in the ${network_name} network ..."
+
+	local hosts
+	hosts=`lib_generate_tempfile`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local escape_hosts=`lib_escape_string "${hosts}"`
+
+	lib_atexit_add "rm -f \"${escape_hosts}\""
+
+	network_hosts -rNn "${network_name}" > "${hosts}"
+
+	local nlines
+	nlines=`cat -- "${hosts}" | wc -l`
+	nlines=$((nlines-1))
+
+	local network_address=`network_get -I -- "${network_name}" network`
+	local network_cidr=`network_get -I -- "${network_name}" cidr`
+
+	head -${nlines} -- "${hosts}" | tail -n +2 | while read -r jaddr jname
+	do
+		if lib_check_testnet "${jaddr}" "${network_address}" "${network_cidr}"; then
+			continue
+		fi
+
+		new_jaddr=`network_reserve -j "${jname}" -n "${network_name}" -a forceauto`
+
+		lib_debug "Fixed: jail:${jname}, old:${jaddr}, new:${new_jaddr} "
+	done
 }
 
 network_get()
@@ -1448,6 +1637,7 @@ Parameters:
     assign                          -- Assign a non-reserved IP address to a jail and its e-pair within it.
     attach                          -- Attach an interface to a bridge.
     detach                          -- Detach an interface from a bridge.
+    fix                             -- Fixes some problems that may occur when using virtual networks.
     get                             -- Get keywords from a specific network.
     hosts                           -- List the addresses of a network.
     list                            -- List the networks.
@@ -1494,6 +1684,14 @@ Options for detach:
                                        interfaces that are not in the ${NETWORK_GENERIC_EPR} group, they are simply ignored.
     -f                              -- When using with \`-d\` it destroys an ${NETWORK_GENERIC_EPR} interface that is not a member of the bridge.
     -i                              -- Does not display an error when a specified interface is not a member of the specified bridge.
+
+Parameters for fix:
+    all                             -- Try to solve all possible problems in the following order: addr, dup.
+    addr                            -- Reserve a new IP address for a jail that has an address that is not in a valid range in its network.
+    dup                             -- Reserve a new IP address for a jail that has the same IP address as another jail.
+
+Options for fix all, fix addr and fix dup:
+    -n network_name                 -- Operate in this network. If not set operate in all networks.
 
 Options for get:
     -e                              -- This option is not required when using -p. The \\t character is used to delimit columns,
@@ -1566,6 +1764,7 @@ usage: network add [-O] [-d description] network_name network_address/cidr
        network assign -e ether_name -j jail_name -n network_name [-d] [-a auto|forceauto|address]
        network attach [-b bridge] [[epair|iface]:]interface ...
        network detach [-Ddi] [-b bridge] [[epair|iface]:]interface ...
+       network fix [all | dup | addr] [-n network_name]
        network get [-eHIpt] network_name [keyword ...]
        network hosts -a -n network_name
        network hosts -d -n network_name

@@ -3317,6 +3317,32 @@ DOWN    dup          thin  13.1-RELEASE  -       10.42.0.5
 UP      origin       thin  13.1-RELEASE  -       10.42.0.4
 ```
 
+**Note**: A much easier way to solve the above problem is to use the `appjail network fix dup` command.
+
+Another problem that can occur is when importing a jail that has a network with the same name as an existing one on the host, but with a different IP range.
+
+```
+# appjail jail list
+DOWN    jtest        thin               13.1-RELEASE  -      172.0.0.2
+DOWN    badwolf      thin               13.1-RELEASE  -      10.32.0.11
+DOWN    php          thin               13.1-RELEASE  -      10.32.0.9
+DOWN    mariadb      thin               13.1-RELEASE  -      10.32.0.10
+DOWN    nginx        thin               13.1-RELEASE  -      10.32.0.16
+DOWN    teleirc      thin               13.1-RELEASE  -      10.32.0.6
+```
+
+The above example reveals a big problem: `jtest` has a correct IP address, but `badwolf`, `php`, `mariadb`, `nginx` and `teleirc` have an invalid range since they were imported from another host. You can use the instructions explained earlier in the section, but AppJail has a useful command that simplifies this problem: `appjail network fix addr`.
+
+```
+# appjail network fix addr
+[00:00:00] [ debug ] Fixing IPv4 addresses that are not in the development network ...
+[00:00:03] [ debug ] Fixed: jail:teleirc, old:10.32.0.6, new:172.0.0.3
+[00:00:05] [ debug ] Fixed: jail:php, old:10.32.0.9, new:172.0.0.4
+[00:00:08] [ debug ] Fixed: jail:mariadb, old:10.32.0.10, new:172.0.0.5
+[00:00:11] [ debug ] Fixed: jail:badwolf, old:10.32.0.11, new:172.0.0.6
+[00:00:13] [ debug ] Fixed: jail:nginx, old:10.32.0.16, new:172.0.0.7
+```
+
 ## Update & Upgrade
 
 Getting security patches and upgrading to a new version is very important and AppJail can do it with simple commands.
