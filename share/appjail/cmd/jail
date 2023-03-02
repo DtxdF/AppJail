@@ -877,6 +877,18 @@ jail_install_clone+release()
 	if ! lib_zfs_clone "${dataset}@${snapshot_name}" "${ZFS_JAILS_NAME}/${jail_name}/jail"; then
 		lib_err ${EX_CANTCREAT} "Cannot clone ${dataset}@${snapshot_name} to ${ZFS_JAILS_NAME}/${jail_name}"
 	fi
+
+	# post-installation
+	case "${jail_type}" in
+		${JAIL_TYPE_DEBOOTSTRAP})
+			jail_install_standard_linux_debootstrap \
+				-C \
+				-a "${osarch}" \
+				-j "${jail_name}" \
+				-r "${release_name}" \
+				-v "${osversion}"
+			;;
+	esac
 }
 
 jail_install_empty()
@@ -994,7 +1006,7 @@ jail_install_standard()
 			jail_install_standard_thinjail "${releasedir}/release" "${jail_path}/jail"
 			;;
 		${JAIL_TYPE_DEBOOTSTRAP})
-			jail_install_standard_linux_debootstrap "${releasedir}/linux_debootstrap" "${jail_path}/jail"
+			jail_install_standard_linux_debootstrap -a "${osarch}" -j "${jail_name}" -r "${release_name}" -v "${osversion}"
 			;;
 		*)
 			lib_err ${EX_DATAERR} "Invalid jail type: ${jail_type}"
@@ -1109,36 +1121,67 @@ jail_install_standard_thinjail()
 
 jail_install_standard_linux_debootstrap()
 {
+	local _o
+	local opt_copy=1
+	local osarch=
+	local jail_name=
+	local release_name=
+	local osversion=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: jail_install_standard_linux_debootstrap [-C] -a osarch -j jail_name -r release_name -v osversion"
+	fi
+
+	while getopts ":Ca:j:r:v:" _o; do
+		case "${_o}" in
+			C)
+				opt_copy=0
+				;;
+			a)
+				osarch="${OPTARG}"
+				;;
+			j)
+				jail_name="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				jail_install_standard_linux_debootstrap # usage
+				;;
+		esac
+	done
+
+	local jail_path="${JAILDIR}/${jail_name}/jail"
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}/linux_debootstrap"
+
+	if [ ! -d "${releasedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the \`${releasedir}\` directory. Use \`appjail fetch\` to create it."
+	fi
+
 	# Load linux kernel modules
 	lib_modules_linuxmods
 
-	local source dest
-
-	source="$1"; dest="$2"
-
-	if [ -z "${source}" -o -z "${dest}" ]; then
-		lib_err ${EX_USAGE} "usage: install_deboostrap_linux_jail source dest"
-	fi
-
-	if [ ! -d "${source}" ]; then
-		lib_err ${EX_NOINPUT} "Cannot find the \`${source}\` directory. Use \`appjail fetch\` to create it."
-	fi
-
 	lib_info "Creating a linux+debootstrap jail ..."
 
-	lib_debug "Copying: cp -a \"${source}/\" \"${dest}\""
+	if [ ${opt_copy} -eq 1 ]; then
+		lib_debug "Copying: cp -a \"${releasedir}/\" \"${jail_path}\""
 
-	if ! cp -a "${source}/" "${dest}"; then
-		lib_err ${EX_IOERR} "Error copying ${source}/"
+		if ! cp -a "${releasedir}/" "${jail_path}"; then
+			lib_err ${EX_IOERR} "Error copying ${releasedir}/"
+		fi
 	fi
 
-	mkdir -p "${dest}/dev"
-	mkdir -p "${dest}/dev/shm"
-	mkdir -p "${dest}/dev/fd"
-	mkdir -p "${dest}/proc"
-	mkdir -p "${dest}/sys"
+	mkdir -p "${jail_path}/dev"
+	mkdir -p "${jail_path}/dev/shm"
+	mkdir -p "${jail_path}/dev/fd"
+	mkdir -p "${jail_path}/proc"
+	mkdir -p "${jail_path}/sys"
 
-	local escape_dest=`lib_escape_string "${dest}"`
+	local escape_dest=`lib_escape_string "${jail_path}"`
 
 	lib_atexit_add "umount \"${escape_dest}/dev/shm\" > /dev/null 2>&1"
 	lib_atexit_add "umount \"${escape_dest}/dev/fd\" > /dev/null 2>&1"
@@ -1146,39 +1189,39 @@ jail_install_standard_linux_debootstrap()
 	lib_atexit_add "umount \"${escape_dest}/proc\" > /dev/null 2>&1"
 	lib_atexit_add "umount \"${escape_dest}/sys\" > /dev/null 2>&1"
 
-	if ! mount -t devfs devfs "${dest}/dev"; then
-		lib_err ${EX_SOFTWARE} "Error mounting \`devfs\` to ${dest}/dev"
+	if ! mount -t devfs devfs "${jail_path}/dev"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`devfs\` to ${jail_path}/dev"
 	fi
 
-	if ! mount -t tmpfs -o rw,size=1g,mode=1777 tmpfs "${dest}/dev/shm"; then
-		lib_err ${EX_SOFTWARE} "Error mounting \`tmpfs\` to ${dest}/dev/shm"
+	if ! mount -t tmpfs -o rw,size=1g,mode=1777 tmpfs "${jail_path}/dev/shm"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`tmpfs\` to ${jail_path}/dev/shm"
 	fi
 
-	if ! mount -t fdescfs -o rw,linrdlnk fdescfs "${dest}/dev/fd"; then
-		lib_err ${EX_SOFTWARE} "Error mounting \`fdescfs\` to ${dest}/dev/fd"
+	if ! mount -t fdescfs -o rw,linrdlnk fdescfs "${jail_path}/dev/fd"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`fdescfs\` to ${jail_path}/dev/fd"
 	fi
 
-	if ! mount -t linprocfs linprocfs "${dest}/proc"; then
-		lib_err ${EX_SOFTWARE} "Error mounting \`linprocfs\` to ${dest}/proc"
+	if ! mount -t linprocfs linprocfs "${jail_path}/proc"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`linprocfs\` to ${jail_path}/proc"
 	fi
 
-	if ! mount -t linsysfs linsysfs "${dest}/sys"; then
-		lib_err ${EX_SOFTWARE} "Error mounting \`linsysfs\` to ${dest}/sys"
+	if ! mount -t linsysfs linsysfs "${jail_path}/sys"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`linsysfs\` to ${jail_path}/sys"
 	fi
 
-	if ! chroot "${dest}" sh -c "rm -f /var/cache/apt/archives/rsyslog*.deb"; then
+	if ! chroot "${jail_path}" sh -c "rm -f /var/cache/apt/archives/rsyslog*.deb"; then
 		lib_err ${EX_SOFTWARE} "Error removing: /var/cache/apt/archives/rsyslog*.deb"
 	fi
 
-	if ! chroot "${dest}" sh -c "DEBIAN_FRONTEND=noninteractive dpkg --force-depends --force-confdef --force-confold -i /var/cache/apt/archives/*.deb"; then
+	if ! chroot "${jail_path}" sh -c "DEBIAN_FRONTEND=noninteractive dpkg --force-depends --force-confdef --force-confold -i /var/cache/apt/archives/*.deb"; then
 		lib_err ${EX_SOFTWARE} "Error installing *.deb packages."
 	fi
 
-	umount "${dest}/dev/shm"
-	umount "${dest}/dev/fd"
-	umount "${dest}/dev"
-	umount "${dest}/proc"
-	umount "${dest}/sys"
+	umount "${jail_path}/dev/shm"
+	umount "${jail_path}/dev/fd"
+	umount "${jail_path}/dev"
+	umount "${jail_path}/proc"
+	umount "${jail_path}/sys"
 }
 
 jail_install_tiny+export()
