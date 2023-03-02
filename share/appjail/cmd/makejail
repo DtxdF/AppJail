@@ -33,6 +33,8 @@ lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 
+# Additional options used by the `appjail quick` command.
+
 # The root directory of the first Makejail
 MAKEJAIL_ROOTDIR=
 
@@ -100,9 +102,9 @@ makejail_main()
 	local _o
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
 
-	while getopts ":evb:f:j:" _o; do
+	while getopts ":evb:f:j:o:" _o; do
 		case "${_o}" in
-			b|f|j)
+			b|f|j|o)
 				if lib_check_empty "${OPTARG}"; then
 					makejail_usage
 					exit ${EX_USAGE}
@@ -128,6 +130,26 @@ makejail_main()
 				;;
 			j)
 				MAKEJAIL_JAILNAME="${OPTARG}"
+				;;
+			o)
+				if [ -z "${MAKEJAIL_OPTIONS}" ]; then
+					MAKEJAIL_OPTIONS="`lib_generate_tempfile`"
+
+					errlevel=$?
+					if [ ${errlevel} -ne 0 ]; then
+						exit ${errlevel}
+					fi
+
+					local escape_mkoptions
+					escape_mkoptions=`lib_escape_string "${MAKEJAIL_OPTIONS}"`
+
+					lib_atexit_add "rm -f \"${escape_mkoptions}\""
+				fi
+
+				local option="${OPTARG}"
+				option=`lib_escape_string "${option}"`
+
+				echo "\"${option}\"" >> "${MAKEJAIL_OPTIONS}"
 				;;
 			*)
 				makejail_usage
@@ -339,8 +361,15 @@ makejail_write()
 	# ARG
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_ARG}"
 
-	# An empty argument to force the creation of the jail.
-	echo > "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}/${priority}.${MAKEJAIL_CMD_OPTION}"
+	# Additional options provided by the user.
+	if [ -n "${MAKEJAIL_OPTIONS}" ]; then
+		local option
+		while IFS= read -r option; do
+			echo "${option}" > "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}/${priority}.${MAKEJAIL_CMD_OPTION}"
+
+			priority=$((priority+1))
+		done < "${MAKEJAIL_OPTIONS}"
+	fi
 	# OPTION
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_OPTION}"
 
@@ -1158,12 +1187,13 @@ Options:
     -b build_arg        -- Arguments that will be replaced when all Makejails are included in a single Makejail.
     -f makejail         -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
     -j jail_name        -- Jail name. If not defined, a random string is used.
+    -o option           -- Additional options to be used by the \`appjail quick\` command.
 EOF
 }
 
 makejail_usage()
 {
 	cat << EOF
-usage: makejail [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] -- [runtime_args ...]
+usage: makejail [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
 EOF
 }
