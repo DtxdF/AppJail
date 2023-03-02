@@ -223,7 +223,7 @@ jail_create()
 		clone+release)
 			conf_keys="appjail_version birth osarch osversion jail_type release_name"
 
-			jail_install_clone+release -a "${osarch}" -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -v "${osversion}"
+			jail_install_clone+release -a "${osarch}" -j "${jail_name}" -r "${release_name}" -t "${jail_type}" -v "${osversion}" -- "${install_args}"
 			;;
 		empty)
 			conf_keys="appjail_version birth jail_type"
@@ -829,6 +829,7 @@ jail_install_clone+release()
 				;;
 		esac
 	done
+	shift $((OPTIND-1))
 
 	if [ -z "${osarch}" -o -z "${jail_name}" -o -z "${release_name}" -o -z "${jail_type}" -o -z "${osversion}" ]; then
 		jail_install_clone+release # usage
