@@ -172,7 +172,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tmpdir|type|tzdata|virtualnet|vnet|x11) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -2505,9 +2505,73 @@ quick_set_type()
 	QUICK_OPTION_JAILTYPE="${jail_type}"
 }
 
+quick_set_clone+jail()
+{
+	local jail2clone
+	jail2clone="$1"; quick_reqoption "clone+jail" "${jail2clone}"
+
+	QUICK_OPTION_INSTALL_METHOD="clone+jail=${jail2clone}"
+}
+
+quick_set_clone+release()
+{
+	local snapshot_name
+	snapshot_name="$1"; quick_reqoption "clone+release" "${snapshot_name}"
+
+	QUICK_OPTION_INSTALL_METHOD="clone+release=${snapshot_name}"
+}
+
+quick_set_copy()
+{
+	local jail2copy
+	jail2copy="$1"; quick_reqoption "copy" "${jail2copy}"
+
+	QUICK_OPTION_INSTALL_METHOD="copy=${jail2copy}"
+}
+
 quick_set_empty()
 {
 	QUICK_OPTION_INSTALL_METHOD="empty"
+}
+
+quick_set_import+jail()
+{
+	local image
+	image="$1"; quick_reqoption "import+jail" "${image}"
+
+	QUICK_OPTION_INSTALL_METHOD="import+jail=${image}"
+}
+
+quick_set_import+root()
+{
+	local image
+	image="$1"; quick_reqoption "import+root" "${image}"
+
+	QUICK_OPTION_INSTALL_METHOD="import+root=${image}"
+}
+
+quick_set_tiny+import()
+{
+	local image
+	image="$1"; quick_reqoption "tiny+import" "${image}"
+
+	QUICK_OPTION_INSTALL_METHOD="tiny+import=${image}"
+}
+
+quick_set_zfs+import+jail()
+{
+	local image
+	image="$1"; quick_reqoption "zfs+import+jail" "${image}"
+
+	QUICK_OPTION_INSTALL_METHOD="zfs+import+jail=${image}"
+}
+
+quick_set_zfs+import+root()
+{
+	local image
+	image="$1"; quick_reqoption "zfs+import+root" "${image}"
+
+	QUICK_OPTION_INSTALL_METHOD="zfs+import+root=${image}"
 }
 
 quick_set_osarch()
@@ -2662,6 +2726,18 @@ Options:
 				 - bridge="epair:nginx iface:em0 bridge:public"
                              Descr: Creates a bridge if it does not exist and attach an epair device or an interface to it.
 
+    clone+jail            -- Syntax: clone+jail=jail2clone@snapname
+                             Type: options
+                             Descr: See \`appjail jail\`.
+
+    clone+release         -- Syntax: clone+release
+                             Type: bool
+                             Descr: See \`appjail jail\`.
+
+    copy                  -- Syntax: copy=jail2copy
+                             Type: str
+                             Descr: See \`appjail jail\`.
+
     copydir               -- Syntax: copydir="directory"
                              Type: str
                              Default: ${QUICK_OPTION_COPYDIR}
@@ -2770,6 +2846,14 @@ Options:
 				 - fstab="/usr/local/www /usr/local/www"
 				 - fstab="/dev/da0s1 /mnt msdosfs"
                              Descr: Creates an fstab entry.
+
+    import+jail           -- Syntax: import+jail=input:in_file [compress:algo]
+                             Type: options
+                             Descr: See \`appjail jail\`.
+
+    import+root           -- Syntax: import+root=input:in_file [compress:algo]
+                             Type: options
+                             Descr: See \`appjail jail\`.
 
     initscript            -- Syntax: initscript="path/to/initscript".
                              Type: str
@@ -3007,6 +3091,10 @@ Options:
 			            parse this template, so be careful when there are parameters that may create
 				    unexpected behavior.
 
+    tiny+import           -- Syntax: tiny+import=path/to/appjail_file
+                             Type: str
+                             Descr: See \`appjail jail\`.
+
     tmpdir                -- Syntax: tmpdir
                              Type: bool
 			     Conflicts: x11
@@ -3059,6 +3147,14 @@ Options:
 			     Conflicts: tmpdir
                              Descr: Create a directory inside the jail with permissions 1777 and create an fstab entry to
 			            mount \`/tmp/.X11-unix\`.
+
+   zfs+import+jail        -- Syntax: zfs+import+jail=input:in_file [compress:algo]
+                             Type: options
+                             Descr: See \`appjail jail\`.
+
+   zfs+import+root        -- Syntax: zfs+import+root=input:in_file [compress:algo]
+                             Type: options
+                             Descr: See \`appjail jail\`.
 EOF
 }
 

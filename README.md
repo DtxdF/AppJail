@@ -3068,8 +3068,22 @@ Import the tarball to the jail directory (`{JAILDIR}/{JAIL_NAME}/jail`).
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -I import+jail="input:nginx.tzst" othernginx
+```
+
+###### #2
+
+```sh
+appjail quick nginx \
+    import+jail="input:/tmp/web3.txz" \
+    virtualnet="development:nginx default" \
+    nat \
+    expose=8082:80 \
+    limits=vmemoryuse:deny=512m \
+    start
 ```
 
 #### import+root
@@ -3094,8 +3108,23 @@ Import the tarball to the root directory of the jail (`{JAILDIR}/{JAIL_NAME}`).
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -I import+root="input:nginx.tzst" nginx
+```
+
+###### #2
+
+```sh
+appjail quick jweb \
+    import+root="input:/tmp/web3.tgz" \
+    vnet=em0 \
+    dhcp=em0 \
+    mount_devfs \
+    devfs_ruleset=10 \
+    overwrite \
+    start
 ```
 
 ### ZFS
@@ -3180,8 +3209,19 @@ The root dataset will be created.
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -I zfs+import+jail="input:mysql.zsnap.xz" mysql
+```
+
+###### #2
+
+```sh
+appjail quick mysql \
+    zfs+import+jail="input:/tmp/mysql.txz" \
+    virtualnet="development:mysql default" \
+    nat
 ```
 
 #### zfs+import+root
@@ -3206,8 +3246,22 @@ Import the file to the root dataset of the jail (`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}`
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -I zfs+import+root="input:badwolf.zsnap.zst" badwolf
+```
+
+###### #2
+
+```sh
+appjail quick apache \
+    zfs+import+root="input:/tmp/jweb.txz" \
+    bridge="apache iface:jext" \
+    dhcp=sb_apache \
+    mount_devfs \
+    devfs_ruleset=10 \
+    start
 ```
 
 ### Clones
@@ -3240,8 +3294,16 @@ Clones a jail and uses it to create another jail.
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -I clone+jail=webserver@snap1 nginx
+```
+
+###### #2
+
+```sh
+appjail quick mariadb clone+jail=jdb@snap1 overwrite start
 ```
 
 #### clone+release
@@ -3264,8 +3326,27 @@ Valid types: `thick`, `linux+debootstrap`
 
 ##### Examples
 
+###### #1
+
 ```sh
 appjail jail create -T thick -v 12.3-RELEASE -I clone+release=snap1 bluejail
+```
+
+###### #2
+
+```sh
+appjail quick bullseye \
+    clone+release=linuxsnap1 \
+    osversion=bullseye \
+    type=linux+debootstrap \
+    alias=appjail0 \
+    virtualnet="development" \
+    linuxfs \
+    devfs_ruleset=11 \
+    template=/tmp/linux.conf \
+    nat=network:development \
+    overwrite \
+    start
 ```
 
 ### Copy
@@ -3273,7 +3354,16 @@ appjail jail create -T thick -v 12.3-RELEASE -I clone+release=snap1 bluejail
 Instead of saving space and time, you can copy an entire jail using another jail. It is very simple:
 
 ```sh
-appjail jail create -I copy=blue red
+appjail jail create -I copy=bullseye debian11
+# or
+appjail quick debian11 \
+    copy=bullseye \
+    alias=appjail0 \
+    virtualnet="development" \
+    devfs_ruleset=11 \
+    template=/tmp/linux.conf \
+    nat=network:development \
+    start
 ```
 
 ### IP address conflicts
