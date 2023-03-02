@@ -55,7 +55,7 @@ appjail quick myjail start login
 
 Using the `appjail fetch` command will download the `MANIFEST` file to check the components. Afterwards, AppJail will download the components. By default, AppJail will only download `base.txz`. AppJail will extract those components into its release directory.
 
-At this point, AppJail can create a jail using the `appjail quick` command. In the above example, `appjail quick` will create a jail called `myjail`. Using the `start` option, AppJail will start the jail after its creation. The `login` option simply logs into the jail after startup.
+At this point, AppJail can create a jail using the `appjail quick` command. In the above example, `appjail quick` will create a jail named `myjail`. Using the `start` option, AppJail will start the jail after its creation. The `login` option simply logs into the jail after startup.
 
 The `appjail fetch` is not necessary to run again unless you need another release with different components.
 
@@ -171,7 +171,7 @@ I recommend using the private space (RFC 1918) to organize your virtual networks
 * 172.16.0.0/12
 * 192.168.0.0/16
 
-To create a virtual network, we can use the `appjail network` command, but we need three things: network address, CIDR and the network name. The following example creates a network called `development` using `10.42.0.0` as the network address, and `24` as the CIDR.
+To create a virtual network, we can use the `appjail network` command, but we need three things: network address, CIDR and the network name. The following example creates a network named `development` using `10.42.0.0` as the network address, and `24` as the CIDR.
 
 ```sh
 appjail network add development 10.42.0.0/24
@@ -285,7 +285,7 @@ You probably want to put that module in your `loader.conf(5)`.
 appjail quick myjail jng="myjail jext" overwrite start
 ```
 
-`myjail` is the name used for the links and `jext` is the interface that will be attached to the bridge. In the above example, `jng` will create a node called `ng0_myjail` and a bridge called `jextbridge`.
+`myjail` is the name used for the links and `jext` is the interface that will be attached to the bridge. In the above example, `jng` will create a node named `ng0_myjail` and a bridge named `jextbridge`.
 
 **Note**: You need to install the `jng` script before using this option. Run `install -m 555 /usr/share/examples/jails/jng /usr/local/bin/jng` to install it.
 
@@ -301,11 +301,11 @@ appjail quick jbridge bridge="jpub iface:jext" start
 appjail quick jbridge bridge="jpub iface:jext bridge:public" start
 ```
 
-AppJail will create two interfaces called `s[ab]_jpub`. The `sa_jpub` interface is attached to the bridge and the `sb_jpub` is used by the jail.
+AppJail will create two interfaces named `s[ab]_jpub`. The `sa_jpub` interface is attached to the bridge and the `sb_jpub` is used by the jail.
 
 AppJail does not create bridges and epairs unless they do not exist. It also cannot add an interface as a member of a bridge when it is already added.
 
-By default, a bridge called `SHARED_BRIDGE` (default: `appjail`) is created unless you provide another name as you have seen.
+By default, a bridge named `SHARED_BRIDGE` (default: `appjail`) is created unless you provide another name as you have seen.
 
 Suppose we are installing packages and we don't want to provide connection to the outside until we really need it. AppJail can detach an interface that is a member of a bridge using `appjail network detach`.
 
@@ -1131,7 +1131,7 @@ appjail config -sj nginx -a 'depend=php-fpm'
 appjail config -sj php-fpm -a 'depend=mariadb'
 ``` 
 
-The `appjail stop` command will not stop the dependencies because the clients may be using the services offered by those jails. But, AppJail has a command to recursively stop the jail and its dependencies called `appjail rstop`.
+The `appjail stop` command will not stop the dependencies because the clients may be using the services offered by those jails. But, AppJail has a command to recursively stop the jail and its dependencies named `appjail rstop`.
 
 `appjail rstop` sorts the jails in the same way as `appjail start` does but in reverse order.
 
@@ -1811,7 +1811,7 @@ Execute a command and use its output (stdout) as the Makejail file.
 
 ##### git - (syntax: git+url [--baseurl url] [--file makejail_filename] [--global | --local [--cachedir directory]])
 
-Clone a `git(1)` repository in the global cache directory (`GLOBAL_GIT_CACHEDIR`) or in the local cache directory specified with `--cachedir` (default: `.makejail_local`) to get the Makejail called `makejail_filename` (default: `Makejail`).
+Clone a `git(1)` repository in the global cache directory (`GLOBAL_GIT_CACHEDIR`) or in the local cache directory specified with `--cachedir` (default: `.makejail_local`) to get the Makejail named `makejail_filename` (default: `Makejail`).
 
 The `--basedir` parameter is used as a URL prefix and is intended for other git-like methods, such as those mentioned in the following sections.
 
@@ -2388,7 +2388,7 @@ As you can see in `INCLUDE`, a lot of useless information such as leading spaces
 
 When `INCLUDE` compiles all Makejails into a single Makejail, `appjail makejail` uses it to execute the instructions.
 
-The first stage to execute is `build`. This stage writes a script called `buildscript` that takes care of building the jail.
+The first stage to execute is `build`. This stage writes a script named `buildscript` that takes care of building the jail.
 
 When `buildscript` successfully completes its execution, the `initscript` is written to the jail directory, overwriting another `initscript` (if any).
 
@@ -2617,7 +2617,7 @@ To use build arguments use a syntax like `%{name[: | !][value]}` on any line, al
 * `name`: It is recommended to write it in upper case.
 * `: | !`: If the `:` character is used, `value` will be used as default value when not set by the user. If the `!` is used, `appjail makejail` will complain when the build argument is not set by the user, or in other words, this causes the build argument to be required and `value` is used as a description.
 
-A good example is when using Python. The Python executable is called `pythonx.y`, where `x` is the major version and `y` is the minor version. If we need to use Python in some stages for an application, we must use such numbers. Of course, the application must be written to use the specific python version and there are better options for the above example such as using shegbang.
+A good example is when using Python. The Python executable is named `pythonx.y`, where `x` is the major version and `y` is the minor version. If we need to use Python in some stages for an application, we must use such numbers. Of course, the application must be written to use the specific python version and there are better options for the above example such as using shegbang.
 
 `appjail makejail` uses the name of the build arguments to search and replace in the same way as in the `REPLACE` command.
 
@@ -2687,11 +2687,11 @@ The Makejail uses `VAR` with `--noexpand` to escape the `$` character (see `VAR`
 
 The rest of the code shows that this Makejail uses `RAW` to perform some useful checks. When all the checks are correct, python installs using variables instead of build arguments. All checks for build arguments should be performed at build stage unless there is a good reason to perform them at another stage.
 
-**Note**: The build arguments can also be called `Macro Variables`.
+**Note**: The build arguments can also be named `Macro Variables`.
 
 ### Jailed GUI applications (x11)
 
-The process to run a GUI (x11) application in a jail is very easy using AppJail. You just need to mount the socket directory. AppJail has a shortcut for this in `appjail quick` called `x11`.
+The process to run a GUI (x11) application in a jail is very easy using AppJail. You just need to mount the socket directory. AppJail has a shortcut for this in `appjail quick` named `x11`.
 
 However, the process is a bit different if you want to run a GUI application on linux or FreeBSD.
 
@@ -3268,7 +3268,7 @@ appjail quick apache \
 
 Clones is a useful feature of ZFS that saves time and space.
 
-AppJail takes advantage of this feature to clone a jail or a release to create some useful applications. For example, you can clone a generic jail called `webserver` which has its own configuration files, generic files, packages, etc. so you can clone it into a new jail called `nginx`. Another example is making a change to a jail, but copying the whole jail takes a lot of time and space, so cloning here is very useful.
+AppJail takes advantage of this feature to clone a jail or a release to create some useful applications. For example, you can clone a generic jail named `webserver` which has its own configuration files, generic files, packages, etc. so you can clone it into a new jail named `nginx`. Another example is making a change to a jail, but copying the whole jail takes a lot of time and space, so cloning here is very useful.
 
 Clones should be used temporarily in the same way as thinjails and you should be aware that you cannot destroy a dataset of a jail on which another jail depends without forcing it (see `appjail jail destroy` for more details).
 
@@ -3484,7 +3484,7 @@ env PAGER=cat appjail upgrade release -i -n 13.1-RELEASE -v 12.3-RELEASE
 
 ### Upgrading a thinjail
 
-Thinjails are very useful. they save a lot of time and space and AppJail uses them by default. However, AppJail does not upgrade thinjails.
+Thinjails are very useful, they save a lot of time and space and AppJail uses them by default. However, AppJail does not upgrade thinjails.
 
 Instead of trying to upgrade, I recommend separating the data that the jail uses to function properly and the used data that must persist, and when a new version of FreeBSD arrives, just create a new jail with that version.
 
@@ -3550,7 +3550,7 @@ appjail fstab jail debian compile
 appjail fstab jail debian mount -a
 ```
 
-`appjail fstab` can also see the mounted devices for the given jail. For example, I want to see the mounted devices for my jail called `movies`:
+`appjail fstab` can also see the mounted devices for the given jail. For example, I want to see the mounted devices for my jail named `movies`:
 
 ```
 # appjail fstab jail movies set -d /dev/da0s1 -m /mnt/07181 -t msdosfs
