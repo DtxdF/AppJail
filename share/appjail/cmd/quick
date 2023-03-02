@@ -1023,7 +1023,7 @@ quick_run_virtualnet()
 
 		ip4=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4"`
 		if lib_check_empty "${ip4}"; then
-			ip4="auto"
+			ip4="forceauto"
 		fi
 
 		lib_debug "Reserving an IPv4 address for ${QUICK_JAILNAME} in ${virtualnet} ..."
@@ -1358,7 +1358,7 @@ quick_run_alias()
 			ip4=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4"`
 
 			if lib_check_empty "${ip4}"; then
-				ip4="auto"
+				ip4="forceauto"
 			fi
 			
 			ip4=`appjail network reserve -j "${QUICK_JAILNAME}" -n "${virtualnet}" -a "${ip4}"` || exit $?

@@ -3368,9 +3368,9 @@ appjail quick debian11 \
 
 ### IP address conflicts
 
-When using the above methods there is a problem with jails that are in a virtual network. If you clone, copy or import a jail that is on an existing virtual network, the IP address may be duplicated with the source jail.
+There are some problems when using the installation methods described above and when using virtual networks: duplicate addresses and jails with the same network name but with different network address.
 
-Let's create a jail and clone it.
+**Note**: The problems described here are when using `appjail jail` to create a jail using the installation methods described in previous sections, but don't worry when using `appjail quick` because this command forcibly reserves an IP address.
 
 ```sh
 appjail quick origin virtualnet="db:origin default" nat tzdata resolv_conf mount_devfs start overwrite
