@@ -369,6 +369,8 @@ makejail_write()
 
 			priority=$((priority+1))
 		done < "${MAKEJAIL_OPTIONS}"
+	else
+		echo > "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}/${priority}.${MAKEJAIL_CMD_OPTION}"
 	fi
 	# OPTION
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_OPTION}"
