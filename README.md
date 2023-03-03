@@ -44,6 +44,8 @@ sysrc appjail_natnet_enable="YES"
 
 If you want to use a custom configuration file, create one in `/usr/local/etc/appjail/appjail.conf`. See more details in `/usr/local/share/appjail/files/default.conf`.
 
+**Note**: It is highly recommended to put the kernel modules suggested in this document in your `loader.conf(5)` file to correctly start the jails on boot.
+
 ## Getting started
 
 To create a very basic jail, only two things are needed: obtaining the FreeBSD components (base.txz, lib32.txz, etc.) and creating the jail using those components.
