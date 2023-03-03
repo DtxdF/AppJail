@@ -1578,7 +1578,7 @@ jail_mark_locked()
 	fi
 
 	if [ -f "${lockdir}/locked" ]; then
-		lib_err ${EX_CANTCREAT} "The ${jail_name} jail has been locked. Use \`appjail mark unlocked\` to fix it."
+		lib_err ${EX_CANTCREAT} "The ${jail_name} jail has been locked. Use \`appjail jail mark unlocked\` to fix it."
 	fi
 
 	lib_debug "Locking ${jail_name} ..."
