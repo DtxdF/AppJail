@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# appjail jail startup script
-
 # PROVIDE: appjail_natnet
 # REQUIRE: LOGIN FILESYSTEMS NETWORKING
 # KEYWORD: shutdown

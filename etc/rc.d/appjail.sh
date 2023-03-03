@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# appjail jail startup script
-
 # PROVIDE: appjail
 # REQUIRE: LOGIN FILESYSTEMS
 # KEYWORD: shutdown
