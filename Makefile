@@ -11,7 +11,6 @@ install: utils-strip
 	# Directories.
 	${MKDIR} -p "${DESTDIR}${PREFIX}/bin"
 	${MKDIR} -p "${DESTDIR}${PREFIX}/share/appjail"
-	${INSTALL} -d -m 750 "${DESTDIR}${PREFIX}/appjail"
 	${MKDIR} -p "${DESTDIR}${PREFIX}/etc"
 	${MKDIR} -p "${DESTDIR}${PREFIX}/etc/rc.d"
 	
