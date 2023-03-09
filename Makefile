@@ -39,12 +39,12 @@ install: utils-strip
 
 	# Utils.
 .for util in getservbyname ipcheck network
-	${MKDIR} -p "${DESTDIR}${PREFIX}/share/appjail/util/${util}"
-	${CP} share/appjail/util/${util}/${util} "${DESTDIR}${PREFIX}/share/appjail/util/${util}/${util}"
+	${MKDIR} -p "${DESTDIR}${PREFIX}/libexec/appjail/${util}"
+	${CP} libexec/${util}/${util} "${DESTDIR}${PREFIX}/libexec/appjail/${util}/${util}"
 .endfor
 
 utils-strip:
-	@${MAKE} -C share/appjail/util strip
+	@${MAKE} -C libexec strip
 
 uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail"
@@ -53,3 +53,4 @@ uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-natnet"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/examples/appjail"
+	${RM} -rf "${DESTDIR}${PREFIX}/libexec/appjail"
