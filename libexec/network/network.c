@@ -365,7 +365,6 @@ safe_atoi(const char *s, int *ret_i)
 static void
 usage(void)
 {
-	fprintf(stderr, "%s",
+	errx(EX_USAGE, "%s",
 		"usage: network [-c | -l | -N network_address | -O network_address -C network_cidr] -a address -n cidr");
-	exit(EX_USAGE);
 }

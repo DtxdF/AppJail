@@ -31,6 +31,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
@@ -64,6 +65,6 @@ main(int argc, char **argv)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: getservbyname name proto\n");
-	exit(EX_USAGE);
+	errx(EX_USAGE, "%s",
+		"usage: getservbyname name proto");
 }
