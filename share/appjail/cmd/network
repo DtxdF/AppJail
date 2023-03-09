@@ -153,7 +153,7 @@ network_add()
 
 	lib_atexit_add "rm -f \"${escape_network_conf}\""
 
-	if ! "${SHAREDIR}/util/network/network" -c -a "${address}" -n ${cidr} > "${network_conf}"; then
+	if ! "${UTILDIR}/network/network" -c -a "${address}" -n ${cidr} > "${network_conf}"; then
 		lib_err ${EX_IOERR} "Error creating the ${network_name} network in ${NETWORKDIR}/${network_name}/network.conf"
 	fi
 
