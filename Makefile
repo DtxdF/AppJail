@@ -46,6 +46,11 @@ install: utils-strip
 utils-strip:
 	@${MAKE} -C libexec strip
 
+utils-clean:
+	@${MAKE} -C libexec clean
+
+clean: utils-clean
+
 uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-dns"
