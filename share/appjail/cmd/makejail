@@ -30,6 +30,7 @@
 
 lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mksum"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 
@@ -1102,7 +1103,7 @@ _makejail_git_clone()
 	fi
 
 	local reponame
-	reponame=`basename -- "${url}"`
+	reponame=`lib_mksum_str "${url}"`
 
 	local repodir
 	repodir="${gitdir}/${reponame}"
