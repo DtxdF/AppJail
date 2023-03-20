@@ -177,10 +177,6 @@ network_add()
 		fi
 	fi
 
-	if ! lib_zfs_mkroot; then
-		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-	fi
-
 	if ! lib_zfs_mkdir "${NETWORKDIR}" "${ZFS_NETWORK_NAME}"; then
 		lib_err ${EX_IOERR} "Error creating ${JAILDIR}"
 	fi

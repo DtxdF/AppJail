@@ -201,10 +201,6 @@ fetch_debootstrap()
 		lib_err ${EX_DATAERR} "Invalid number: ${apt_cache_start}"
 	fi
 
-	if ! lib_zfs_mkroot; then
-		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-	fi
-
 	local releasedir="${RELEASEDIR}/${osarch}/${suite_name}/${release_name}"
 
 	_fetch_atomic_init -a "${osarch}" -r "${release_name}" -v "${suite_name}"
@@ -423,10 +419,6 @@ _fetch_cmd()
 		exit ${EX_USAGE}
 	fi
 	
-	if ! lib_zfs_mkroot; then
-		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-	fi
-
 	if ! lib_zfs_mkdir "${COMPONENTSDIR}" "${ZFS_COMPONENTS_NAME}"; then
 		lib_err ${EX_IOERR} "Error creating ${COMPONENTSDIR}"
 	fi

@@ -122,10 +122,6 @@ jail_create()
 	local template=
 	local osversion="${FREEBSD_VERSION}"
 
-	if ! lib_zfs_mkroot; then
-		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-	fi
-
 	if ! lib_zfs_mkdir "${JAILDIR}" "${ZFS_JAILS_NAME}"; then
 		lib_err ${EX_IOERR} "Error creating ${JAILDIR}"
 	fi

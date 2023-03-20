@@ -111,10 +111,6 @@ logs_list()
 	else
 		keywords="TYPE\tENTITY\tSUBTYPE\tLOG"
 
-		if ! lib_zfs_mkroot; then
-			lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-		fi
-
 		if ! lib_zfs_mkdir "${LOGDIR}" "${ZFS_LOGS_NAME}"; then
 			lib_err ${EX_IOERR} "Error creating ${LOGDIR}"
 		fi

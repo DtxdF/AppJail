@@ -237,10 +237,6 @@ lib_zfs_mklogdir()
 		lib_err ${EX_USAGE} "usage: lib_zfs_mklogdir type entity subtype"
 	fi
 
-	if ! lib_zfs_mkroot; then
-		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
-	fi
-
 	if ! lib_zfs_mkdir "${LOGDIR}" "${ZFS_LOGS_NAME}"; then
 		lib_err ${EX_IOERR} "Error creating ${LOGDIR}"
 	fi

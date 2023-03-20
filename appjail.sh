@@ -43,6 +43,11 @@ main()
 	lib_load "${LIBDIR}/check_func"
 	lib_load "${LIBDIR}/zfs"
 
+	# Create the data directory for functions that use it at startup.
+	if ! lib_zfs_mkroot; then
+		lib_err ${EX_IOERR} "Error creating ${DATADIR}"
+	fi
+
 	lib_init_logtime
 
 	if [ `id -u` -ne 0 ]; then
