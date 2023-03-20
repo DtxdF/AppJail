@@ -101,11 +101,17 @@ makejail_desc="Build a jail using a Makejail file."
 makejail_main()
 {
 	local _o
+	# commands
+	local opt_create=1 # default
+	local opt_delete=0 repoid=
+	local opt_list=0
+	# options
+	local opt_exact_match=0
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
 
-	while getopts ":evb:f:j:o:" _o; do
+	while getopts ":cEelvb:d:f:j:o:" _o; do
 		case "${_o}" in
-			b|f|j|o)
+			b|d|f|j|o)
 				if lib_check_empty "${OPTARG}"; then
 					makejail_usage
 					exit ${EX_USAGE}
@@ -114,8 +120,17 @@ makejail_main()
 		esac
 
 		case "${_o}" in
+			c)
+				opt_create=1
+				;;
+			E)
+				opt_exact_match=1
+				;;
 			e)
 				MAKEJAIL_ERRORS=0
+				;;
+			l)
+				opt_list=1
 				;;
 			v)
 				MAKEJAIL_VERBOSE=1
@@ -125,6 +140,10 @@ makejail_main()
 				arg=`lib_escape_string "${arg}" "" '"'`
 
 				MAKEJAIL_BUILD_ARGS="${MAKEJAIL_BUILD_ARGS} \"${arg}\""
+				;;
+			d)
+				opt_delete=1
+				repoid="${OPTARG}"
 				;;
 			f)
 				makejail_file="${OPTARG}"
@@ -160,18 +179,125 @@ makejail_main()
 	done
 	shift $((OPTIND-1))
 
-	if [ -z "${makejail_file}" ]; then
-		makejail_usage
-		exit ${EX_USAGE}
+	if [ ${opt_delete} -eq 1 ]; then
+		if [ -z "${repoid}" ]; then
+			makejail_usage
+			exit ${EX_USAGE}
+		fi
+
+		local Eflag=
+		if [ ${opt_exact_match} -eq 1 ]; then
+			Eflag="-E"
+		fi
+
+		makejail_delete ${Eflag} "${repoid}"
+	elif [ ${opt_list} -eq 1 ]; then
+		makejail_list
+	else
+		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
+			MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+		fi
+
+		lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
+
+		makejail_run "${makejail_file}" "$@"
+	fi
+}
+
+makejail_delete()
+{
+	local _o
+	local opt_exact_match=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: makejail_delete [-E] repoid"
 	fi
 
-	if [ -z "${MAKEJAIL_JAILNAME}" ]; then
-		MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+	_makejail_check_git # check
+
+	while getopts ":E" _o; do
+		case "${_o}" in
+			E)
+				opt_exact_match=1
+				;;
+			*)
+				makejail_delete # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local repoid
+	repoid="$1"
+	if [ -z "${repoid}" ]; then
+		makejail_delete # usage
 	fi
 
-	lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
+	if ! lib_check_hexnumber "${repoid}"; then
+		lib_err ${EX_DATAERR} -- "${repoid}: invalid ID."
+	fi
+	
+	local use_glob="*"
+	if [ ${opt_exact_match} -eq 1 ]; then
+		use_glob=
+	fi
 
-	makejail_run "${makejail_file}" "$@"
+	local match
+	match=`ls -d -- "${GLOBAL_GIT_CACHEDIR}"/${repoid}${use_glob} 2> /dev/null | xargs basename`
+
+	local match_n
+	match_n=`echo "${match}" | wc -w`
+
+	if [ ${match_n} -eq 0 ]; then
+		lib_err ${EX_NOINPUT} -- "${repoid}: repository not found."
+	elif [ ${match_n} -eq 1 ]; then
+		lib_debug "Destroying ${match} ..."
+
+		rm -rf -- "${GLOBAL_GIT_CACHEDIR}/${match}"
+	else
+		lib_err - -- "${repoid}: too many repositories to delete:"
+
+		for repoid in ${match}; do
+			local repourl
+			repourl=`_makejail_git_geturl "${repoid}"`
+
+			lib_err - "    - ${repoid}: ${repourl}"
+		done
+		exit ${EX_NOPERM}
+	fi
+}
+
+makejail_list()
+{
+	_makejail_check_git # check
+
+	{
+		printf "%s\t%s\n" "ID" "URL"
+
+		mkdir -p -- "${GLOBAL_GIT_CACHEDIR}"
+
+		ls -- "${GLOBAL_GIT_CACHEDIR}" | while read -r repoid
+		do
+			url=`_makejail_git_geturl "${repoid}"`
+
+			printf "%s\t%s\n" "${repoid}" "${url}"
+		done 
+	} | column -ts $'\t'
+}
+
+_makejail_git_geturl()
+{
+	local repoid
+
+	repoid="$1"
+	if [ -z "${repoid}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_git_geturl repoid"
+	fi
+
+	local repopath
+	repopath="${GLOBAL_GIT_CACHEDIR}/${repoid}"
+
+	git -C "${repopath}" remote get-url origin
 }
 
 makejail_run()
@@ -1098,9 +1224,7 @@ _makejail_git_clone()
 		lib_err ${EX_USAGE} "_makejail_git_clone url gitdir mk_file"
 	fi
 
-	if ! which -s "git"; then
-		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
-	fi
+	_makejail_check_git # check
 
 	local reponame
 	reponame=`lib_mksum_str "${url}"`
@@ -1129,6 +1253,13 @@ _makejail_git_clone()
 	fi
 
 	printf "%s\n" "${repodir}/${mk_file}"
+}
+
+_makejail_check_git()
+{
+	if ! which -s "git"; then
+		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
+	fi
 }
 
 makejail_change_stage()
@@ -1184,19 +1315,31 @@ makejail_help()
 
 ${makejail_desc}
 
-Options:
+Parameters:
+    -c                  -- Default. Create a jail using a Makejail.
+    -d id               -- Delete a cloned repository. \`id\` is a hexadecimal number representing the repository to delete. It is
+                           possible to specify only the initial numbers to write less, but if two repositories match, you must add
+                           more numbers to match the exact repository. To make an exact match use \`-E\`.
+    -l                  -- List cloned repositories.
+
+Options for -c:
     -e                  -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
     -v                  -- Use \`set -vx\` to display the commands in the buildscript.
     -b build_arg        -- Arguments that will be replaced when all Makejails are included in a single Makejail.
     -f makejail         -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
     -j jail_name        -- Jail name. If not defined, a random string is used.
     -o option           -- Additional options to be used by the \`appjail quick\` command.
+
+Options for -d:
+    -E                  -- Exact match.
 EOF
 }
 
 makejail_usage()
 {
 	cat << EOF
-usage: makejail [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
+usage: makejail [-c] [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
+       makejail [-E] -d id
+       makejail -l
 EOF
 }

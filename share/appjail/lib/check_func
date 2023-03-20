@@ -166,6 +166,21 @@ lib_check_number()
 	fi
 }
 
+lib_check_hexnumber()
+{
+	local hexnumber="$1"
+
+	if [ -z "${hexnumber}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_hexnumber hexnumber"
+	fi
+
+	if printf "%s" "${hexnumber}" | grep -Eq '^[0-9a-fA-F]+$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 lib_check_jailparam()
 {
 	local parameter="$1"
