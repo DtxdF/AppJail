@@ -151,14 +151,14 @@ main()
 			jexec_args="-l"
 		fi
 
-		if [ -n "${huser}" ]; then
-			local escape_huser=`lib_escape_string "${huser}" "" "${escape_chars}"`
-
-			jexec_args="${jexec_args} -U \"${escape_huser}\""
-		elif [ -n "${juser}" ]; then
+		if [ -n "${juser}" ]; then
 			local escape_juser=`lib_escape_string "${juser}" "" "${escape_chars}"`
 
-			jexec_args="${jexec_args} -u \"${escape_juser}\""
+			jexec_args="${jexec_args} -U \"${escape_juser}\""
+		elif [ -n "${huser}" ]; then
+			local escape_huser=`lib_escape_string "${huser}" "" "${escape_chars}"`
+
+			jexec_args="${jexec_args} -u \"${escape_huser}\""
 		fi
 
 		command="\"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args}"
