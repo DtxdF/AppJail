@@ -36,6 +36,11 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/jail"
 
+ESCAPE_CHARS='`"\$'
+ENTRYPOINT=
+WORKDIR="/"
+USERNAME="root"
+
 main()
 {
 	local args="$1"
@@ -43,39 +48,17 @@ main()
 		lib_err ${EX_USAGE} "usage: RUN [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
 	fi
 
-	local escape_chars
-	escape_chars='`"\'
+	# Entrypoint.
+	get_entrypoint
 
-	local entrypoint
-	local entrypoint_file="${MAKEJAIL_TEMPDIR}/entrypoint/${MAKEJAIL_CURRENT_STAGE}"
-	if [ -f "${entrypoint_file}" ]; then
-		entrypoint=`head -1 -- "${entrypoint_file}"`
-	else
-		entrypoint="command --"
-	fi
+	# Working directory.
+	get_workdir
 
-	local workdir
-	local workdir_file="${MAKEJAIL_TEMPDIR}/workdir/${MAKEJAIL_CURRENT_STAGE}"
-	if [ -f "${workdir_file}" ]; then
-		workdir=`head -1 -- "${workdir_file}"`
-	else
-		workdir="/"
-	fi
+	# Username.
+	get_username
 
-	local username
-	local username_file="${MAKEJAIL_TEMPDIR}/user/${MAKEJAIL_CURRENT_STAGE}"
-	if [ -f "${username_file}" ]; then
-		username=`head -1 -- "${username_file}"`
-		username=`lib_escape_string "${username}" "" "${escape_chars}"`
-	else
-		username="root"
-	fi
-
-	local env_vars=
-	local env_vars_file="${MAKEJAIL_TEMPDIR}/env/${MAKEJAIL_CURRENT_STAGE}"
-	if [ -f "${env_vars_file}" ]; then
-		env_vars=`head -1 -- "${env_vars_file}"`
-	fi
+	# Environment.
+	get_environment
 
 	# jexec options
 	local noclean=0
@@ -139,37 +122,41 @@ main()
 	fi
 
 	if [ -n "${huser}" ]; then
-		local escape_huser=`lib_escape_string "${huser}" "" "${escape_chars}"`
+		local escape_huser=`lib_escape_string "${huser}" "" "${ESCAPE_CHARS}"`
 
 		jexec_args="${jexec_args} -U \"${escape_huser}\""
 	elif [ -n "${juser}" ]; then
-		local escape_juser=`lib_escape_string "${juser}" "" "${escape_chars}"`
+		local escape_juser=`lib_escape_string "${juser}" "" "${ESCAPE_CHARS}"`
 
 		jexec_args="${jexec_args} -u \"${escape_juser}\""
 	fi
 
-	echo "cat << \"EOF\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su -l \"${username}\" -c \"env ${env_vars} sh -s\""
+	local prg_args=
 
-	local workdir_escape_chars
-	workdir_escape_chars='`"\$'
-
-	workdir=`lib_escape_string "${workdir}" "" "${workdir_escape_chars}"`
-	echo "cd -- \"${workdir}\""
-
-	local entrypoint_args=`lib_split_jailparams "${entrypoint}"`
-	local entrypoint_items=`printf "%s\n" "${entrypoint_args}" | wc -l`
+	local entrypoint_args=
+	local entrypoint_items=
 	local entrypoint_index=0
 
-	while [ ${entrypoint_index} -lt ${entrypoint_items} ]; do
-		entrypoint_index=$((entrypoint_index+1))
+	if ! lib_check_empty "${ENTRYPOINT}"; then
+		entrypoint_args=`lib_split_jailparams "${ENTRYPOINT}"`
+		entrypoint_items=`printf "%s\n" "${entrypoint_args}" | wc -l`
+		entrypoint_index=0
 
-		local cmd=`printf "%s\n" "${entrypoint_args}" | head -${entrypoint_index} | tail -n 1`
-		if ! lib_check_empty "${cmd}"; then
-			cmd=`lib_escape_string "${cmd}" "" "${escape_chars}"`
-		fi
+		while [ ${entrypoint_index} -lt ${entrypoint_items} ]; do
+			entrypoint_index=$((entrypoint_index+1))
 
-		echo -n " \"${cmd}\""
-	done
+			local cmd=`printf "%s\n" "${entrypoint_args}" | head -${entrypoint_index} | tail -n 1`
+			if ! lib_check_empty "${cmd}"; then
+				cmd=`lib_escape_string "${cmd}" 3 "${ESCAPE_CHARS}"`
+			fi
+
+			if [ -z "${prg_args}" ]; then
+				prg_args="\\\"${cmd}\\\""
+			else
+				prg_args="${prg_args} \\\"${cmd}\\\""
+			fi
+		done
+	fi
 
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
@@ -177,13 +164,51 @@ main()
 		local cmd=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
 
 		if ! lib_check_empty "${cmd}"; then
-			cmd=`lib_escape_string "${cmd}" "" "${escape_chars}"`
+			cmd=`lib_escape_string "${cmd}" 3 "${ESCAPE_CHARS}"`
 		fi
 
-		echo -n " \"${cmd}\""
+		if [ -z "${prg_args}" ]; then
+			prg_args="\\\"${cmd}\\\""
+		else
+			prg_args="${prg_args} \\\"${cmd}\\\""
+		fi
 	done
-	echo
-	echo "EOF"
+
+	echo "echo \"cd \\\"${WORKDIR}\\\"; env ${ENV_VARS} ${prg_args}\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su -l \"${USERNAME}\" -c \"sh -s\""
+}
+
+get_entrypoint()
+{
+	local entrypoint_file="${MAKEJAIL_TEMPDIR}/entrypoint/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${entrypoint_file}" ]; then
+		ENTRYPOINT=`head -1 -- "${entrypoint_file}"`
+	fi
+}
+
+get_workdir()
+{
+	local workdir_file="${MAKEJAIL_TEMPDIR}/workdir/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${workdir_file}" ]; then
+		WORKDIR=`head -1 -- "${workdir_file}"`
+		WORKDIR=`lib_escape_string "${WORKDIR}" 3 "${ESCAPE_CHARS}"`
+	fi
+}
+
+get_username()
+{
+	local username_file="${MAKEJAIL_TEMPDIR}/user/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${username_file}" ]; then
+		USERNAME=`head -1 -- "${username_file}"`
+		USERNAME=`lib_escape_string "${USERNAME}" "" "${ESCAPE_CHARS}"`
+	fi
+}
+
+get_environment()
+{
+	local env_vars_file="${MAKEJAIL_TEMPDIR}/env/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${env_vars_file}" ]; then
+		ENV_VARS=`head -1 -- "${env_vars_file}"`
+	fi
 }
 
 main "$@"
