@@ -45,7 +45,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: RUN [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
+		lib_err ${EX_USAGE} "usage: RUN [--maintain-env] [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
 	fi
 
 	# Entrypoint.
@@ -61,6 +61,7 @@ main()
 	get_environment
 
 	# jexec options
+	local maintain_env=0
 	local noclean=0
 	local juser=
 	local huser=
@@ -93,6 +94,9 @@ main()
 		esac
 
 		case "${arg}" in
+			--maintain-env)
+				maintain_env=1
+				;;
 			--noclean)
 				noclean=1
 				;;
@@ -174,7 +178,13 @@ main()
 		fi
 	done
 
-	echo "echo \"cd \\\"${WORKDIR}\\\"; env ${ENV_VARS} ${prg_args}\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su -l \"${USERNAME}\" -c \"sh -s\""
+	if [ ${maintain_env} -eq 1 ]; then
+		su_args="-m"
+	else
+		su_args="-l"
+	fi
+
+	echo "echo \"cd \\\"${WORKDIR}\\\"; env ${ENV_VARS} ${prg_args}\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su ${su_args} \"${USERNAME}\" -c \"sh -s\""
 }
 
 get_entrypoint()
