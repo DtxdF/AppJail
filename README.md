@@ -38,10 +38,23 @@ Contribute your Makejail: https://github.com/AppJail-makejails
 
 ## Installation
 
+If you want to contribute to the AppJail project or just want to get the latest features, use the bleeding-edge version:
+
 ```
 git clone https://github.com/DtxdF/AppJail.git
 cd AppJail
 make install
+```
+
+A much more stable version can be installed using the FreeBSD package manager:
+
+```
+pkg install -y appjail
+```
+
+Whether you choose a stable or an unstable version, configure the following parameters:
+
+```
 sysrc appjail_enable="YES"
 sysrc appjail_natnet_enable="YES"
 ```
