@@ -188,15 +188,20 @@ pkg_jail()
 	fi
 
 	case "${jail_type}" in
-		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
-		*) lib_err ${EX_DATAERR} "You cannot use pkg(8) when this jail is a ${jail_type} jail."
+		${JAIL_TYPE_DEBOOTSTRAP})
+			jexec -l "${jail_name}" apt-get "$@"
+			;;
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK})
+			if [ ${opt_jail} -eq 1 ]; then
+				jexec -l -U root "${jail_name}" pkg "$@"
+			else
+				pkg -j "${jail_name}" "$@"
+			fi
+			;;
+		*)
+			lib_err ${EX_DATAERR} "You cannot use pkg(8) when this jail is a ${jail_type} jail."
+			;;
 	esac
-
-	if [ ${opt_jail} -eq 1 ]; then
-		jexec -l -U root "${jail_name}" pkg "$@"
-	else
-		pkg -j "${jail_name}" "$@"
-	fi
 }
 
 _pkg_getjailtype()
