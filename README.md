@@ -2077,10 +2077,14 @@ REPLACE /usr/local/www/wordpress/wp-config-appjail.php DB_NAME wordpress /usr/lo
 #### Syntax
 
 ```
-RUN [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]
+RUN [--maintain-env] [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]
 ```
 
 **Note**: The arguments have the same meaning as `CMD --jexec`.
+
+##### --maintain-env
+
+Leave the environment unchanged instead of simulating a full login.
 
 #### Description
 
