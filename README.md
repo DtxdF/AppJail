@@ -2853,6 +2853,23 @@ The `start` stage of the initscript has been executed because we used the `start
 
 If you need to use a custom initscript, remember that it will be overwritten after the execution of the `buildscript` (see `Getting started with Makejail`), so use it only to build processes and remember to execute the stages using `START` or `OPTION start` and `STOP`.
 
+### Makejails and the command-line
+
+At first it may seem that to run a Makejail we need another Makejail that includes it. For a long term application this is useful, as we need to remember all the options to rebuild another jail in the near future, but from time to time we need to pass options from the command-line.
+
+```sh
+appjail makejail \
+    -j nscde \
+    -o virtualnet="development:nscde default" \
+    -o nat \
+    -o copydir=/tmp/files \
+    -o file=/etc/rc.conf \
+    -o x11 \
+    -f gh+AppJail-makejails/nscde
+```
+
+Using a single command the above command creates a jail named `nscde` to run the `nscde` desktop environment.
+
 ### Empty jails
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.
