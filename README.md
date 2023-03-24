@@ -2870,6 +2870,27 @@ appjail makejail \
 
 Using a single command the above command creates a jail named `nscde` to run the `nscde` desktop environment.
 
+### Maintenance of cloned Makejails
+
+Although combining `git(1)` and Makejails is useful, it leads to leaving old Makejails that we may no longer use.
+
+```
+# appjail makejail -l
+ID                                                                URL
+13f4788a856861d05be744697ec17256596b025dc42ca3799483d28c12ed4217  https://github.com/AppJail-makejails/nscde
+64d3082bab0f936c42b54ed444246567c58d528db0bb8606efc0680ef7856aaf  https://github.com/AppJail-makejails/python
+...
+```
+
+Let's suppose we finish developing our python application and we don't need the Makejail for python, so we will remove it.
+
+```
+# appjail makejail -d 64d
+[00:00:00] [ debug ] Destroying 64d3082bab0f936c42b54ed444246567c58d528db0bb8606efc0680ef7856aaf ...
+```
+
+We can use only the first characters as ID to write less, but if two or more Makejails match, it is necessary to write more characters to make the ID unique.
+
 ### Empty jails
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.
