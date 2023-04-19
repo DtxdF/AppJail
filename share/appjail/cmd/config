@@ -404,7 +404,7 @@ Options for -g, -s and -x
 
 Options for -g and -x:
     -A                          -- Dump or remove all parameters.
-    -i                          -- Ignore unknown variables. Using this option together with -x, supresses
+    -i                          -- Ignore unknown variables. Using this option together with -x, suppresses
                                    some messages and does not modify the template when an error has occured.
 
 Options for -g:
