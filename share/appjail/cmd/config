@@ -406,7 +406,6 @@ Options for -g and -x:
     -A                          -- Dump or remove all parameters.
     -i                          -- Ignore unknown variables. Using this option together with -x, supresses
                                    some messages and does not modify the template when an error has occured.
-    -P                          -- 
 
 Options for -g:
     -c                          -- Check only. Return success if all requested parameters exist.
