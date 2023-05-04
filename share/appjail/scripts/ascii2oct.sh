@@ -38,7 +38,7 @@ main()
 	fi
 
 	for str in "$@"; do
-		printf "%s" "${str}" | od -toC | grep -Ewo '[0-7]{3}' | sed -Ee 's/^0//' -e 's/^([0-7])/\\\1/' | tr -d '\n'
+		printf "%s" "${str}" | od -v -toC | grep -Ewo '[0-7]{3}' | sed -Ee 's/^0//' -e 's/^([0-7])/\\\1/' | tr -d '\n'
 	done
 	echo
 }
