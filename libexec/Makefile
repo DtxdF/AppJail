@@ -1,5 +1,5 @@
 MAKE?=make
-TARGETS=getservbyname ipcheck network
+TARGETS=appjail-config getservbyname ipcheck network
 
 all:
 .for target in ${TARGETS}

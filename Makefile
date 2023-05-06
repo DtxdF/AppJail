@@ -23,6 +23,7 @@ install: utils-strip
 	# Scripts.
 	${INSTALL} -m 555 appjail.sh "${DESTDIR}${PREFIX}/bin/appjail"
 	${INSTALL} -m 555 share/appjail/scripts/dns.sh "${DESTDIR}${PREFIX}/bin/appjail-dns"
+	${INSTALL} -m 555 share/appjail/scripts/ajconf.sh "${DESTDIR}${PREFIX}/bin/appjail-config"
 
 	# Files.
 .for folder in cmd files lib makejail scripts
@@ -30,7 +31,7 @@ install: utils-strip
 .endfor
 	
 	# Prefix.
-.for f in bin/appjail share/appjail/files/config.conf share/appjail/files/default.conf 
+.for f in bin/appjail bin/appjail-config share/appjail/files/config.conf share/appjail/files/default.conf 
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 
@@ -42,6 +43,11 @@ install: utils-strip
 	${MKDIR} -p "${DESTDIR}${PREFIX}/libexec/appjail/${util}"
 	${CP} libexec/${util}/${util} "${DESTDIR}${PREFIX}/libexec/appjail/${util}/${util}"
 .endfor
+	# appjail-config & tok
+	${MKDIR} -p "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config"
+	${CP} libexec/appjail-config/appjail-config "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/appjail-config"
+	${CP} libexec/appjail-config/tok "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/tok"
+
 
 utils-strip:
 	@${MAKE} -C libexec strip
