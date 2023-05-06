@@ -49,7 +49,12 @@ utils-strip:
 utils-clean:
 	@${MAKE} -C libexec clean
 
+utils-cleanall:
+	@${MAKE} -C libexec cleanall
+
 clean: utils-clean
+
+cleanall: utils-cleanall
 
 uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail"

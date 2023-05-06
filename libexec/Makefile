@@ -15,3 +15,8 @@ clean:
 .for target in ${TARGETS}
 	@${MAKE} -C ${target} clean
 .endfor
+
+cleanall:
+.for target in ${TARGETS}
+	@${MAKE} -C ${target} cleanall
+.endfor

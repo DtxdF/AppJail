@@ -8,6 +8,8 @@ ${TARGET}: ${TARGET}.c
 	${CC} ${CFLAGS} -o ${TARGET} ${.ALLSRC}
 
 clean:
+
+cleanall: clean
 	${RM} -f ${TARGET}
 
 strip: ${TARGET}
