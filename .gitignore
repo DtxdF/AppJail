@@ -1,3 +1,6 @@
 /libexec/network/network
 /libexec/getservbyname/getservbyname
 /libexec/ipcheck/ipcheck
+/libexec/appjail-config/appjail-config
+/libexec/appjail-config/tok
+*.o
