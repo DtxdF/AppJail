@@ -382,6 +382,8 @@ config_help()
 
 ${config_desc}
 
+*DEPRECATED*: Do not try to use this command anymore, use \`appjail-config\` instead.
+
 Parameters:
     -e                          -- Use EDITOR environment variable to edit the template.
     -g                          -- Get the value of a parameter.
