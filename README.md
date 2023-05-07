@@ -332,7 +332,7 @@ Suppose we are installing packages and we don't want to provide connection to th
 appjail network detach jpub
 ```
 
-However, it is necessary to edit the template using `appjail config -ej jbridge` and remove the lines where AppJail attaches the interface to not provide connection to the outside when the jail is restarted.
+However, it is necessary to edit the template using `appjail-config edit -j jbridge` and remove the lines where AppJail attaches the interface to not provide connection to the outside when the jail is restarted.
 
 AppJail does not destroy an interface that is not a member of the specified bridge, so if we stop the jail using `appjail stop` the `s[ab]_jpub` interface is still in the system. To force the destruction of an `if_epair(4)` interface use `appjail network detach -df`.
 
@@ -564,8 +564,8 @@ To create NAT rules manually for an existing jail, we can use `appjail nat`.
 ```sh
 appjail quick jnat virtualnet="development:jn1 default" overwrite
 appjail nat add jail -n development jnat
-appjail config -Ia 'exec.prestart="appjail nat on jail ${name}"' -j jnat
-appjail config -Ia 'exec.poststop="appjail nat off jail ${name}"' -j jnat
+appjail-config set -Ij jnat exec.prestart='appjail nat on jail ${name}'
+appjail-config set -Ij jnat exec.poststop='appjail nat off jail ${name}'
 appjail start jnat
 ```
 
@@ -596,8 +596,8 @@ appjail quick jnonat virtualnet="db:jnonat default" nonat overwrite start
 # Manually:
 appjail quick jnonat virtualnet="db:jnonat default" overwrite
 appjail nat add jail -n db -N jnonat
-appjail config -Ia 'exec.prestart="appjail nat on jail ${name}"' -j jnonat
-appjail config -Ia 'exec.poststop="appjail nat off jail ${name}"' -j jnonat
+appjail-config set -Ij jnonat exec.prestart='appjail nat on jail ${name}'
+appjail-config set -Ij jnonat exec.poststop='appjail nat off jail ${name}'
 appjail start jnonat
 ```
 
@@ -617,8 +617,8 @@ appjail quick nginx virtualnet="web:nginx default" nat expose=80 start
 # Manually:
 appjail quick nginx virtualnet="web:nginx default" nat overwrite
 appjail expose set -k web -p 80 nginx
-appjail config -Ia 'exec.prestart="appjail expose on ${name}"' -j nginx
-appjail config -Ia 'exec.poststop="appjail expose off ${name}"' -j nginx
+appjail-config set -Ij nginx exec.prestart='appjail expose on ${name}'
+appjail-config set -Ij nginx exec.prestart='appjail expose off ${name}'
 appjail start nginx
 # www/nginx:
 appjail pkg jail nginx install -y nginx
@@ -683,8 +683,8 @@ appjail quick nginx virtualnet="web:nginx default" nat expose=80 overwrite
 appjail limits set nginx vmemoryuse:deny=512m
 appjail limits set nginx vmemoryuse:log=450m
 appjail limits set nginx maxproc:log=30
-appjail config -Ia 'exec.created="appjail limits on ${name}"' -j nginx
-appjail config -Ia 'exec.poststop="appjail limits off ${name}"' -j nginx
+appjail-config set -Ij nginx exec.created='appjail limits on ${name}'
+appjail-config set -Ij nginx exec.created='appjail limits off ${name}'
 appjail start nginx
 ```
 
@@ -729,11 +729,11 @@ AppJail cannot parse a `jail.conf(5)` file, but it can parse its own format: tem
 The main motivation for using templates is to easily parse a file for scripts and for humans. See the following example:
 
 ```
-# appjail config -Agj nginx
+# appjail-config getAll -j nginx
 exec.start: "/bin/sh /etc/rc"
 exec.stop: "/bin/sh /etc/rc.shutdown jail"
-mount.devfs:
-vnet:
+mount.devfs
+vnet
 vnet.interface+: "eb_nginx"
 exec.prestart+: "appjail network plug -e \"nginx\" -n \"web\""
 exec.poststart+: "appjail network assign -d -e \"nginx\" -j \"${name}\" -n \"web\""
@@ -753,7 +753,7 @@ The syntax is based on `jail.conf(5)`, but has some differences:
 * `+:` instead of `+=`.
 * Lists does not exist, but the AppJail tokenizer can achieve the same effect using rows and columns:
   - Rows are parameters that are repeated in the template. They are usually separated using `+:` when there is more than one, but it is optional, although it is very important to put the correct operator because AppJail translates the template to a `jail.conf(5)` file. A particular row can be accessed using an index from `0`.
-  - Columns are the value of a row. They are separated using spaces, but the column in quotes can be used to use spaces in the column. The `\` character must be used to escape `"`. A particular column can be accessed using an index from `0`. `0` is for accessing the entire value of a row and a number greater than `0` is for accessing the particular column.
+  - Columns are the value of a row. They are separated using spaces, but the column in quotes (single or double) can be used to use spaces in the column. The `\` character must be used to escape `"` or `'`. A particular column can be accessed using an index from `0`.
 
 AppJail tries to not to lose functionality by using this format. You can use variables, for example.
 
@@ -763,8 +763,6 @@ Although you can use any parameter you want in a template, `appjail start` inter
 * `mount.fstab`: If not set, AppJail uses the compiled fields of the `appjail fstab` command. See `Mounting file systems`.
 * `host.hostname`: If not set, AppJail concatenates the jail name and `HOST_DOMAIN` (default: `.appjail`).
 * `depend`: If set, AppJail will recursively start these jails. See `Dependent jails`.
-
-At the moment, AppJail only checks the template syntax and parameters, but does not check if the parameters exist in `jail(8)`. See `TODO`.
 
 As mentioned above, you can use rows and columns instead of lists. To illustrate this, the following is useful:
 
@@ -783,43 +781,43 @@ The template has it all for learning about templates. For example, `exec.start` 
 We can get the value of `exec.start`.
 
 ```
-# appjail config -gt example.conf -a exec.start
+# appjail-config get -t example.conf exec.start
 exec.start: "/bin/sh /etc/rc"
 ```
 
-The values are not escaped, since we are getting the whole value, not a column. To get the value of column `1` we can use:
+The values are not escaped, since we are getting the whole value, not a column. To get the value of column `0` we can use:
 
 ```
-# appjail config -gt example.conf -a exec.start -C 1
-exec.start: /bin/sh /etc/rc
-```
-
-To get only the value of column `1` but not its parameter name:
-
-```
-# appjail config -gt example.conf -a exec.start -C 1 -n
+# appjail-config getColumn -t example.conf exec.start
 /bin/sh /etc/rc
+```
+
+To get only the value of `exec.start` but not its parameter name:
+
+```
+# appjail-config get -nt example.conf exec.start
+"/bin/sh /etc/rc"
 ```
 
 Another useful example is `ip4.addr`. To edit the whole value of row `1`:
 
 ```
-# appjail config -st example.conf -a ip4.addr=10.42.0.3/10 -R 1
-# appjail config -gt example.conf -a ip4.addr -R 1
+# appjail-config set -r 1 -t example.conf ip4.addr=10.42.0.3/10
+# appjail-config get -r 1 -t example.conf ip4.addr
 ip4.addr+: 10.42.0.3/10
 ```
 
-However, if we want to edit row `0` with some columns, we probably do not want to edit the whole value. To edit only column `2`.
+However, if we want to edit row `0` with some columns, we probably do not want to edit the whole value. To edit only column `1`.
 
 ```
-# appjail config -st example.conf -a ip4.addr=192.168.1.176/24 -C 2
-# appjail config -gt example.conf -a ip4.addr
+# appjail-config setColumn -c 1 -t example.conf ip4.addr=192.168.1.176/24
+# appjail-config get -t example.conf ip4.addr
 ip4.addr: 192.168.1.123/24 192.168.1.176/24
 ```
 
 Templates have another useful feature: `required parameters`.
 
-Instead of using static parameters with values that may not be portable across multiples environments, we can use `required parameters` to force the user to edit some parameters. If the user does not edit those parameters, the jail won't start.
+Instead of using static parameters with values that may not be portable across multiple environments, we can use `required parameters` to force the user to edit some parameters. If the user does not edit those parameters, the jail won't start.
 
 `required parameters` are parameters starting with an asterisk (`*`). The value is optional, but if set, `appjail start` uses it to display a custom message.
 
@@ -831,7 +829,7 @@ vnet
 *vnet.interface: VNET requires an interface.
 ```
 
-We can open an editor using `appjail config -e` or use `appjail config -sr` to convert a parameter into a required one.
+**Note**: We can open an editor using `appjail-config edit` or use `appjail-config set -R1` to convert a parameter into a required one.
 
 As mentioned, if we do not edit the template before starting the jail, `appjail start` will complain:
 
@@ -840,29 +838,29 @@ As mentioned, if we do not edit the template before starting the jail, `appjail 
 ...
 [00:00:15] [ warn  ] [vjail] There are required parameters that must be set before starting the jail:
 [00:00:15] [ warn  ] [vjail]     - vnet.interface: VNET requires an interface.
-[00:00:15] [ warn  ] [vjail] You can use `appjail config` to set the required parameters
+[00:00:15] [ warn  ] [vjail] You can use `appjail-config` to set the required parameters
 ```
 
-We can use `appjail config` to solve this problem. We can use `appjail config -e` to open the editor specified by the `EDITOR` environment variable or use `appjail config -s` as if we were configuring any other parameter.
+We can use `appjail-config` to solve this problem. We can use `appjail-config edit` to open the editor specified by the `EDITOR` environment variable or use `appjail-config set` as if we were configuring any other parameter.
 
 ```sh
 # Using ${EDITOR}.
-appjail config -ej vjail
+appjail-config edit -j vjail
 # Using command-line interface.
-appjail config -sj vjail -a 'vnet.interface=jext'
+appjail-config set -j vjail vnet.interface=jext
 ```
 
-To see the change we can use `appjail config -g`.
+To see the change we can use `appjail-config get`.
 
 ```
-# appjail config -gj vjail -a 'vnet.interface'
+# appjail-config get -j vjail vnet.interface
 vnet.interface: jext
 ```
 
 If you want to list the `required parameters`:
 
 ```
-# appjail config -kt alias.conf
+# appjail-config getAll -rt alias.conf
 *interface: Interface name.
 *ip4.addr: IPv4 address to use.
 ```
@@ -876,7 +874,7 @@ mount.devfs
 *ip4.addr: IPv4 address to use.
 ```
 
-`appjail config` has many parameters to list here, but I think the above examples show the basics.
+`appjail-config` has many parameters to list here, but I think the above examples show the basics. Use `appjail-config help` and `appjail-config help [cmd]` to get more details.
 
 ## Initscripts
 
@@ -1146,8 +1144,8 @@ AppJail can start jails before the jail we are specifying. It works in the same 
 We just have to put the `depend` parameter in the template and `appjail start` will do the job of starting dependencies.
 
 ```sh
-appjail config -sj nginx -a 'depend=php-fpm'
-appjail config -sj php-fpm -a 'depend=mariadb'
+appjail-config set -j nginx depend=php-fpm
+appjail-config set -j php-fpm depend=mariadb
 ``` 
 
 The `appjail stop` command will not stop the dependencies because the clients may be using the services offered by those jails. But, AppJail has a command to recursively stop the jail and its dependencies named `appjail rstop`.
@@ -2139,8 +2137,7 @@ SERVICE nginx nginx start
 #### Syntax
 
 ```
-SET --mark parameter[=value] parameter[=value]
-SET [--column column] [--row row] parameter[=value]
+SET [--mark] [--column column] [--row row] parameter[=value]
 ```
 
 ##### --mark
@@ -2153,7 +2150,7 @@ The column and the row to edit. See `Templates` for more details.
 
 #### Description
 
-Use `appjail config` to edit the current template.
+Use `appjail-config` to edit the current template.
 
 #### Examples
 
@@ -3007,9 +3004,9 @@ The template is not included, so we can use the `bridge.conf` template and edit 
 
 ```sh
 appjail jail create -t /usr/local/share/examples/appjail/templates/bridge.conf -I tiny+import=nginx.appjail tinynginx
-appjail config -sa '${iface}=nginx' -j tinynginx
-appjail config -sa '${ext_iface}=em0' -j tinynginx
-appjail config -sa 'devfs_ruleset=10' -j tinynginx
+appjail-config set -j tinynginx '${iface}=nginx'
+appjail-config set -j tinynginx '${ext_iface}=em0'
+appjail-config set -j tinynginx devfs_ruleset=10
 appjail start tinynginx
 ```
 
@@ -3676,9 +3673,9 @@ AppJail is not focused on building software. There are very interesting projects
 - [ ] Add support for `ipfw` and `ipfilter`.
 - [x] Although Makejails can be retrieved anywhere by the methods described in `INCLUDE`, a centralized repository to easily retrieve generic Makejails is useful. This can be done on Github or Gitlab. (See https://github.com/AppJail-makejails).
 - [x] Create Makejails for applications. It is a difficult job to do alone, but with many people it is feasible. (Done using the centralized repository, of course this is in progress anyway).
-- [ ] rc scripts to start resource limitation rules, nat for jails and to expose ports. `appjail quick` and `appjail config` do this job, but it can be useful to spend less time starting/stopping jails.
+- [ ] rc scripts to start resource limitation rules, nat for jails and to expose ports. `appjail quick` and `appjail-config` do this job, but it can be useful to spend less time starting/stopping jails.
 - [ ] Implement a supervisor.
-- [ ] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`.
+- [x] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`. (Done with the new tool, `appjail-config`)
 - [ ] Implement all `jail(8)` parameters in `appjail quick`.
 - [ ] The `jng` script is useful, but AppJail must create the Netgraph nodes in the same way as bridges and epairs.
  
