@@ -2,6 +2,8 @@
     <img src="assets/logos/appjail-logo.png" />
 </p>
 
+----
+
 # AppJail
 
 AppJail is an open source framework entirely written in `sh(1)` and C to create isolated, portable and easy to deploy environments using FreeBSD jails that behaves like an application.
