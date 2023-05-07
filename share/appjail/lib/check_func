@@ -222,36 +222,6 @@ lib_check_empty()
 	fi
 }
 
-lib_check_jaillist()
-{
-	local parameter="$1"
-
-	if [ -z "${parameter}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_check_jaillist parameter"
-	fi
-
-	if printf "%s" "${parameter}" | grep -Eq '\+$'; then
-		return 0
-	else
-		return 1
-	fi
-}
-
-lib_check_jailreq()
-{
-	local parameter="$1"
-
-	if [ -z "${parameter}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_check_jailreq parameter"
-	fi
-
-	if printf "%s" "${parameter}" | grep -Eq '^\*'; then
-		return 0
-	else
-		return 1
-	fi
-}
-
 lib_check_path_traversal()
 {
 	local errlevel=0

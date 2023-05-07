@@ -29,9 +29,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 lib_load "${LIBDIR}/colors"
-lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/mksum"
+lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/zfs"
