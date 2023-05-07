@@ -44,7 +44,9 @@ main()
 	fi
 
 	# Arguments
-	local args_list=`lib_split_jailparams "${args}"`
+	local args_list
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+
 	local file=`printf "%s\n" "${args_list}" | head -1 | tail -n 1`
 	local old=`printf "%s\n\n" "${args_list}" | head -2 | tail -n 1`
 	local new=`printf "%s\n\n\n" "${args_list}" | head -3 | tail -n 1`

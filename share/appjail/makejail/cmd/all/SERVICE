@@ -48,7 +48,10 @@ main()
 
 	printf "%s" "\"\${APPJAIL_SCRIPT}\" service jail \"\${APPJAIL_JAILNAME}\" "
 
-	lib_split_jailparams "${args}" | while IFS= read -r service_arg
+	local args_list
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+
+	printf "%s\n" "${args_list}" | while IFS= read -r service_arg
 	do
 		if ! lib_check_empty "${service_arg}"; then
 			service_arg=`lib_escape_string "${service_arg}" "" "${escape_chars}"`

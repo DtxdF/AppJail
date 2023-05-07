@@ -414,9 +414,13 @@ _jail_export()
 			;;
 	esac
 
-	local params=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local params
+	local total_items
 	local current_index=0
+
+	params=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${params}" | wc -l`
+
 	local compress= output=
 	local parameter= value= arg
 
@@ -553,9 +557,13 @@ _jail_import()
 		lib_err ${EX_DATAERR} "${function} syntax: input:in_file [compress:algo]"
 	fi
 
-	local params=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local params
+	local total_items
 	local current_index=0
+
+	params=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${params}" | wc -l`
+
 	local compress= input=
 	local parameter= value= arg
 
@@ -1262,9 +1270,13 @@ jail_install_tiny+export()
 
 	lib_info "Exporting ${jail_name} as a tiny jail ..."
 
-	local params=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local params
+	local total_items
 	local current_index=0
+
+	params=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${params}" | wc -l`
+
 	local compress= files= output=
 	local parameter= value= arg
 

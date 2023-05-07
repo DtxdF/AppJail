@@ -403,9 +403,12 @@ _fetch_cmd()
 	shift $((OPTIND-1))
 
 	if [ $# -eq 0 ]; then
-		local args_list=`lib_split_jailparams "${COMPONENTS}"`
-		local total_items=`printf "%s\n" "${args_list}" | wc -l`
+		local args_list
+		local total_items
 		local current_index=0
+
+		args_list=`lib_split_jailparams "${COMPONENTS}"` || exit $?
+		total_items=`printf "%s\n" "${args_list}" | wc -l`
 
 		while [ ${current_index} -lt ${total_items} ]; do 
 			current_index=$((current_index+1))

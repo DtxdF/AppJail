@@ -426,7 +426,7 @@ quick_set_nat()
 
 	params="$1"
 	if ! lib_check_empty "${params}"; then
-		params=`lib_split_jailparams "${params}"`
+		params=`lib_split_jailparams "${params}"` || exit $?
 		total_items=`printf "%s\n" "${params}" | wc -l`
 	fi
 
@@ -566,7 +566,7 @@ quick_set_nonat()
 
 	params="$1"
 	if ! lib_check_empty "${params}"; then
-		params=`lib_split_jailparams "${params}"`
+		params=`lib_split_jailparams "${params}"` || exit $?
 		total_items=`printf "%s\n" "${params}" | wc -l`
 	fi
 
@@ -732,9 +732,12 @@ quick_set_expose()
 		lib_err ${EX_DATAERR} "expose syntax: hport[:jport] [descr:description] [ext_if:external_interface] [logopts:firewall_logopts] [network:network_name] [on_if:interface] [proto:protocol]"
 	fi
 
-	local params=`lib_split_jailparams "${params}"`
-	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local params
+	local total_items
 	local current_index=0
+
+	params=`lib_split_jailparams "${params}"` || exit $?
+	total_items=`printf "%s\n" "${params}" | wc -l`
 
 	local port=
 	local description=
@@ -883,7 +886,7 @@ quick_set_jng()
 		lib_err ${EX_DATAERR} "jng syntax: name [iface:]interface ... [bridge:bridge_name]"
 	fi
 
-	params=`lib_split_jailparams "${params}"`
+	params=`lib_split_jailparams "${params}"` || exit $?
 	local total_items=`printf "%s\n" "${params}" | wc -l`
 	local current_index=0
 
@@ -1093,7 +1096,7 @@ quick_set_virtualnet()
 		lib_err ${EX_DATAERR} "virtualnet syntax: virtualnet:interface [default] [address:ipv4_address] [interface_desc:interface_description]"
 	fi
 
-	params=`lib_split_jailparams "${params}"`
+	params=`lib_split_jailparams "${params}"` || exit $?
 	local total_items=`printf "%s\n" "${params}" | wc -l`
 	local current_index=0
 
@@ -1633,7 +1636,7 @@ quick_set_bridge()
 		lib_err ${EX_DATAERR} "bridge syntax: [[epair|iface]:]interface ... [bridge:bridge_name]"
 	fi
 
-	params=`lib_split_jailparams "${params}"`
+	params=`lib_split_jailparams "${params}"` || exit $?
 	local total_items=`printf "%s\n" "${params}" | wc -l`
 	local current_index=0
 
@@ -1747,7 +1750,7 @@ quick_set_fstab()
 
 	params="$1"; quick_reqoption "fstab" "${params}"
 
-	params=`lib_split_jailparams "${params}"`
+	params=`lib_split_jailparams "${params}"` || exit $?
 	local total_items=`printf "%s\n" "${params}" | wc -l`
 	local current_index=0
 
@@ -1878,7 +1881,7 @@ quick_set_limits()
 		lib_err ${EX_DATAERR} "limits syntax: rule [descr:description]"
 	fi
 
-	params=`lib_split_jailparams "${params}"`
+	params=`lib_split_jailparams "${params}"` || exit $?
 	local total_items=`printf "%s\n" "${params}" | wc -l`
 	local current_index=0
 
@@ -2104,9 +2107,12 @@ quick_args()
 
 	enable_cmd="appjail enable \"${QUICK_JAILNAME}\" ${enable_cmd}"
 
-	local args_list=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local args_list
+	local total_items
 	local current_index=0
+
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
 
 	local args enable_cmd_args=
 	while [ ${current_index} -lt ${total_items} ]; do 
@@ -2408,7 +2414,10 @@ quick_run_copy()
 	if [ -n "${QUICK_OPTION_FILES}" ]; then
 		lib_debug "Adding files in (${QUICK_OPTION_FILES}) to the list of files to copy ..."
 
-		lib_split_jailparams "${QUICK_OPTION_FILES}" | while IFS= read -r file
+		local files2copy
+		files2copy=`lib_split_jailparams "${QUICK_OPTION_FILES}"` || exit $?
+
+		printf "%s\n" "${files2copy}" | while IFS= read -r file
 		do
 			lib_debug "Reading ${file} ..."
 

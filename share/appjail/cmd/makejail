@@ -540,7 +540,10 @@ makejail_build_args()
 
 	lib_atexit_add "rm -rf \"${escape_tempdir}\" > /dev/null 2>&1"
 
-	lib_split_jailparams "${build_args}" | while IFS= read -r build_arg
+	local build_args_list
+	build_args_list=`lib_split_jailparams "${build_args}"` || exit $?
+
+	printf "%s\n" "${build_args_list}" | while IFS= read -r build_arg
 	do
 		name=`lib_jailparam_name "${build_arg}" "="`
 		if [ -f "${tempdir}/${name}" ]; then
@@ -1017,9 +1020,12 @@ makejail_getinclude_cmd()
 	lib_atexit_add "rm -f \"${escape_output}\""
 	
 	# Arguments
-	local args_list=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local args_list
+	local total_items
 	local current_index=0
+
+	local args_list=`lib_split_jailparams "${args}"` || exit $?
+	local total_items=`printf "%s\n" "${args_list}" | wc -l`
 
 	local cmd_args=
 	while [ ${current_index} -lt ${total_items} ]; do 
@@ -1133,9 +1139,13 @@ makejail_getinclude_git()
 	fi
 
 	# Arguments
-	local args_list=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local args_list
+	local total_items
+
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
 	total_items=$((total_items-1))
+
 	local current_index=1
 
 	local url=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`

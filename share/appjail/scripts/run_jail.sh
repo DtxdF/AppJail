@@ -87,7 +87,7 @@ main()
 	# cleared
 	set --
 	if ! lib_check_empty "${args}"; then
-		args_list=`lib_split_jailparams "${args}"`
+		args_list=`lib_split_jailparams "${args}"` || exit $?
 		total_items=`printf "%s\n" "${args_list}" | wc -l`
 		current_index=0
 

@@ -101,19 +101,16 @@ lib_split_jailparams()
 		lib_err ${EX_USAGE} "usage: lib_split_jailparams parameter"
 	fi
 
-	lib_split_sjailparams "${parameter}" | sed -Ee $'s/^["]//' -e $'s/["]$//'
-}
+	local errmsg ret
 
-lib_split_sjailparams()
-{
+	errmsg=`"${UTILDIR}/appjail-config/tok" "${parameter}" 2>&1`
+	ret=$?
 
-	local parameter="$1"
-
-	if [ -z "${parameter}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_split_jailparams parameter"
+	if [ ${ret} -ne 0 ]; then
+		lib_err ${ret} -- "Tokenizer: ${errmsg}"
 	fi
 
-	lib_split_ujailparams "${parameter}" | sed -Ee "s/\\\\([\"])/\1/g"
+	printf "%s\n" "${errmsg}"
 }
 
 lib_split_ujailparams()

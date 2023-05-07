@@ -47,9 +47,12 @@ main()
 	local login_user="root"
 
 	# Arguments
-	local args_list=`lib_split_jailparams "${args}"`
-	local total_items=`printf "%s\n" "${args_list}" | wc -l`
+	local args_list
+	local total_items
 	local current_index=0
+
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
 	
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
