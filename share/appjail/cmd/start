@@ -48,7 +48,7 @@ start_main()
 	local create_args=
 	local start_args=
 	local jail_name=
-	local template= template_temp escape_template_temp
+	local template=
 	local jail_path
 	local line
 	local errlevel=0
@@ -205,31 +205,17 @@ start_main()
 		fi
 	fi
 
-	# Check only
-	if ! "${APPJAIL_PROGRAM}" config -Agt "${template}" > /dev/null; then
-		exit ${EX_CONFIG}
+	local errmsg
+	errmsg=`lib_ajconf check -t "${template}" 2>&1`
+
+	if [ $? -ne 0 ]; then
+		lib_err ${EX_CONFIG} -- "${errmsg}"
 	fi
 
-	lib_debug "Checking for invalid parameters..."
+	local template_temp
+	template_temp="`lib_generate_tempfile`" || exit $?
 
-	local param
-	for param in name path; do
-		"${APPJAIL_PROGRAM}" config -gct "${template}" \
-			-a "${param}"
-
-		errlevel=$?
-		if [ ${errlevel} -eq 0 ]; then
-			lib_err ${errlevel} -- "${param}: cannot be used in the template configuration."
-		fi
-	done
-
-	template_temp="`lib_generate_tempfile`"
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
-
+	local escape_template_temp
 	escape_template_temp=`lib_escape_string "${template_temp}"`
 
 	lib_atexit_add "rm -f \"${escape_template_temp}\""
@@ -242,12 +228,12 @@ start_main()
 
 	lib_debug "Checking for parameters marked as required..."
 
-	if "${APPJAIL_PROGRAM}" config -Kt "${template_temp}"; then
+	if lib_ajconf getAll -Rt "${template_temp}"; then
 		lib_warn "There are required parameters that must be set before starting the jail:"
-		"${APPJAIL_PROGRAM}" config -kt "${template_temp}" | cut -c2- | while IFS= read -r param; do
+		lib_ajconf getAll -rt "${template_temp}" | cut -c2- | while IFS= read -r param; do
 			lib_warn "    - ${param}"
 		done
-		lib_warn "You can use \`appjail config\` to set the required parameters."
+		lib_warn "You can use \`appjail-config\` to set the required parameters."
 		exit ${EX_CONFIG}
 	fi
 
@@ -256,7 +242,7 @@ start_main()
 		mount.fstab \
 		host.hostname
 	do
-		if "${APPJAIL_PROGRAM}" config -gPct "${template_temp}" -a "${jail_param}"; then
+		if lib_ajconf get -Ct "${template_temp}" "${jail_param}"; then
 			continue
 		fi
 
@@ -297,18 +283,17 @@ start_main()
 	done
 
 	local escape_jail_path=`lib_escape_string "${jail_path}/jail"`
-	echo "path: \"${escape_jail_path}\"" >> "${template_temp}"
+	lib_ajconf set -Vt "${template_temp}" "path=\"${escape_jail_path}\""
 
 	lib_debug "Path: ${jail_path}/jail"
 
 	# It is not necessary since the start command starts the jails.
-	"${APPJAIL_PROGRAM}" config -xPit "${template_temp}" -a 'depend'
+	lib_ajconf del -Pit "${template_temp}" depend
 
 	# To control the start of all jails dependencies.
 	APPJAIL_START_DEPEND="${APPJAIL_START_DEPEND:-1}"
 	if [ "${APPJAIL_START_DEPEND}" = "1" ]; then
 		"${SCRIPTSDIR}/get_depends.sh" \
-			-a "${APPJAIL_PROGRAM}" \
 			-c "${CONFIG}" \
 			-t "${template}" \
 			-- "${jail_name}" |\
@@ -335,7 +320,7 @@ start_main()
 	fi
 
 	lib_debug "Compiling template to \`${jail_path}/conf/jail.conf\` ..."
-	if ! lib_template2jail_conf "${jail_name}" "${template_temp}" > "${jail_path}/conf/jail.conf"; then
+    if ! lib_ajconf jailConf -n "${jail_name}" -t "${template_temp}" > "${jail_path}/conf/jail.conf"; then
 		lib_err ${EX_IOERR} "Error while compiling the template."
 	fi
 
@@ -502,14 +487,9 @@ start_jail()
 	fi
 
 	local jail_path="${JAILDIR}/${jail_name}"
+
 	local jail_type
-
-	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		return ${errlevel}
-	fi
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || return $?
 
 	case "${jail_type}" in
 		${JAIL_TYPE_THIN})
@@ -521,7 +501,7 @@ start_jail()
 			local osarch osversion release_name
 
 			for conf_key in ${conf_keys}; do
-				conf_value=`"${APPJAIL_PROGRAM}" config -gnit "${jail_path}/conf/config.conf" -a "${conf_key}"`
+				conf_value=`lib_ajconf get -Vnit "${jail_path}/conf/config.conf" "${conf_key}"`
 
 				if lib_check_empty "${conf_value}"; then
 					lib_err ${EX_CONFIG} -- "${conf_key} is empty or not defined in the configuration file!"

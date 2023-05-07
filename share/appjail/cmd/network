@@ -272,12 +272,7 @@ network_assign()
 	jail_path="${JAILDIR}/${jail_name}"
 
 	local jail_type
-	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || exit $?
 
 	case "${jail_type}" in
 		${JAIL_TYPE_THICK}|${JAIL_TYPE_THIN}) ;;
@@ -291,12 +286,7 @@ network_assign()
 	local network_netmask=`network_get -I -- "${network_name}" netmask`
 	local network_broadcast=`network_get -I -- "${network_name}" broadcast`
 
-	address=`network_reserve -j "${jail_name}" -n "${network_name}" -a "${address}"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
+	address=`network_reserve -j "${jail_name}" -n "${network_name}" -a "${address}"` || exit $?
 
 	jexec -l "${jail_name}" \
 		ifconfig "eb_${ether_name}" \

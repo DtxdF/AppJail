@@ -31,7 +31,6 @@
 main()
 {
 	local _o
-	local appjail_program
 	local config
 	local template
 	local jail_name
@@ -44,11 +43,8 @@ main()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":a:c:t:" _o; do
+	while getopts ":c:t:" _o; do
 		case "${_o}" in
-			a)
-				appjail_program="${OPTARG}"
-				;;
 			c)
 				config="${OPTARG}"
 				;;
@@ -101,7 +97,7 @@ main()
 
 	lib_atexit_add "rm -f \"${escape_seen}\""
 
-	dep_resolve "${jail_name}" "${resolved}" "${seen}" "${appjail_program}" "${template}"
+	dep_resolve "${jail_name}" "${resolved}" "${seen}" "${template}"
 
 	while IFS= read -r depend; do
 		printf "%s\n" "${depend}"
@@ -114,11 +110,10 @@ dep_resolve()
 	local jail_name="$1"
 	local resolved="$2"
 	local seen="$3"
-	local appjail_program="$4"
-	local template="$5"
+	local template="$4"
 
-	if [ -z "${jail_name}" -o -z "${resolved}" -o -z "${seen}" -o -z "${appjail_program}" -o -z "${template}" ]; then
-		lib_err ${EX_USAGE} "usage: dep_resolve jail_name resolved_file seen_file appjail_program template"
+	if [ -z "${jail_name}" -o -z "${resolved}" -o -z "${seen}" -o -z "${template}" ]; then
+		lib_err ${EX_USAGE} "usage: dep_resolve jail_name resolved_file seen_file template"
 	fi
 
 	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
@@ -134,13 +129,13 @@ dep_resolve()
 	lib_debug -- "${jail_name} appended to the \`seen\` list."
 
 	if [ -f "${template}" ]; then
-		"${appjail_program}" config -gPilt "${template}" -a 'depend' | while IFS= read -r jail_depend; do
-			if ! match "${jail_depend}" "${resolved}"; then
-				if match "${jail_depend}" "${seen}"; then
-					lib_err ${EX_CONFIG} "${jail_name}: dependency loop: ${jail_depend}"
-				fi
-				dep_resolve "${jail_depend}" "${resolved}" "${seen}" "${appjail_program}" "${JAILDIR}/${jail_depend}/conf/template.conf"
+		lib_ajconf getColumn -Ppit "${template}" depend | while IFS= read -r jail_depend; do
+		    if ! match "${jail_depend}" "${resolved}"; then
+			if match "${jail_depend}" "${seen}"; then
+			    lib_err ${EX_CONFIG} "${jail_name}: dependency loop: ${jail_depend}"
 			fi
+			dep_resolve "${jail_depend}" "${resolved}" "${seen}" "${JAILDIR}/${jail_depend}/conf/template.conf"
+		    fi
 		done
 	else
 		lib_debug "Missing template.conf for ${jail_name}"
@@ -174,7 +169,7 @@ match()
 
 usage()
 {
-	echo "usage: get_depends.sh -a appjail_program -c config -t template jail_name"
+	echo "usage: get_depends.sh -c config -t template jail_name"
 }
 
 main "$@"

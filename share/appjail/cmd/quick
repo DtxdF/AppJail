@@ -319,11 +319,11 @@ quick_run_vnet()
 		return 0
 	fi
 
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
 
 	local interface
 	for interface in ${QUICK_OPTION_VNET_INTERFACES}; do
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"${interface}\""
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="\"${interface}\""
 	done
 }
 
@@ -415,8 +415,8 @@ quick_run_nat()
 		exit ${errlevel}
 	fi
 
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail nat on jail \"${name}\""'
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail nat off jail \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart='"appjail nat on jail \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail nat off jail \"${name}\""'
 }
 
 quick_set_nat()
@@ -555,8 +555,8 @@ quick_run_nonat()
 		exit ${errlevel}
 	fi
 
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail nat on jail \"${name}\""'
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail nat off jail \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart='"appjail nat on jail \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail nat off jail \"${name}\""'
 }
 
 quick_set_nonat()
@@ -719,8 +719,8 @@ quick_run_expose()
 		exit ${errlevel}
 	fi
 
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.prestart="appjail expose on \"${name}\""'
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail expose off \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart='"appjail expose on \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail expose off \"${name}\""'
 }
 
 quick_set_expose()
@@ -856,7 +856,7 @@ quick_run_jng()
 	lib_modules_load "ng_ether"
 	
 	# vnet
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
 
 	lib_keys_list "${QUICK_KEY_JNG}" | while IFS= read -r jng_name
 	do
@@ -864,9 +864,9 @@ quick_run_jng()
 		interfaces=`lib_keys_get "${QUICK_KEY_JNG}" "${jng_name}" "interfaces"`
 		bridge=`lib_keys_get "${QUICK_KEY_JNG}" "${jng_name}" "bridge"`
 
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=${ng_interfaces}"
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"jng bridge -b ${bridge} ${jng_name} ${interfaces}\""
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.poststop=\"jng shutdown ${jng_name}\""
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="${ng_interfaces}"
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"jng bridge -b ${bridge} ${jng_name} ${interfaces}\""
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop="\"jng shutdown ${jng_name}\""
 	done
 }
 
@@ -1003,7 +1003,7 @@ quick_run_virtualnet()
 	fi
 
 	# vnet
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
 
 	lib_keys_list "${QUICK_KEY_VIRTUALNET}" | while IFS= read -r virtualnet
 	do
@@ -1035,7 +1035,7 @@ quick_run_virtualnet()
 		interface_desc=`lib_keys_get "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface_desc"`
 		
 		# vnet interfaces
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"eb_${interface}\""
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="\"eb_${interface}\""
 
 		lib_debug "VNET Interface:e[ab]_${interface} Description:${interface_desc}"
 
@@ -1044,29 +1044,32 @@ quick_run_virtualnet()
 			local escape_interface_desc
 			escape_interface_desc=`lib_escape_string "${interface_desc}" "${QUICK_ESCAPE_TEMPLATE}"`
 
-			appjail config \
+			lib_ajconf set \
 				-It "${QUICK_TEMP_TEMPLATE}" \
-				-a "exec.prestart=\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\" -d \\\"${escape_interface_desc}\\\"\""
+				exec.prestart="\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\" -d \\\"${escape_interface_desc}\\\"\""
 		else
-			appjail config \
+			lib_ajconf set \
 				-It "${QUICK_TEMP_TEMPLATE}" \
-				-a "exec.prestart=\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\"\""
+				exec.prestart="\"appjail network plug -e \\\"${interface}\\\" -n \\\"${virtualnet}\\\"\""
 		fi
 
 		# assign
 		if [ -n "${QUICK_OPTION_DEFNET}" ] && [ "${QUICK_OPTION_DEFNET}" = "${virtualnet}" ]; then
 			lib_debug "${virtualnet} is the default router."
 
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" \
-					-a "exec.poststart=\"appjail network assign -d -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
+			lib_ajconf set \
+				-It "${QUICK_TEMP_TEMPLATE}" \
+				exec.poststart="\"appjail network assign -d -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
 		else
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" \
-					-a "exec.poststart=\"appjail network assign -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
+			lib_ajconf set \
+				-It "${QUICK_TEMP_TEMPLATE}" \
+				exec.poststart="\"appjail network assign -e \\\"${interface}\\\" -j \\\"\${name}\\\" -n \\\"${virtualnet}\\\"\""
 		fi
 
 		# unplug
-		appjail config -It "${QUICK_TEMP_TEMPLATE}" \
-				-a "exec.poststop=\"appjail network unplug \\\"${virtualnet}\\\" \\\"${interface}\\\"\""
+		lib_ajconf set \
+			-It "${QUICK_TEMP_TEMPLATE}" \
+			exec.poststop="\"appjail network unplug \\\"${virtualnet}\\\" \\\"${interface}\\\"\""
 	done
 
 	errlevel=$?
@@ -1345,7 +1348,7 @@ quick_run_alias()
 	if [ -n "${QUICK_OPTION_ALIAS_IFACE}" ]; then
 		lib_debug "Default interface: ${QUICK_OPTION_ALIAS_IFACE}"
 
-		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "interface=\"${QUICK_OPTION_ALIAS_IFACE}\""
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" interface="\"${QUICK_OPTION_ALIAS_IFACE}\""
 	fi
 
 	if [ ${QUICK_OPTION_VIRTUALNET} -eq 1 ]; then
@@ -1371,7 +1374,7 @@ quick_run_alias()
 
 			lib_debug "Adding IPv4 address to ${QUICK_JAILNAME} template: ${ip4}"
 
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip4.addr=${ip4}"
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" ip4.addr="${ip4}"
 		done
 
 		errlevel=$?
@@ -1399,20 +1402,20 @@ quick_run_alias()
 
 			lib_debug "Adding IPv4 address to ${QUICK_JAILNAME} template: ${addr}"
 
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip4.addr=${addr}"
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" ip4.addr="${addr}"
 		done
 
 		has_option=1
 	elif [ ${QUICK_OPTION_IP4_INHERIT} -eq 1 ]; then
 		lib_debug -- "${QUICK_JAILNAME} will inherit the IPv4 stack ..."
 
-		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip4=inherit"
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" ip4="inherit"
 
 		has_option=1
 	elif [ ${QUICK_OPTION_IP4_DISABLE} -eq 1 ]; then
 		lib_debug -- "${QUICK_JAILNAME} will not be able to use the IPv4 stack ..."
 
-		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip4=disable"
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" ip4="disable"
 
 		has_option=1
 	fi
@@ -1434,20 +1437,20 @@ quick_run_alias()
 
 			lib_debug "Adding IPv6 address to ${QUICK_JAILNAME} template: ${addr}"
 
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "ip6.addr=${addr}"
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" ip6.addr="${addr}"
 		done
 
 		has_option=1
 	elif [ ${QUICK_OPTION_IP6_INHERIT} -eq 1 ]; then
 		lib_debug -- "${QUICK_JAILNAME} will inherit the IPv6 stack ..."
 
-		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip6=inherit"
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" ip6="inherit"
 
 		has_option=1
 	elif [ ${QUICK_OPTION_IP6_DISABLE} -eq 1 ]; then
 		lib_debug -- "${QUICK_JAILNAME} will not be able to use the IPv6 stack ..."
 
-		appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "ip6=disable"
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" ip6="disable"
 
 		has_option=1
 	fi
@@ -1597,7 +1600,7 @@ quick_run_bridge()
 	fi
 	
 	# vnet
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "vnet"
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
 
 	lib_keys_list "${QUICK_KEY_BRIDGE}" | while IFS= read -r bridge
 	do
@@ -1605,14 +1608,14 @@ quick_run_bridge()
 
 		epairs=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "epairs"`
 		for epair in ${epairs}; do
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "vnet.interface=\"sb_${epair}\""
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"appjail network attach -b \\\"${bridge}\\\" \\\"epair:${epair}\\\"\""
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.poststop=\"appjail network detach -b \\\"${bridge}\\\" -id \\\"epair:${epair}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="\"sb_${epair}\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"epair:${epair}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop="\"appjail network detach -b \\\"${bridge}\\\" -id \\\"epair:${epair}\\\"\""
 		done
 
 		interfaces=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "interfaces"`
 		for interface in ${interfaces}; do
-			appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.prestart=\"appjail network attach -b \\\"${bridge}\\\" \\\"iface:${interface}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"iface:${interface}\\\"\""
 		done
 	done
 }
@@ -1813,7 +1816,8 @@ quick_run_cpuset()
 		return 0
 	fi
 
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a "exec.created=\"appjail cpuset \\\"\${name}\\\" \\\"${QUICK_OPTION_CPUSET}\\\"\""
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" \
+		exec.created="\"appjail cpuset \\\"\${name}\\\" \\\"${QUICK_OPTION_CPUSET}\\\"\""
 }
 
 quick_set_cpuset()
@@ -1859,8 +1863,8 @@ quick_run_limits()
 		fi
 	done
 
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.created="appjail limits on \"${name}\""'
-	appjail config -It "${QUICK_TEMP_TEMPLATE}" -a 'exec.poststop="appjail limits off \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.created='"appjail limits on \"${name}\""'
+	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail limits off \"${name}\""'
 }
 
 quick_set_limits()
@@ -2210,8 +2214,8 @@ quick_run_devfs()
 
 	lib_debug "Using devfs option ..."
 
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "mount.devfs"
-	appjail config -st "${QUICK_TEMP_TEMPLATE}" -a "devfs_ruleset=${QUICK_OPTION_DEVFS_RULESET}"
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" mount.devfs
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" devfs_ruleset="${QUICK_OPTION_DEVFS_RULESET}"
 }
 
 quick_set_devfs_ruleset()
@@ -2617,7 +2621,7 @@ quick_vnetiface()
 
 quick_list_vifaces()
 {
-	appjail config -glPt "${QUICK_TEMP_TEMPLATE}" -a 'vnet.interface'
+	lib_ajconf getColumn -Ppt "${QUICK_TEMP_TEMPLATE}" vnet.interface
 }
 
 quick_iface()

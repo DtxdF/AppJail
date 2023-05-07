@@ -215,12 +215,7 @@ _pkg_getjailtype()
 	jail_path="${JAILDIR}/${jail_name}"
 
 	local jail_type
-	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || exit $?
 
 	if lib_check_empty "${jail_type}"; then
 		lib_err ${EX_CONFIG} "Jail type is empty!"

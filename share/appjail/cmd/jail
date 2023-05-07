@@ -333,7 +333,7 @@ jail_create()
 				;;
 		esac
 
-		"${APPJAIL_PROGRAM}" config -st "${jail_path}/conf/config.conf" -a "${conf_key}=${conf_value}"
+		lib_ajconf set -Vt "${jail_path}/conf/config.conf" "${conf_key}=${conf_value}"
 	done
 
 	jail_mark_clean "${jail_name}"
@@ -1420,7 +1420,7 @@ jail_install_tiny+import()
 	local param_osarch param_osversion param_jail_type
 
 	for conf_key in ${conf_keys}; do
-		conf_value=`"${APPJAIL_PROGRAM}" config -gnit "${tempdir}/config.conf" -a "${conf_key}"`
+		conf_value=`lib_ajconf get -Vnit "${tempdir}/config.conf" "${conf_key}"`
 
 		if lib_check_empty "${conf_value}"; then
 			lib_err ${EX_CONFIG} -- "${conf_key} is empty or not defined in the configuration file!"
@@ -1730,15 +1730,13 @@ jail_get()
 			value=
 			case "${keyword}" in
 				appjail_version)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "appjail_version"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e appjail_version "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni appjail_version`
 					fi
 					;;
 				arch)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "osarch"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e osarch "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni osarch`
 					fi
 					;;
 				boot)
@@ -1749,9 +1747,8 @@ jail_get()
 					fi
 					;;
 				created)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "birth"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e birth "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni birth`
 
 						if ! lib_check_empty "${value}"; then
 							if ! lib_check_number "${value}"; then
@@ -1775,18 +1772,18 @@ jail_get()
 					;;
 				ip4)
 
-					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *ip4\.addr' "${template_conf}"; then
-						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'ip4.addr' | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					if [ ${status_template} -eq 1 ]; then
+						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip4.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
 					fi
 					;;
 				ip6)
-					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *ip6\.addr' "${template_conf}"; then
-						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'ip6.addr' | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					if [ ${status_template} -eq 1 ]; then
+						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip6.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
 					fi
 					;;
 				hostname)
-					if [ ${status_template} -eq 1 ] && grep -qE '^\*? *host\.hostname' "${template_conf}"; then
-						value=`"${APPJAIL_PROGRAM}" config -iPnlgj "${jail_name}" -a 'host.hostname' | tr '\n' ' ' | sed -Ee 's/ $/\n/'`
+					if [ ${status_template} -eq 1 ]; then
+						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi host.hostname | tr '\n' ',' | sed -Ee 's/,$/\n/'`
 					fi
 					;;
 				locked)
@@ -1831,9 +1828,8 @@ jail_get()
 					fi
 					;;
 				release_name)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "release_name"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e release_name "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni release_name`
 					fi
 					;;
 				status)
@@ -1845,15 +1841,13 @@ jail_get()
 					fi
 					;;
 				type)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "jail_type"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e jail_type "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni jail_type`
 					fi
 					;;
 				version)
-					#value=`"${APPJAIL_PROGRAM}" config -gnit "${JAILDIR}/${jail_name}/conf/config.conf" -a "osversion"`
 					if [ ${status_config} -eq 1 ]; then
-						value=`grep -e osversion "${config_file}" | cut -d' ' -f2-`
+						value=`lib_ajconf get -t "${config_file}" -Vni osversion`
 					fi
 					;;
 			esac
@@ -2397,7 +2391,7 @@ Installation methods:
                                  Parameters: 
 				     - snapname: Snapshot name to be created if it does not exist.
                                  Descr: Clones a release and uses it to create another jail.
-				        Valid types: \`thick\`, \`linux+debootstrap\`
+					Valid types: \`thick\`, \`linux+debootstrap\`
 
     copy                      -- Syntax: copy=jail2copy
                                  Parameters:
@@ -2411,7 +2405,7 @@ Installation methods:
                                  Parameters:
 				     - output: Tarball name.
 				     - compress: Compress the tarball using the following methods:
-				                 bzip, gzip, lrzip (requires archivers/lrzip), lz4,
+						 bzip, gzip, lrzip (requires archivers/lrzip), lz4,
 						 lzma, lzop (requires archivers/lzop), xz, zstd.
 						 If not defined, compression is not used.
 				 Descr: Export the jail directory (\`{JAILDIR}/{JAIL_NAME}/jail\`).
@@ -2454,9 +2448,9 @@ Installation methods:
                                  Parameters:
 				     - input: The file to import.
 				     - compress: AppJail can auto-detect the compression used, but you can force any other
-				                 compression if you wish.
+						 compression if you wish.
 				 Descr: Import the file to the dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}/jail\`).
-				        The root dataset will be created.
+					The root dataset will be created.
 
     zfs+import+root           -- Syntax: zfs+import+root="input:in_file [compress:algo]"
 				 Descr: Import the file to the root dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}\`).

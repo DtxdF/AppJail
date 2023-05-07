@@ -53,7 +53,6 @@ rstop_main()
 	local template="${JAILDIR}/${jail_name}/conf/template.conf"
 
 	"${SCRIPTSDIR}/get_depends.sh" \
-		-a "${APPJAIL_PROGRAM}" \
 		-c "${CONFIG}" \
 		-t "${template}" \
 		-- "${jail_name}" | tail -r |\

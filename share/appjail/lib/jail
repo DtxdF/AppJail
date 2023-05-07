@@ -862,3 +862,10 @@ lib_split_ujailparams()
 
 	printf "%s" "${parameter}" | grep -Eoe $'[^ ]+' -e $'["]([^"]|\\\\["])+["]'
 }
+
+lib_ajconf()
+{
+    APPJAIL_CONFIG_JAILDIR="${JAILDIR}"; export APPJAIL_CONFIG_JAILDIR
+
+    "${UTILDIR}/appjail-config/appjail-config" "$@"
+}

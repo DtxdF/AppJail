@@ -84,21 +84,18 @@ update_jail()
 	fi
 
 	local jail_type
-	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		return ${errlevel}
-	fi
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || return $?
 
 	if [ "${jail_type}" != "${JAIL_TYPE_THICK}" ]; then
 		lib_err ${EX_NOPERM} "${jail_name} is not a thickjail."
 	fi
 
+	local freebsd_update_args
 	if [ ${opt_force} -eq 1 ]; then
 		freebsd_update_args="-F"
 	fi
 
+	local currently_running
 	currently_running=`chroot "${basedir}" freebsd-version`
 
 	freebsd-update \
@@ -119,8 +116,6 @@ update_release()
 	local freebsd_arch="${FREEBSD_ARCH}"
 	local release_name="${DEFAULT_RELEASE}"
 	local freebsd_version="${FREEBSD_VERSION}"
-	# freebsd-update(8) args
-	local freebsd_update_args= basedir currently_running
 
 	while getopts ":fjra:v:" _o; do
 		case "${_o}" in
@@ -167,16 +162,18 @@ update_release()
 
 	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
 
-	basedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}/release"
+	local basedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}/release"
 
 	if [ ! -d "${basedir}" ]; then
 		lib_err ${EX_NOINPUT} "Cannot find the release directory (${basedir})."
 	fi
 
+	local freebsd_update_args
 	if [ ${opt_force} -eq 1 ]; then
 		freebsd_update_args="-F"
 	fi
 
+	local currently_running
 	currently_running=`chroot "${basedir}" freebsd-version`
 
 	freebsd-update \

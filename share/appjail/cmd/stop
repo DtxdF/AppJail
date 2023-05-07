@@ -240,14 +240,9 @@ stop_jail()
 	fi
 
 	local jail_path="${JAILDIR}/${jail_name}"
+
 	local jail_type
-
-	jail_type=`"${APPJAIL_PROGRAM}" config -gnt "${jail_path}/conf/config.conf" -a "jail_type"`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		return ${errlevel}
-	fi
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || return $?
 
 	case "${jail_type}" in
 		thin)
