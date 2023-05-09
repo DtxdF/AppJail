@@ -47,6 +47,8 @@ main()
 		local name=`lib_jailparam_name "${arg}" "="`
 		local default_value=`lib_jailparam_value "${arg}" "="`
 
+		name=`get_mkvarkey "${name}"`
+
 		if ! lib_check_empty "${default_value}"; then
 			default_value=`lib_escape_string "${default_value}" "" "${escape_chars}"`
 		fi
@@ -58,6 +60,7 @@ main()
 	init_parse
 	while IFS= read -r arg; do
 		local name=`lib_jailparam_name "${arg}" "="`
+		name=`get_mkvarkey "${name}"`
 
 		option_parse "${name}"
 	done < "${input}"
@@ -67,8 +70,22 @@ main()
 	while IFS= read -r arg; do
 		local name=`lib_jailparam_name "${arg}" "="`
 
+		if lib_check_mkvar "${name}" 1; then
+			continue
+		fi
+
 		required_parse "${name}"
 	done < "${input}"
+}
+
+get_mkvarkey()
+{
+	local key="$1"
+	if [ -z "${key}" ]; then
+		lib_err ${EX_USAGE} "usage: get_mkvarkey key"
+	fi
+
+	printf "%s" "${key}" | sed -Ee 's/^([a-zA-Z_][a-zA-Z0-9_]*)\??$/\1/'
 }
 
 init_parse()

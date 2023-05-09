@@ -65,6 +65,30 @@ lib_check_var()
 	fi
 }
 
+lib_check_mkvar()
+{
+	local variable="$1" only_mkvar="$2"
+
+	if [ -z "${variable}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_mkvar variable only_mkvar"
+	fi
+
+	only_mkvar="${only_mkvar:-0}"
+	
+	local regex
+	if [ ${only_mkvar} -eq 0 ]; then
+		regex='^[a-zA-Z_][a-zA-Z0-9_]*\??(=.*)?$'
+	else
+		regex='^[a-zA-Z_][a-zA-Z0-9_]*\?(=.*)?$'
+	fi
+
+	if printf "%s" "${variable}" | grep -Eq "${regex}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 lib_check_jailname()
 {
 	local jail_name="$1"

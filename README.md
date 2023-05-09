@@ -1426,14 +1426,14 @@ ADD https://dl-cdn.alpinelinux.org/alpine/v3.17/releases/x86_64/alpine-minirootf
 #### Syntax
 
 ```
-ARG name[=default_value]
+ARG name[?][=[default_value]]
 ```
 
 #### Description
 
 Creates arguments to the current stage. See `Initscripts` for more details.
 
-If `default_value` is not defined, the argument will be a non-optional argument.
+If `default_value` is not defined, the argument will be a non-optional argument unless `?=` is used.
 
 #### Examples
 

@@ -38,10 +38,10 @@ main()
 {
 	local arg="$1"
 	if lib_check_empty "${arg}"; then
-		lib_err ${EX_USAGE} "usage: ARG name[=default_value]"
+		lib_err ${EX_USAGE} "usage: ARG name[?][=[default_value]]"
 	fi
 
-	if ! lib_check_var "${arg}"; then
+	if ! lib_check_mkvar "${arg}"; then
 		lib_err ${EX_DATAERR} -- "${arg}: Invalid variable."
 	fi
 
