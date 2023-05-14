@@ -103,10 +103,6 @@ main()
 
 			param_value=`lib_jailparam_value "${arg}" =`
 
-			if lib_check_empty "${param_value}"; then
-				lib_err ${EX_DATAERR} "option requires an argument -- ${parameter}"
-			fi
-
 			set -- "$@" "--${parameter}" "${param_value}"
 		done
 	fi
