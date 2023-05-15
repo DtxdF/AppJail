@@ -2899,7 +2899,7 @@ Options:
                              Descr: Allow unrestricted access to all addresses on the system.
 
     ip6                   -- Syntax: ip6="ipv6_address"
-                                     ip6="interface|ipv6_adddress"
+                                     ip6="interface|ipv6_address"
 			     Type: options
 			     Requires: alias
                              Descr: Counterpart of ip4.
