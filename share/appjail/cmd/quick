@@ -2953,9 +2953,6 @@ Options:
 			     Type: options
 			     Conflicts: ip4_inherit or ip4_disable
 			     Requires: alias
-			     Parameters:
-				 - ipv4_address (IPv4 address, required):
-				 - interface (str, optional):
 			     Examples:
 			         - ip4="jext|192.168.1.120/24"
 			     Descr: IPv4 address to be used as alias.
