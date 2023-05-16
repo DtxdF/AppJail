@@ -65,6 +65,7 @@ cleanall: utils-cleanall
 uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-dns"
+	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-config"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-natnet"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
