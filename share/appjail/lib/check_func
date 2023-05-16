@@ -870,3 +870,17 @@ _lib_check_cpulist()
 		exit ${errlevel}
 	fi
 }
+
+lib_check_macaddr()
+{
+	local macaddr="$1"
+	if [ -z "${macaddr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_macaddr macaddr"
+	fi
+
+	if printf "%s" "${macaddr}" | grep -qEe '^([a-fA-F0-9]{1,2}(-|:)){5}[a-fA-F0-9]{1,2}$'; then
+		return 0
+	else
+		return 1
+	fi
+}

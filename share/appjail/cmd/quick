@@ -58,6 +58,7 @@ QUICK_IFNAMSIZ=15
 # Directories
 QUICK_KEY_BRIDGE="bridge"
 QUICK_KEY_DHCP="dhcp"
+QUICK_KEY_ETHER="ether"
 QUICK_KEY_EXPOSE="expose"
 QUICK_KEY_FSTAB="fstab"
 QUICK_KEY_IP4="ip4"
@@ -111,6 +112,7 @@ QUICK_OPTION_JNG=0
 QUICK_OPTION_LINUXFS=0
 QUICK_OPTION_LOGIN="${DEFAULT_LOGIN}"
 QUICK_OPTION_LOGIN_USER="${DEFAULT_LOGIN_USER}"
+QUICK_OPTION_MACADDR=0
 QUICK_OPTION_MOUNT_DEVFS="${DEFAULT_MOUNT_DEVFS}"
 QUICK_OPTION_NAT=0
 QUICK_OPTION_NONAT=0
@@ -172,7 +174,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -201,6 +203,9 @@ quick_main()
 	local virtualnet_options
 	virtualnet_options="virtualnet"
 
+	local interface_options
+	interface_options="macaddr"
+
 	local autoconf_options
 	autoconf_options="dhcp slaac"
 
@@ -208,7 +213,7 @@ quick_main()
 	nat_options="nat nonat expose"
 
 	local network_options
-	network_options="${vnet_options} ${bridge_options} ${alias_options} ${virtualnet_options} ${jng_options} ${autoconf_options} ${nat_options}"
+	network_options="${vnet_options} ${bridge_options} ${alias_options} ${virtualnet_options} ${interface_options} ${jng_options} ${autoconf_options} ${nat_options}"
 
 	local limits_options
 	limits_options="cpuset limits"
@@ -1516,7 +1521,7 @@ quick_run_dhcp()
 		lib_debug "Configuring ${interface} to use DHCP ..."
 
 		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
-		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}="SYNCDHCP" >&2 || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="SYNCDHCP" >&2 || exit $?
 	done
 
 	errlevel=$?
@@ -1572,7 +1577,7 @@ quick_run_slaac()
 
 		# Actives the interface if the `dhcp` option did not.
 		if [ ${QUICK_OPTION_DHCP} -eq 0 ]; then
-			sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}="up" >&2 || exit $?
+			sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="up" >&2 || exit $?
 		fi
 
 		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}_ipv6="inet6 auto_linklocal accept_rtadv" >&2 || exit $?
@@ -2238,6 +2243,75 @@ quick_set_devfs_ruleset()
 	fi
 
 	QUICK_OPTION_DEVFS_RULESET="${devfs_ruleset}"
+}
+
+quick_run_macaddr()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_MACADDR} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_BRIDGE} -eq 0 -a ${QUICK_OPTION_JNG} -eq 0 -a ${QUICK_OPTION_VNET} -eq 0 ]; then
+		quick_reqoptions "macaddr" "bridge, jng or vnet"
+	fi
+
+	case "${QUICK_OPTION_JAILTYPE}" in
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
+		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: macaddr can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+	esac
+
+	lib_keys_list "${QUICK_KEY_ETHER}" | while IFS= read -r nro
+	do
+		interface=`lib_keys_get "${QUICK_KEY_ETHER}" "${nro}" "interface"`
+		addr=`lib_keys_get "${QUICK_KEY_ETHER}" "${nro}" "addr"`
+
+		# Check if {interface} is in {vnet.interface}.
+		match=`quick_vnetiface "${interface}"`
+		if lib_check_empty "${match}"; then
+			interfaces=`quick_list_vifaces`
+			lib_err ${EX_CONFIG} -- "${interface}: the interface is not in vnet.interface. Current interfaces: ${interfaces}"
+		fi
+
+		lib_debug "Configuring ${interface} to use the MAC address \`${addr}\`"
+
+		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="ether ${addr}" >&2 || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_macaddr()
+{
+	local parameters
+
+	parameters="$1"; quick_reqoption "macaddr" "${parameters}"
+
+	local interface addr
+
+	interface=`lib_jailparam_name "${parameters}" :`
+	addr=`lib_jailparam_value "${parameters}" :`
+
+	if lib_check_empty "${interface}" || lib_check_empty "${addr}"; then
+		lib_err ${EX_DATAERR} "macddr syntax: interface:addr"
+	fi
+
+	if [ "${addr}" != "random" ] && ! lib_check_macaddr "${addr}"; then
+		lib_err ${EX_DATAERR} "Invalid MAC address: ${addr}"
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_ETHER}"
+	nro=`lib_keys_append "${QUICK_KEY_ETHER}" "interface" "${interface}"`
+	lib_keys_set "${QUICK_KEY_ETHER}" "${nro}" "addr" "${addr}"
+
+	QUICK_OPTION_MACADDR=1
 }
 
 quick_set_mount_devfs()
@@ -2956,6 +3030,20 @@ Options:
                              Type: str
                              Default: ${QUICK_OPTION_LOGIN_USER}
                              Descr: Username used by the login command.
+
+    macaddr               -- Syntax: macaddr="interface:addr"
+                             Type: options
+			     Requires: bridge, jng or vnet
+			     Parameters:
+			         - interface (str, required):
+				     Interface name.
+				 - addr (str, required): 
+				     MAC address. \`random\` can be used to choose a random MAC address.
+			     Examples:
+			         - macaddr="sb_nginx:aa-bb-cc-dd-ee-ff"
+				 - macaddr="sb_apache:aa:bb:cc:aa:10:fe"
+				 - macaddr="sb_jtest:random"
+			     Descr: Changes the MAC address of a given interface.
 
     mount_devfs           -- Syntax: mount_devfs
                              Type: bool
