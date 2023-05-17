@@ -3662,6 +3662,38 @@ NRO  ENABLED  NAME  DEVICE      MOUNTPOINT  TYPE    OPTIONS  DUMP  PASS
 0    1        -     /usr/ports  /usr/ports  nullfs  rw       0     0
 ```
 
+## Unprivileged users
+
+When you share a server with co-workers or when you are the only person using a laptop, it is probably worth using AppJail without accessing the `root` account. AppJail has a simple but useful wrapper for such users named `appjail-user`.
+
+The `appjail-user` uses `RUNAS` (default: `doas`) to execute AppJail commands as root. You can set it in the AppJail configuration file to whatever you prefer, such as `sudo` or `doas`. Of course, you need to install one of them first. I recommend using `security/doas` because it is simple and secure.
+
+The only rule required in your `doas.conf(5)` file is:
+
+```
+permit nopass :appjail as root cmd appjail
+```
+
+If you want, you can remove `nopass` to require a password. This rule also assumes that you have a group named `appjail`. If you don't, don't worry:
+
+```sh
+pw groupadd -n appjail
+```
+
+To add your user to the `appjail` group simply run the following:
+
+```sh
+pw groupmod -n appjail -m "$USER"
+```
+
+Where `$USER` is your user. For these changes to take effect, you must log back into the system if you are adding yourself.
+
+Now, any user that is in that group can run `appjail-user` as the administrator runs `appjail`:
+
+```
+$ appjail-user jail list
+```
+
 ## Design decisions
 
 Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`. Network names and custom stage names use the same regex. For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`. For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.

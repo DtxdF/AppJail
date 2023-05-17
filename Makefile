@@ -28,6 +28,7 @@ install: utils-strip
 	# Wrappers & misc.
 	${INSTALL} -m 555 share/appjail/scripts/dns.sh "${DESTDIR}${PREFIX}/bin/appjail-dns"
 	${INSTALL} -m 555 share/appjail/scripts/ajconf.sh "${DESTDIR}${PREFIX}/bin/appjail-config"
+	${INSTALL} -m 555 share/appjail/scripts/ajuser.sh "${DESTDIR}${PREFIX}/bin/appjail-user"
 
 	# cmd
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/cmd"
@@ -60,7 +61,7 @@ install: utils-strip
 	${FIND} share/appjail/scripts -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# Prefix.
-.for f in bin/appjail bin/appjail-config share/appjail/files/config.conf share/appjail/files/default.conf 
+.for f in bin/appjail bin/appjail-config bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf 
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 
@@ -96,6 +97,7 @@ uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-dns"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-config"
+	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-user"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-natnet"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
