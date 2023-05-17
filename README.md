@@ -10,6 +10,10 @@ AppJail is an open source framework entirely written in `sh(1)` and C to create 
 
 Contribute your Makejail: https://github.com/AppJail-makejails
 
+## Comparing AppJail
+
+[How does AppJail compare to other FreeBSD jail frameworks?](https://github.com/DtxdF/AppJail/wiki#comparing-appjail)
+
 ## Features
 
 * Easy to use.
