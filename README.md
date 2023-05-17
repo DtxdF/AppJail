@@ -3676,6 +3676,9 @@ The only rule required in your `doas.conf(5)` file is:
 
 ```
 permit nopass :appjail as root cmd appjail
+
+# If you plan to use x11 applications, it is probably necessary to pass `keepenv`:
+#permit nopass keepenv :appjail as root cmd appjail
 ```
 
 If you want, you can remove `nopass` to require a password. This rule also assumes that you have a group named `appjail`. If you don't, don't worry:
