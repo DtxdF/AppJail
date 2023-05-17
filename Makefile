@@ -1,4 +1,5 @@
 CP?=cp
+FIND?=find
 INSTALL?=install
 MKDIR?=mkdir
 RM?=rm
@@ -9,10 +10,11 @@ all: install
 
 install: utils-strip
 	# Directories.
-	${MKDIR} -p "${DESTDIR}${PREFIX}/bin"
-	${MKDIR} -p "${DESTDIR}${PREFIX}/share/appjail"
-	${MKDIR} -p "${DESTDIR}${PREFIX}/etc"
-	${MKDIR} -p "${DESTDIR}${PREFIX}/etc/rc.d"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/bin"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc/rc.d"
 	
 	# rc scripts.
 .for rc_script in appjail appjail-natnet
@@ -20,34 +22,62 @@ install: utils-strip
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/etc/rc.d/${rc_script}"
 .endfor
 
-	# Scripts.
+	# Main script.
 	${INSTALL} -m 555 appjail.sh "${DESTDIR}${PREFIX}/bin/appjail"
+
+	# Wrappers & misc.
 	${INSTALL} -m 555 share/appjail/scripts/dns.sh "${DESTDIR}${PREFIX}/bin/appjail-dns"
 	${INSTALL} -m 555 share/appjail/scripts/ajconf.sh "${DESTDIR}${PREFIX}/bin/appjail-config"
 
-	# Files.
-.for folder in cmd files lib makejail scripts
-	${CP} -R share/appjail/${folder} "${DESTDIR}${PREFIX}/share/appjail"
-.endfor
+	# cmd
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/cmd"
+	${FIND} share/appjail/cmd -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
+	
+	# files
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/files"
+	${FIND} share/appjail/files -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	
+	# lib
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/lib"
+	${FIND} share/appjail/lib -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	
+	# makejail
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/cmd"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/write"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/cmd/all"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/cmd/build"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/write/all"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/write/build"
+
+	${FIND} share/appjail/makejail/cmd/all -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/cmd/build -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/write/all -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/write/build -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	
+	# scripts
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/scripts"
+	${FIND} share/appjail/scripts -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# Prefix.
 .for f in bin/appjail bin/appjail-config share/appjail/files/config.conf share/appjail/files/default.conf 
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 
-	# Examples.
-	${CP} -R share/examples "${DESTDIR}${PREFIX}/share"
+	# examples
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/examples/appjail"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/examples/appjail/templates"
+	${FIND} share/examples/appjail/templates -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
 
-	# Utils.
+	# utils
 .for util in getservbyname ipcheck network
-	${MKDIR} -p "${DESTDIR}${PREFIX}/libexec/appjail/${util}"
-	${CP} libexec/${util}/${util} "${DESTDIR}${PREFIX}/libexec/appjail/${util}/${util}"
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/libexec/appjail/${util}"
+	${INSTALL} -m 555 libexec/${util}/${util} "${DESTDIR}${PREFIX}/libexec/appjail/${util}/${util}"
 .endfor
 	# appjail-config & tok
-	${MKDIR} -p "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config"
-	${CP} libexec/appjail-config/appjail-config "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/appjail-config"
-	${CP} libexec/appjail-config/tok "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/tok"
-
+	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config"
+	${INSTALL} -m 555 libexec/appjail-config/appjail-config "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/appjail-config"
+	${INSTALL} -m 555 libexec/appjail-config/tok "${DESTDIR}${PREFIX}/libexec/appjail/appjail-config/tok"
 
 utils-strip:
 	@${MAKE} -C libexec strip
