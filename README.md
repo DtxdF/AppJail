@@ -3701,6 +3701,20 @@ Now, any user that is in that group can run `appjail-user` as the administrator 
 $ appjail-user jail list
 ```
 
+Similarly, there is a variant for `appjail-config` named `appjail-config-user`. The instructions for using it are similar to the above:
+
+```
+permit nopass :appjail as root cmd appjail-config
+```
+
+Now, any user that is in that group can run `appjail-config-user` as the administrator runs `appjail-config`:
+
+```
+$ appjail-config-user set -j myjail devfs_ruleset=15
+```
+
+Of course, unlike `appjail`, `appjail-config` does not require privileges for simple tasks like reading templates, but it does require privileges for writing them.
+
 ## Design decisions
 
 Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`. Network names and custom stage names use the same regex. For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`. For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.
