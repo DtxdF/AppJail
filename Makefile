@@ -51,10 +51,10 @@ install: utils-strip
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/write/all"
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/makejail/write/build"
 
-	${FIND} share/appjail/makejail/cmd/all -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
-	${FIND} share/appjail/makejail/cmd/build -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
-	${FIND} share/appjail/makejail/write/all -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
-	${FIND} share/appjail/makejail/write/build -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/cmd/all -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/cmd/build -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/write/all -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/makejail/write/build -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# scripts
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/appjail/scripts"
