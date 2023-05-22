@@ -242,8 +242,10 @@ makejail_delete()
 		use_glob=
 	fi
 
+	mkdir -p -- "${GLOBAL_GIT_CACHEDIR}"
+
 	local match
-	match=`ls -d -- "${GLOBAL_GIT_CACHEDIR}"/${repoid}${use_glob} 2> /dev/null | xargs basename`
+	match=`find "${GLOBAL_GIT_CACHEDIR}" -name "${repoid}${use_glob}" -mindepth 1 -maxdepth 1 -exec basename {} \;`
 
 	local match_n
 	match_n=`echo "${match}" | wc -w`
