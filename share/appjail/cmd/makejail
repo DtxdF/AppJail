@@ -1247,10 +1247,14 @@ _makejail_git_clone()
 
 		git clone -q -o origin -- "${url}" "${repodir}" >&2
 	else
-		lib_debug "Updating ${repodir} ..."
+		if [ "${AUTO_GIT_UPDATE}" != 0 ]; then
+			lib_debug "Updating ${repodir} ..."
 
-		git -C "${repodir}" fetch -q origin >&2 &&
-		git -C "${repodir}" reset -q --hard origin >&2
+			git -C "${repodir}" fetch -q origin >&2 &&
+			git -C "${repodir}" reset -q --hard origin >&2
+		else
+			lib_warn "Automatic updates are disabled (AUTO_GIT_UPDATE = 0), ${url} (id = ${reponame}) will not be updated."
+		fi
 	fi
 
 	errlevel=$?
