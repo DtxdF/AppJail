@@ -42,10 +42,12 @@ main()
 	if lib_check_empty "${args}"; then
 		lib_err - "usage: PKG [[--chroot | --jexec [--jail] | --local]] package ..."
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --remove package ..."
+		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --autoremove"
 		exit ${EX_USAGE}
 	fi
 
 	# Options
+	local use_autoremove=0
 	local use_pkgchroot=0
 	local use_pkgjail=0
 	local use_pkgjexec=1
@@ -69,6 +71,9 @@ main()
 		fi
 
 		case "${arg}" in
+			--autoremove)
+				use_autoremove=1
+				;;
 			--chroot)
 				use_pkgchroot=1
 				;;
@@ -102,7 +107,9 @@ main()
 
 	if [ ${use_remove} -eq 1 ]; then
 		pkg_cmd="remove -y --"
-	elif [ ${use_remove} -eq 0 ]; then
+	elif [ ${use_autoremove} -eq 1 ]; then
+		pkg_cmd="autoremove -y"
+	else
 		pkg_cmd="install -y --"
 	fi
 
@@ -122,17 +129,20 @@ main()
 	# command
 	printf "%s" "${pkg_prefix}"
 
-	while [ ${current_index} -lt ${total_items} ]; do 
-		current_index=$((current_index+1))
-		local pkg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
-		if lib_check_empty "${pkg}"; then
-			continue
-		fi
+	# autoremove does not require packages.
+	if [ ${use_autoremove} -eq 0 ]; then
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+			local pkg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${pkg}"; then
+				continue
+			fi
 
-		pkg=`lib_escape_string "${pkg}" "" "${escape_chars}"`
+			pkg=`lib_escape_string "${pkg}" "" "${escape_chars}"`
 
-		printf " %s" "\"${pkg}\""
-	done
+			printf " %s" "\"${pkg}\""
+		done
+	fi
 	echo
 }
 
