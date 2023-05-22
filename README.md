@@ -1986,6 +1986,7 @@ MOUNT /tmp /tmp
 PKG [[--chroot | --jexec [--jail] | --local]] package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --remove package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --autoremove
+PKG [[--chroot | --jexec [--jail] | --local]] --update
 ```
 
 ##### --chroot
@@ -2011,6 +2012,10 @@ Remove one or more packages instead of installing them.
 ##### --autoremove
 
 Remove orphan or unused packages.
+
+##### --update
+
+Update the list of packages.
 
 ##### package
 
