@@ -1984,6 +1984,7 @@ MOUNT /tmp /tmp
 
 ```
 PKG [[--chroot | --jexec [--jail] | --local]] package ...
+PKG [[--chroot | --jexec [--jail] | --local]] --remove package ...
 ```
 
 ##### --chroot
@@ -2000,7 +2001,11 @@ This option can be used for thinjails and thickjails. For thinjails it is necess
 
 ##### --local
 
-Install a package on the host.
+Run the host's package manager.
+
+##### --remove
+
+Remove one or more packages instead of installing them.
 
 ##### package
 

@@ -40,7 +40,9 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: PKG [[--chroot | --jexec [--jail] | --local]] package ..."
+		lib_err - "usage: PKG [[--chroot | --jexec [--jail] | --local]] package ..."
+		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --remove package ..."
+		exit ${EX_USAGE}
 	fi
 
 	# Options
@@ -48,6 +50,7 @@ main()
 	local use_pkgjail=0
 	local use_pkgjexec=1
 	local use_pkglocal=0
+	local use_remove=0
 
 	# Arguments
 	local args_list
@@ -78,6 +81,9 @@ main()
 			--local)
 				use_pkglocal=1
 				;;
+			--remove)
+				use_remove=1
+				;;
 			--)
 				break
 				;;
@@ -94,17 +100,27 @@ main()
 	local pkg_args=
 	local escape_chars='`"\'
 
+	if [ ${use_remove} -eq 1 ]; then
+		pkg_cmd="remove -y --"
+	elif [ ${use_remove} -eq 0 ]; then
+		pkg_cmd="install -y --"
+	fi
+
+	local pkg_prefix
 	if [ ${use_pkgchroot} -eq 1 ]; then
-		printf "%s" "\"\${APPJAIL_SCRIPT}\" pkg chroot \"\${APPJAIL_JAILNAME}\" install -y --"
+		pkg_prefix="\"\${APPJAIL_SCRIPT}\" pkg chroot \"\${APPJAIL_JAILNAME}\" ${pkg_cmd}"
 	elif [ ${use_pkglocal} -eq 1 ]; then
-		printf "%s" "pkg install -y --"
+		pkg_prefix="pkg ${pkg_cmd}"
 	elif [ ${use_pkgjexec} -eq 1 ]; then
 		if [ ${use_pkgjail} -eq 1 ]; then
 			pkg_args="-j"
 		fi
 
-		printf "%s" "\"\${APPJAIL_SCRIPT}\" pkg jail \"\${APPJAIL_JAILNAME}\" ${pkg_args} -- install -y --"
+		pkg_prefix="\"\${APPJAIL_SCRIPT}\" pkg jail \"\${APPJAIL_JAILNAME}\" ${pkg_args} -- ${pkg_cmd}"
 	fi
+
+	# command
+	printf "%s" "${pkg_prefix}"
 
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
