@@ -103,15 +103,17 @@ makejail_main()
 	local _o
 	# commands
 	local opt_create=1 # default
-	local opt_delete=0 repoid=
+	local opt_delete=0
 	local opt_list=0
+	local opt_update=0
 	# options
 	local opt_exact_match=0
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
+	local repoid=
 
-	while getopts ":cEelvb:d:f:j:o:" _o; do
+	while getopts ":cEelvb:d:f:j:o:u:" _o; do
 		case "${_o}" in
-			b|d|f|j|o)
+			b|d|f|j|o|u)
 				if lib_check_empty "${OPTARG}"; then
 					makejail_usage
 					exit ${EX_USAGE}
@@ -171,6 +173,10 @@ makejail_main()
 
 				echo "\"${option}\"" >> "${MAKEJAIL_OPTIONS}"
 				;;
+			u)
+				opt_update=1
+				repoid="${OPTARG}"
+				;;
 			*)
 				makejail_usage
 				exit ${EX_USAGE}
@@ -180,11 +186,6 @@ makejail_main()
 	shift $((OPTIND-1))
 
 	if [ ${opt_delete} -eq 1 ]; then
-		if [ -z "${repoid}" ]; then
-			makejail_usage
-			exit ${EX_USAGE}
-		fi
-
 		local Eflag=
 		if [ ${opt_exact_match} -eq 1 ]; then
 			Eflag="-E"
@@ -193,6 +194,13 @@ makejail_main()
 		makejail_delete ${Eflag} "${repoid}"
 	elif [ ${opt_list} -eq 1 ]; then
 		makejail_list
+	elif [ ${opt_update} -eq 1 ]; then
+		local Eflag=
+		if [ ${opt_exact_match} -eq 1 ]; then
+			Eflag="-E"
+		fi
+
+		makejail_update ${Eflag} "${repoid}"
 	else
 		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
 			MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
@@ -285,6 +293,94 @@ makejail_list()
 			printf "%s\t%s\n" "${repoid}" "${url}"
 		done 
 	} | column -ts $'\t'
+}
+
+makejail_update()
+{
+	local _o
+	local opt_exact_match=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: makejail_update [-E] repoid"
+	fi
+
+	_makejail_check_git # check
+
+	while getopts ":E" _o; do
+		case "${_o}" in
+			E)
+				opt_exact_match=1
+				;;
+			*)
+				makejail_delete # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local repoid
+	repoid="$1"
+	if [ -z "${repoid}" ]; then
+		makejail_delete # usage
+	fi
+
+	if ! lib_check_hexnumber "${repoid}"; then
+		lib_err ${EX_DATAERR} -- "${repoid}: invalid ID."
+	fi
+	
+	local use_glob="*"
+	if [ ${opt_exact_match} -eq 1 ]; then
+		use_glob=
+	fi
+
+	mkdir -p -- "${GLOBAL_GIT_CACHEDIR}"
+
+	local match
+	match=`find "${GLOBAL_GIT_CACHEDIR}" -name "${repoid}${use_glob}" -mindepth 1 -maxdepth 1 -exec basename {} \;`
+
+	local match_n
+	match_n=`echo "${match}" | wc -w`
+
+	if [ ${match_n} -eq 0 ]; then
+		lib_err ${EX_NOINPUT} -- "${repoid}: repository not found."
+	else
+		local current_commit url
+		for repoid in ${match}; do
+			current_commit=`_makejail_git_getlastcommit "${repoid}"`
+			url=`_makejail_git_geturl "${repoid}"`
+
+			lib_set_logprefix " [`random_color`${repoid}${COLOR_DEFAULT}]"
+
+			lib_info "Updating (url = ${url}) ..."
+
+			if ! _makejail_git_update "${GLOBAL_GIT_CACHEDIR}/${repoid}"; then
+				lib_err $? "An error occurred while updating."
+			fi
+
+			if [ "${current_commit}" = `_makejail_git_getlastcommit "${repoid}"` ]; then
+				lib_info "Already up to date."
+			else
+				lib_info "Updated."
+			fi
+		done
+
+		lib_info "Done."
+	fi
+}
+
+_makejail_git_getlastcommit()
+{
+	local repoid
+
+	repoid="$1"
+	if [ -z "${repoid}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_git_getlastcommit repoid"
+	fi
+
+	local repopath
+	repopath="${GLOBAL_GIT_CACHEDIR}/${repoid}"
+
+	git -C "${repopath}" rev-parse HEAD
 }
 
 _makejail_git_geturl()
@@ -1252,8 +1348,7 @@ _makejail_git_clone()
 		if [ "${AUTO_GIT_UPDATE}" != 0 ]; then
 			lib_debug "Updating ${repodir} ..."
 
-			git -C "${repodir}" fetch -q origin >&2 &&
-			git -C "${repodir}" reset -q --hard origin >&2
+			_makejail_git_update "${repodir}"
 		else
 			lib_warn "Automatic updates are disabled (AUTO_GIT_UPDATE = 0), ${url} (id = ${reponame}) will not be updated."
 		fi
@@ -1276,6 +1371,18 @@ _makejail_check_git()
 	if ! which -s "git"; then
 		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
 	fi
+}
+
+_makejail_git_update()
+{
+	local repodir="$1"
+
+	if [ -z "${repodir}" ]; then
+		lib_err ${EX_USAGE} "usage: _makejail_git_update repodir"
+	fi
+
+	git -C "${repodir}" fetch -q origin >&2 &&
+	git -C "${repodir}" reset -q --hard origin >&2
 }
 
 makejail_change_stage()
@@ -1337,6 +1444,8 @@ Parameters:
                            possible to specify only the initial numbers to write less, but if two repositories match, you must add
                            more numbers to match the exact repository. To make an exact match use \`-E\`.
     -l                  -- List cloned repositories.
+    -u id               -- Update cloned repositories. This parameter uses the same function to get a list of repositories as \`-d\`,
+                           but updates all matching repositories.
 
 Options for -c:
     -e                  -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
@@ -1346,7 +1455,7 @@ Options for -c:
     -j jail_name        -- Jail name. If not defined, a random string is used.
     -o option           -- Additional options to be used by the \`appjail quick\` command.
 
-Options for -d:
+Options for -d, -u:
     -E                  -- Exact match.
 EOF
 }
@@ -1357,5 +1466,6 @@ makejail_usage()
 usage: makejail [-c] [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
        makejail [-E] -d id
        makejail -l
+       makejail [-E] -u id
 EOF
 }
