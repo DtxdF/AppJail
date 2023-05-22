@@ -112,6 +112,11 @@ main()
 	done
 	current_index=$((current_index-1))
 
+	local mutually_exclusive=$((use_remove+use_autoremove+use_update+use_upgrade))
+	if [ ${mutually_exclusive} -ge 2 ]; then
+		main # usage
+	fi
+
 	local pkg_args=
 	local escape_chars='`"\'
 
