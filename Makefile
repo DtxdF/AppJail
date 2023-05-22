@@ -70,6 +70,7 @@ install: utils-strip
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/examples/appjail"
 	${MKDIR} -m 555 -p "${DESTDIR}${PREFIX}/share/examples/appjail/templates"
 	${FIND} share/examples/appjail/templates -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${INSTALL} -m 444 share/examples/appjail/appjail.conf "${DESTDIR}${PREFIX}/share/examples/appjail/appjail.conf"
 
 	# utils
 .for util in getservbyname ipcheck network

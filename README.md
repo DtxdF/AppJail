@@ -71,7 +71,7 @@ sysrc appjail_enable="YES"
 sysrc appjail_natnet_enable="YES"
 ```
 
-If you want to use a custom configuration file, create one in `/usr/local/etc/appjail/appjail.conf`. See more details in `/usr/local/share/appjail/files/default.conf`.
+If you want to use a custom configuration file, create one in `/usr/local/etc/appjail/appjail.conf`. See more details in `/usr/local/share/examples/appjail/appjail.conf`.
 
 **Note**: It is highly recommended to put the kernel modules suggested in this document in your `loader.conf(5)` file to correctly start the jails on boot.
 
