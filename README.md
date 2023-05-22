@@ -1987,6 +1987,7 @@ PKG [[--chroot | --jexec [--jail] | --local]] package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --remove package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --autoremove
 PKG [[--chroot | --jexec [--jail] | --local]] --update
+PKG [[--chroot | --jexec [--jail] | --local]] --upgrade
 ```
 
 ##### --chroot
@@ -2016,6 +2017,10 @@ Remove orphan or unused packages.
 ##### --update
 
 Update the list of packages.
+
+##### --upgrade
+
+Perform upgrades of package software distributions.
 
 ##### package
 

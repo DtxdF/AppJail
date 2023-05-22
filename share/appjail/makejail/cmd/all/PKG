@@ -44,6 +44,7 @@ main()
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --remove package ..."
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --autoremove"
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --update"
+		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --upgrade"
 		exit ${EX_USAGE}
 	fi
 
@@ -55,6 +56,7 @@ main()
 	local use_pkglocal=0
 	local use_remove=0
 	local use_update=0
+	local use_upgrade=0
 
 	# Arguments
 	local args_list
@@ -94,6 +96,9 @@ main()
 			--update)
 				use_update=1
 				;;
+			--upgrade)
+				use_upgrade=1
+				;;
 			--)
 				break
 				;;
@@ -116,6 +121,8 @@ main()
 		pkg_cmd="autoremove -y"
 	elif [ ${use_update} -eq 1 ]; then
 		pkg_cmd="update -y"
+	elif [ ${use_upgrade} -eq 1 ]; then
+		pkg_cmd="upgrade -y"
 	else
 		pkg_cmd="install -y --"
 	fi
@@ -137,7 +144,7 @@ main()
 	printf "%s" "${pkg_prefix}"
 
 	# autoremove does not require packages.
-	if [ ${use_autoremove} -eq 0 -a ${use_update} -eq 0 ]; then
+	if [ ${use_autoremove} -eq 0 -a ${use_update} -eq 0 -a ${use_upgrade} -eq 0 ]; then
 		while [ ${current_index} -lt ${total_items} ]; do 
 			current_index=$((current_index+1))
 			local pkg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
