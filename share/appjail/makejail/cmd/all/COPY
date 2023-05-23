@@ -43,11 +43,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: COPY [--verbose] src [dst]"
+		lib_err ${EX_USAGE} "usage: COPY [--verbose] [--jail jail] src [dst]"
 	fi
 	
 	# Options
 	local verbose=0
+	local jail_name=
 	
 	# Arguments
 	local args_list
@@ -64,9 +65,27 @@ main()
 			continue
 		fi
 
+		local optarg=
+		case "${arg}" in
+			--jail)
+				current_index=$((current_index+1))
+				if [ ${current_index} -eq ${total_items} ]; then
+					main # usage
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					main # usage
+				fi
+				;;
+		esac
+
 		case "${arg}" in
 			--verbose)
 				verbose=1
+				;;
+			--jail)
+				jail_name="${optarg}"
 				;;
 			--)
 				break
@@ -122,6 +141,16 @@ main()
 		workdir=
 	fi
 
+	if [ -n "${jail_name}" ]; then
+		local escape_jail_name=`lib_escape_string "${jail_name}" "" "${escape_chars}"`
+
+		cat << EOF
+if ! lib_check_jailname "${escape_jail_name}"; then
+	lib_err \${EX_DATAERR} "Invalid jail name \"${escape_jail_name}\""
+fi
+EOF
+		src="\${JAILDIR}/${jail_name}/jail/${src}"
+	fi
 	local escape_src=`lib_escape_string "${src}" "" "${escape_chars}"`
 
 	local escape_dst=

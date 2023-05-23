@@ -1592,12 +1592,16 @@ CMD echo "Hello, \${name}"
 #### Syntax
 
 ```
-COPY [--verbose] src [dst]
+COPY [--verbose] [--jail jail] src [dst]
 ```
 
 ##### --verbose
 
 See `-v` in `cp(1)`.
+
+##### --jail
+
+Copy the file relative to a directory in a jail.
 
 ##### src
 
