@@ -83,7 +83,7 @@ main()
 				mark=1
 				;;
 			--column)
-                opt_column=1
+				opt_column=1
 				column="${optarg}"
 				;;
 			--row)
@@ -129,17 +129,17 @@ main()
 		main # usage
 	fi
 
-    row=`lib_escape_string "${row}" "" "${escape_chars}"`
+	row=`lib_escape_string "${row}" "" "${escape_chars}"`
 
 	if [ ${mark} -eq 1 ]; then
 		echo "appjail-config set -R1 -j \"\${APPJAIL_JAILNAME}\" -r \"${row}\" -- \"${parameters}\""
-    fi
+	fi
 
-    if [ ${opt_column} -eq 1 ]; then
+	if [ ${opt_column} -eq 1 ]; then
 		column=`lib_escape_string "${column}" "" "${escape_chars}"`
 
 		echo "appjail-config setColumn -j \"\${APPJAIL_JAILNAME}\" -c \"${column}\" -r \"${row}\" -- \"${parameters}\""
-    else
+	else
 		echo "appjail-config set -j \"\${APPJAIL_JAILNAME}\" -r \"${row}\" -- \"${parameters}\""
 	fi
 }
