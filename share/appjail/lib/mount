@@ -123,9 +123,11 @@ lib_mountpoint_mounted()
 				break
 			fi
 		else
-			if printf "%s" "${cmp1}" | grep -qwF "${mountpoint}"; then
-				lib_multi_replace "${format}" 1 "${cmp1}" 2 "${cmp2}"
-			fi
+			case "${cmp1}" in
+				${mountpoint}*)
+					lib_multi_replace "${format}" 1 "${cmp1}" 2 "${cmp2}"
+					;;
+			esac
 		fi
 	done
 }

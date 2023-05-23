@@ -2087,7 +2087,7 @@ _jail_chkjfolder()
 		tflag="-t nozfs"
 	fi
 
-	mounted=`lib_mountpoint_mounted -F '%2 -> %1' ${tflag} "${JAILDIR}/${jail_name}"`
+	mounted=`lib_mountpoint_mounted -F '%2 -> %1' ${tflag} "${JAILDIR}/${jail_name}/"`
 	if [ -n "${mounted}" ]; then
 		lib_warn "The jail directory (${JAILDIR}/${jail_name}) has one or more mounted file systems:"
 		printf "%s\n" "${mounted}" | while IFS= read -r line; do
