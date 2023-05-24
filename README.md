@@ -1625,6 +1625,32 @@ Copy a file from the host to the jail.
 COPY --verbose ${index} /usr/local/www/nginx/index.html
 ```
 
+### DESTROY
+
+#### Syntax
+
+```
+DESTROY [--force] [--with-all-dependents] jail
+```
+
+#### --force
+
+See `-f` in `appjail jail destroy`.
+
+#### --with-all-dependents
+
+See `-R` in `appjail jail destroy`.
+
+#### Description
+
+Stops and destroys a jail.
+
+#### Examples
+
+```
+DESTROY builder
+```
+
 ### ENTRYPOINT
 
 #### Syntax
