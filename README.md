@@ -3983,6 +3983,7 @@ AppJail is not focused on building software. There are very interesting projects
 - [x] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`. (Done with the new tool, `appjail-config`)
 - [ ] Implement all `jail(8)` parameters in `appjail quick`.
 - [ ] The `jng` script is useful, but AppJail must create the Netgraph nodes in the same way as bridges and epairs.
+- [ ] Man pages.
  
 ## Contributing
 
