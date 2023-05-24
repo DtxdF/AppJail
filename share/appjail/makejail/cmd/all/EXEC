@@ -1,0 +1,168 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/replace"
+
+main()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: EXEC [--continue-with-errors] [--verbose] [[--arg parameter[=value]] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail"
+	fi
+	
+	# options
+	local parameters=
+	local opt_continue_with_errors=0
+	local opt_verbose=0
+	local build_args=
+	local options=
+	local makejail_file=
+	local jail_name=
+
+	# escape chars
+	local escape_chars
+	escape_chars='`"\'
+
+	# Arguments
+	local args_list
+	local total_items
+	local current_index=0
+
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		local optarg=
+		case "${arg}" in
+			--arg|--build-arg|--file|--name|--option)
+				current_index=$((current_index+1))
+				if [ ${current_index} -gt ${total_items} ]; then
+					break
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					main # usage
+				fi
+				;;
+		esac
+
+		case "${arg}" in
+			--continue-with-errors)
+				opt_continue_with_errors=1
+				;;
+			--verbose)
+				opt_verbose=1
+				;;
+			--arg)
+				# get
+				local value=`lib_jailparam_value "${optarg}" "="`
+				local parameter=`lib_jailparam_name "${optarg}" "="`
+
+				# escape
+				parameter=`lib_escape_string "${parameter}" "" "${escape_chars}"`
+
+				# escape when the value is not empty
+				if ! lib_check_empty "${value}"; then
+					value=`lib_escape_string "${value}" "" "${escape_chars}"`
+				fi
+
+				# add -- as its prefix
+				parameter="--${parameter} \"${value}\""
+
+				# push it into the list
+				if [ -z "${parameters}" ]; then
+					parameters="${parameter}"
+				else
+					parameters="${parameters} ${parameter}"
+				fi
+				;;
+			--build-arg)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${optarg}" "" '"'`
+
+				build_args="${options} -b \"${optarg}\""
+				;;
+			--file)
+				makejail_file="${optarg}"
+				;;
+			--name)
+				jail_name="${optarg}"
+				;;
+			--option)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${optarg}" "" '"'`
+
+				options="${options} -o \"${optarg}\""
+				;;
+			--)
+				break
+				;;
+			--*)
+				main # usage
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+
+	if [ -z "${jail_name}" -o -z "${makejail_file}" ]; then
+		main # usage
+	fi
+
+	jail_name=`lib_escape_string "${jail_name}" "" "${escape_chars}"`
+	makejail_file=`lib_escape_string "${makejail_file}" "" "${escape_chars}"`
+
+	local mk_args=
+	if [ ${opt_continue_with_errors} -eq 1 ]; then
+		mk_args="-e"
+	fi
+
+	if [ ${opt_verbose} -eq 1 ]; then
+		mk_args="${mk_args} -v"
+	fi
+
+	printf "%s\n" "\"\${APPJAIL_SCRIPT}\" makejail -c ${mk_args} ${options} ${build_args} -j \"${jail_name}\" -f \"${makejail_file}\" -- ${parameters}"
+}
+
+main "$@"

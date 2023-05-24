@@ -1666,6 +1666,60 @@ Environment variables to be used by the `RUN` command.
 ENV TOKEN=bba06278ca32777dc3724d42fe6fd3d9
 ```
 
+### EXEC
+
+#### Syntax
+
+```
+EXEC [--continue-with-errors] [--verbose] [[--arg parameter[=value]] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail
+```
+
+#### --continue-with-errors
+
+See `-e` in `appjail makejail`.
+
+#### --verbose
+
+See `-v` in `appjail makejail`.
+
+#### --arg
+
+Sets the value of a parameter to the Makejail to be executed.
+
+#### --build-arg
+
+See `-b` in `appjail makejail`.
+
+#### --option
+
+See `-o` in `appjail makejail`.
+
+#### --file
+
+See `-f` in `appjail makejail`.
+
+#### --name
+
+See `-j` in `appjail makejail`.
+
+#### Description
+
+Execute a Makejail.
+
+#### Examples
+
+##### #1
+
+```
+EXEC --file gh+AppJail-makejails/hello --name hello
+```
+
+##### #2
+
+```
+EXEC --file build.makejail --name builder --arg "cflags=-O2 -pipe" --arg ldflags=-lm
+```
+
 ### INCLUDE
 
 #### Syntax
