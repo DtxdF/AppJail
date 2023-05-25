@@ -43,10 +43,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: COPY [--verbose] [--jail jail] src [dst]"
+		lib_err ${EX_USAGE} "usage: COPY [--glob | --glob-left | --glob-right] [--verbose] [--jail jail] src [dst]"
 	fi
 	
 	# Options
+	local glob_left=0
+	local glob_right=0
 	local verbose=0
 	local jail_name=
 	
@@ -81,6 +83,16 @@ main()
 		esac
 
 		case "${arg}" in
+			--glob)
+				glob_left=1
+				glob_right=1
+				;;
+			--glob-left)
+				glob_left=1
+				;;
+			--glob-right)
+				glob_right=1
+				;;
 			--verbose)
 				verbose=1
 				;;
@@ -165,7 +177,17 @@ EOF
 		cp_args="-v"
 	fi
 
-	echo "cp ${cp_args} -a -- \"${escape_src}\" \"${escape_dst}\""
+	local glob_left_s=
+	if [ "${glob_left}" -eq 1 ]; then
+		glob_left_s="*"
+	fi
+
+	local glob_right_s=
+	if [ "${glob_right}" -eq 1 ]; then
+		glob_right_s="*"
+	fi
+
+	echo "cp ${cp_args} -a -- ${glob_left_s}\"${escape_src}\"${glob_right_s} \"${escape_dst}\""
 }
 
 main "$@"

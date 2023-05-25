@@ -1592,8 +1592,20 @@ CMD echo "Hello, \${name}"
 #### Syntax
 
 ```
-COPY [--verbose] [--jail jail] src [dst]
+COPY [--glob | --glob-left | --glob-right] [--verbose] [--jail jail] src [dst]
 ```
+
+##### --glob
+
+Use the glob expression in the left and right corners of `src`.
+
+##### --glob-left
+
+Use the glob expression in the left corner of `src`.
+
+##### --glob-right
+
+Use the glob expression in the right corner of `src`.
 
 ##### --verbose
 
@@ -1621,8 +1633,17 @@ Copy a file from the host to the jail.
 
 #### Examples
 
+##### #1
+
 ```
 COPY --verbose ${index} /usr/local/www/nginx/index.html
+```
+
+##### #2
+
+```
+# Will copy /usr/local/lib/{libtag.so,libtag.so.1,libtag.so.1.19.0}
+COPY --verbose --jail "${gonic_builder}" --glob-right /usr/local/lib/libtag.so /usr/local/lib
 ```
 
 ### DESTROY
