@@ -3842,6 +3842,8 @@ Of course, unlike `appjail`, `appjail-config` does not require privileges for si
 
 ## DNS
 
+**Note**: Note that such scripts are not necessary when you use bridges and a DNS and a DHCP server, such as BIND9/ISC-DHCP or dnsmasq.
+
 Although AppJail does not ship with a DNS server and does not support one, it has the `appjail-dns` script.
 
 ```
