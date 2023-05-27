@@ -840,8 +840,8 @@ EOF
 expose_usage()
 {
 	cat << EOF
-usage: expose get [-eHIpt] -n nro jail_name
-       expose list [-eHIpt] [-n nro] jail_name
+usage: expose get [-eHIipt] -n nro jail_name
+       expose list [-eHIipt] [-n nro] jail_name
        expose off jail_name
        expose on jail_name
        expose remove [all | nro nro] jail_name
