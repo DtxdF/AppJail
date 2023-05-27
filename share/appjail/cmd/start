@@ -320,7 +320,7 @@ start_main()
 	fi
 
 	lib_debug "Compiling template to \`${jail_path}/conf/jail.conf\` ..."
-    if ! lib_ajconf jailConf -n "${jail_name}" -t "${template_temp}" > "${jail_path}/conf/jail.conf"; then
+	if ! lib_ajconf jailConf -n "${jail_name}" -t "${template_temp}" > "${jail_path}/conf/jail.conf"; then
 		lib_err ${EX_IOERR} "Error while compiling the template."
 	fi
 
