@@ -1871,6 +1871,11 @@ quick_run_limits()
 		fi
 	done
 
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.created='"appjail limits on \"${name}\""'
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail limits off \"${name}\""'
 }
