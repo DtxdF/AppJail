@@ -142,6 +142,7 @@ startup_start_jails()
 				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1
 			else
 				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1 &
+				lib_atexit_add "kill $! > /dev/null 2>&1"
 			fi
 
 			current=$((current+1))
@@ -205,6 +206,7 @@ startup_start_nat_networks()
 			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1
 		else
 			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1 &
+			lib_atexit_add "kill $! > /dev/null 2>&1"
 		fi
 
 		current=$((current+1))
@@ -272,6 +274,7 @@ startup_stop_jails()
 				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1
 			else
 				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1 &
+				lib_atexit_add "kill $! > /dev/null 2>&1"
 			fi
 
 			current=$((current+1))
@@ -364,6 +367,7 @@ startup_stop_nat_networks()
 			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1
 		else
 			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1 &
+			lib_atexit_add "kill $! > /dev/null 2>&1"
 		fi
 
 		current=$((current+1))
