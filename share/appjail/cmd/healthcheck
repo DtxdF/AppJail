@@ -1,0 +1,982 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+
+# Health type
+HEALTHCHECK_HEALTH_HOST_TYPE="host"
+HEALTHCHECK_HEALTH_JAIL_TYPE="jail"
+# Recover type
+HEALTHCHECK_RECOVER_HOST_TYPE="host"
+HEALTHCHECK_RECOVER_JAIL_TYPE="jail"
+
+healthcheck_desc="Check jail health by running a command inside the jail or on the host."
+
+healthcheck_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		get|list|remove|run|set) ;;
+		*) healthcheck_usage; exit ${EX_USAGE} ;;
+	esac
+
+	healthcheck_${entity} "$@"
+}
+
+healthcheck_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_ignore_unknro=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local nro=
+
+	local flag_nro=0
+	local flag_enabled=0
+	local flag_name=0
+	local flag_status=0
+	local flag_interval=0
+	local flag_kill_after=0
+	local flag_timeout=0
+	local flag_timeout_signal=0
+	local flag_start_period=0
+	local flag_retries=0
+	local flag_health_type=0
+	local flag_health_cmd=0
+	local flag_recover_type=0
+	local flag_recover_cmd=0
+	local flag_recover_total=0
+	local flag_recover_kill_after=0
+	local flag_recover_timeout=0
+	local flag_recover_timeout_signal=0
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					healthcheck_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				healthcheck_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${nro}" ]; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_name="$1"; shift
+	_healthcheck_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/health/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		if [ ${opt_ignore_unknro} -eq 1 ]; then
+			return 0
+		fi
+
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "nro" "enabled" "name" "status" "health_cmd" "recover_cmd"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			enabled|health_cmd|health_type|interval|kill_after|name|nro|recover_cmd|recover_kill_after|recover_timeout|recover_timeout_signal|recover_total|recover_type|retries|start_period|status|timeout|timeout_signal) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+
+			case "${keyword}" in
+				nro)
+					value="${nro}"
+					;;
+				*)
+					if [ -f "${basedir}/${keyword}" ]; then
+						value=`head -1 -- "${basedir}/${keyword}"`
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+healthcheck_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_ignore_unknro=0 iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local nro=
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					healthcheck_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				healthcheck_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_healthcheck_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_ignore_unknro} -eq -1 ]; then
+		iflag="-i"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${nro}" ]; then
+		healthcheck_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${pflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	local basedir="${JAILDIR}/${jail_name}/conf/boot/health"
+	if [ ! -d "${basedir}" ]; then
+		return
+	fi
+
+	ls -A "${basedir}" | sort -n | while IFS= read -r nro; do
+		healthcheck_get ${eflag} ${Hflag} ${Iflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+healthcheck_remove()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		all|nro) ;;
+		*) healthcheck_usage; exit ${EX_USAGE} ;;
+	esac
+
+	healthcheck_remove_${command} "$@"
+}
+
+healthcheck_remove_all()
+{
+	local basedir
+	local jail_name
+
+	jail_name="$1"
+	_healthcheck_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/health"
+
+	rm -rf "${basedir}"
+}
+
+healthcheck_remove_nro()
+{
+	local nro="$1"; shift
+	if lib_check_empty "${nro}"; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	local jail_name="$1"
+	_healthcheck_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/health/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	rm -rf "${basedir}"
+}
+
+healthcheck_run()
+{
+	local jail_name="$1"
+	_healthcheck_chk_jail "${jail_name}"
+
+	if [ ! -d "${JAILDIR}/${jail_name}/conf/boot/health" ]; then
+		lib_err ${EX_CONFIG} -- "${jail_name} is not configured to use healthcheckers."
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	lib_debug "Starting healthchecking ..."
+
+	local enabled
+	
+	for nro in `healthcheck_list -HIpt "${jail_name}" nro`; do
+		enabled=`healthcheck_get -In "${nro}" "${jail_name}" enabled`
+
+		if [ "${enabled}" != "1" ]; then
+			continue
+		fi
+
+		lib_debug "Starting healthchecker (nro = ${nro}) ..."
+
+		_healthcheck_run "${jail_name}" ${nro} &
+
+		lib_atexit_add "kill $! > /dev/null 2>&1"
+	done
+
+	lib_debug "All healthcheckers has been started. Waiting..."
+	wait
+}
+
+_healthcheck_run()
+{
+	local jail="$1" nro="$2"
+
+	if [ -z "${jail}" -o -z "${nro}" ]; then
+		lib_err ${EX_USAGE} "usage: _healthcheck_run jail nro"
+	fi
+
+	_healthcheck_set_status "${jail}" "${nro}" "starting"
+
+	local start_period=`healthcheck_get -In "${nro}" "${jail}" start_period`
+	if [ "${start_period}" -gt 0 ]; then
+		lib_debug "Sleeping (start_period = ${start_period}) ..."
+
+		sleep "${start_period}" || exit $?
+	fi
+
+	local retries=`healthcheck_get -In "${nro}" "${jail}" retries`
+	local interval=`healthcheck_get -In "${nro}" "${jail}" interval`
+
+	local health_type=`healthcheck_get -In "${nro}" "${jail}" health_type`
+	local health_cmd=`healthcheck_get -In "${nro}" "${jail}" health_cmd`
+	health_cmd=`lib_replace "${health_cmd}" j "\"${jail}\""`
+
+	local recover_type=`healthcheck_get -In "${nro}" "${jail}" recover_type`
+	local recover_cmd=`healthcheck_get -In "${nro}" "${jail}" recover_cmd`
+	recover_cmd=`lib_replace "${recover_cmd}" j "\"${jail}\""`
+
+	local timeout=`healthcheck_get -In "${nro}" "${jail}" timeout`
+	local timeout_signal=`healthcheck_get -In "${nro}" "${jail}" timeout_signal`
+	local kill_after=`healthcheck_get -In "${nro}" "${jail}" kill_after`
+
+	local recover_total=`healthcheck_get -In "${nro}" "${jail}" recover_total`
+	local recover_timeout=`healthcheck_get -In "${nro}" "${jail}" recover_timeout`
+	local recover_timeout_signal=`healthcheck_get -In "${nro}" "${jail}" recover_timeout_signal`
+	local recover_kill_after=`healthcheck_get -In "${nro}" "${jail}" recover_kill_after`
+
+	lib_debug "Healthchecker (nro = ${nro}, retries = ${retries}, interval = ${interval}, type = ${health_type}, cmd = ${health_cmd}, timeout = ${timeout}, timeout_signal = ${timeout_signal}, kill_after = ${kill_after})"
+	lib_debug "Recover (nro = ${nro}, total = ${recover_total}, type = ${recover_type}, cmd = ${recover_cmd}, timeout = ${recover_timeout}, timeout_signal = ${recover_timeout_signal}, kill_after = ${recover_kill_after})"
+
+	local errlevel=0
+	local count_retries=0 count_recover=0
+	while true; do
+		lib_debug "Sleeping (nro = ${nro}, context = health, type = ${health_type}, cmd = ${health_cmd}, interval = ${interval}) ..."
+		sleep "${interval}" || exit $?
+
+		lib_debug "Executing (nro = ${nro}, context = health, type = ${health_type}, cmd = ${health_cmd}) ..."
+
+		if [ "${health_type}" = "${HEALTHCHECK_HEALTH_HOST_TYPE}" ]; then
+			timeout --foreground -k "${kill_after}" -s "${timeout_signal}" ${timeout} \
+				"${APPJAIL_PROGRAM}" cmd local "${jail}" sh -c "${health_cmd}"
+		else
+			timeout --foreground -k "${kill_after}" -s "${timeout_signal}" ${timeout} \
+				"${APPJAIL_PROGRAM}" cmd jexec "${jail}" sh -c "${health_cmd}"
+		fi
+		
+		errlevel=$?
+		if [ ${errlevel} -eq 0 ]; then
+			_healthcheck_set_status "${jail}" "${nro}" "healthy"
+			continue
+		else
+			_healthcheck_set_status "${jail}" "${nro}" "failing"
+		fi
+
+		count_retries=$((count_retries+1))
+
+		lib_debug "Failing (nro = ${nro}, context = health, type = ${health_type}, cmd = ${health_cmd}, status = ${errlevel}, retry = ${count_retries}:${retries})"
+
+		if [ ${count_retries} -lt ${retries} ]; then
+			continue
+		fi
+
+		if [ ${count_recover} -ge ${recover_total} ]; then
+			_healthcheck_set_status "${jail}" "${nro}" "unhealthy"
+			lib_err ${EX_NOPERM} "Total number of recoveries (nro = ${nro}, current = ${count_recover}, total = ${recover_total}) has been reached. Cannot continue..."
+		fi
+
+		lib_debug "Executing (nro = ${nro}, context = recover, type = ${recover_type}, cmd = ${recover_cmd}, total = ${count_recover}:${recover_total}) ..."
+
+		count_recover=$((count_recover+1))
+
+		if [ "${recover_type}" = "${HEALTHCHECK_RECOVER_HOST_TYPE}" ]; then
+			timeout --foreground -k "${recover_kill_after}" -s "${recover_timeout_signal}" ${recover_timeout} \
+				"${APPJAIL_PROGRAM}" cmd local "${jail}" sh -c "${recover_cmd}"
+		else
+			timeout --foreground -k "${recover_kill_after}" -s "${recover_timeout_signal}" ${recover_timeout} \
+				"${APPJAIL_PROGRAM}" cmd jexec "${jail}" sh -c "${recover_cmd}"
+		fi
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			_healthcheck_set_status "${jail}" "${nro}" "unhealthy"
+			lib_err ${errlevel} "Recover command (nro = ${nro}, type = ${recover_type}, cmd = ${recover_cmd}) has failed. Exit status ${errlevel}"
+		fi
+
+		_healthcheck_set_status "${jail}" "${nro}" "healthy"
+
+		# Reset current retries.
+		count_retries=0
+	done
+}
+
+_healthcheck_set_status()
+{
+	local jail="$1" nro="$2" status="$3"
+	if [ -z "${jail}" -o -z "${nro}" -o -z "${status}" ]; then
+		lib_err ${EX_USAGE} "_healthcheck_set_status jail nro status"
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local basedir="${jail_path}/conf/boot/health"
+	local nrodir="${basedir}/${nro}"
+
+	echo "${status}" > "${nrodir}/status"
+}
+
+healthcheck_set()
+{
+	local _o
+	local opt_enabled=
+	local health_cmd=
+	local interval=
+	local kill_after=
+	local opt_name=0 name=
+	local nro="auto"
+	local retries=
+	local recover_cmd=
+	local timeout_signal=
+	local start_period=
+	local recover_total=
+	local timeout=
+
+	while getopts ":Eeh:i:K:k:l:N:n:R:r:S:s:T:t:u:" _o; do
+		case "${_o}" in
+			h|i|K|k|l|n|R|r|S|s|T|t|u)
+				if lib_check_empty "${OPTARG}"; then
+					healthcheck_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			E)
+				opt_enabled=1
+				;;
+			e)
+				opt_enabled=0
+				;;
+			h)
+				health_cmd="${OPTARG}"
+				;;
+			i)
+				interval="${OPTARG}"
+				;;
+			K)
+				recover_kill_after="${OPTARG}"
+				;;
+			k)
+				kill_after="${OPTARG}"
+				;;
+			l)
+				recover_timeout_signal="${OPTARG}"
+				;;
+			N)
+				opt_name=1
+				name="${OPTARG}"
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			R)
+				retries="${OPTARG}"
+				;;
+			r)
+				recover_cmd="${OPTARG}"
+				;;
+			S)
+				timeout_signal="${OPTARG}"
+				;;
+			s)
+				start_period="${OPTARG}"
+				;;
+			T)
+				recover_total="${OPTARG}"
+				;;
+			t)
+				timeout="${OPTARG}"
+				;;
+			u)
+				recover_timeout="${OPTARG}"
+				;;
+			*)
+				healthcheck_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_healthcheck_chk_jail "${jail_name}"
+
+	# Use existing values (if any).
+
+	if [ -z "${health_cmd}" ]; then
+		health_cmd=`healthcheck_get -Iin "${nro}" "${jail_name}" health_cmd`
+
+		if [ -z "${health_cmd}" ]; then
+			health_cmd="${DEFAULT_HEALTH_CMD}"
+		fi
+	fi
+
+	if [ -z "${interval}" ]; then
+		interval=`healthcheck_get -Iin "${nro}" "${jail_name}" interval`
+
+		if [ -z "${interval}" ]; then
+			interval="${DEFAULT_HEALTH_INTERVAL}"
+		fi
+	fi
+
+	if [ -z "${recover_kill_after}" ]; then
+		recover_kill_after=`healthcheck_get -Iin "${nro}" "${jail_name}" recover_kill_after`
+
+		if [ -z "${recover_kill_after}" ]; then
+			recover_kill_after="${DEFAULT_RECOVER_TIMEOUT_KILL_AFTER}"
+		fi
+	fi
+
+	if [ -z "${kill_after}" ]; then
+		kill_after=`healthcheck_get -Iin "${nro}" "${jail_name}" kill_after`
+
+		if [ -z "${kill_after}" ]; then
+			kill_after="${DEFAULT_TIMEOUT_KILL_AFTER}"
+		fi
+	fi
+
+	if [ -z "${recover_timeout_signal}" ]; then
+		recover_timeout_signal=`healthcheck_get -Iin "${nro}" "${jail_name}" recover_timeout_signal`
+
+		if [ -z "${recover_timeout_signal}" ]; then
+			recover_timeout_signal="${DEFAULT_RECOVER_TIMEOUT_SIGNAL}"
+		fi
+	fi
+
+	if [ -z "${retries}" ]; then
+		retries=`healthcheck_get -Iin "${nro}" "${jail_name}" retries`
+
+		if [ -z "${retries}" ]; then
+			retries="${DEFAULT_HEALTH_RETRIES}"
+		fi
+	fi
+
+	if [ -z "${recover_cmd}" ]; then
+		recover_cmd=`healthcheck_get -Iin "${nro}" "${jail_name}" recover_cmd`
+
+		if [ -z "${recover_cmd}" ]; then
+			recover_cmd="${DEFAULT_RECOVER_CMD}"
+		fi
+	fi
+
+	if [ -z "${timeout_signal}" ]; then
+		timeout_signal=`healthcheck_get -Iin "${nro}" "${jail_name}" timeout_signal`
+
+		if [ -z "${timeout_signal}" ]; then
+			timeout_signal="${DEFAULT_TIMEOUT_SIGNAL}"
+		fi
+	fi
+
+	if [ -z "${start_period}" ]; then
+		start_period=`healthcheck_get -Iin "${nro}" "${jail_name}" start_period`
+
+		if [ -z "${start_period}" ]; then
+			start_period="${DEFAULT_HEALTH_START_PERIOD}"
+		fi
+	fi
+
+	if [ -z "${recover_total}" ]; then
+		recover_total=`healthcheck_get -Iin "${nro}" "${jail_name}" recover_total`
+
+		if [ -z "${recover_total}" ]; then
+			recover_total="${DEFAULT_RECOVER_TOTAL}"
+		fi
+	fi
+
+	if [ -z "${timeout}" ]; then
+		timeout=`healthcheck_get -Iin "${nro}" "${jail_name}" timeout`
+
+		if [ -z "${timeout}" ]; then
+			timeout="${DEFAULT_HEALTH_TIMEOUT}"
+		fi
+	fi
+
+	if [ -z "${recover_timeout}" ]; then
+		recover_timeout=`healthcheck_get -Iin "${nro}" "${jail_name}" recover_timeout`
+
+		if [ -z "${recover_timeout}" ]; then
+			recover_timeout="${DEFAULT_RECOVER_TIMEOUT}"
+		fi
+	fi
+
+	# Check.
+
+	local health_type=`lib_jailparam_name "${health_cmd}" :`
+	health_cmd=`lib_jailparam_value "${health_cmd}" :`
+
+	if lib_check_empty "${health_cmd}"; then
+		health_cmd="${health_type}"
+		health_type="${DEFAULT_HEALTH_TYPE}"
+	fi
+
+	case "${health_type}" in
+		${HEALTHCHECK_HEALTH_HOST_TYPE}|${HEALTHCHECK_HEALTH_JAIL_TYPE}) ;;
+		*) lib_err ${EX_DATAERR} -- "${health_type} is not a valid health type."
+	esac
+
+	local recover_type=`lib_jailparam_name "${recover_cmd}" :`
+	recover_cmd=`lib_jailparam_value "${recover_cmd}" :`
+
+	if lib_check_empty "${recover_cmd}"; then
+		recover_cmd="${recover_type}"
+		recover_type="${DEFAULT_RECOVER_TYPE}"
+	fi
+
+	case "${recover_type}" in
+		${HEALTHCHECK_RECOVER_HOST_TYPE}|${HEALTHCHECK_RECOVER_JAIL_TYPE}) ;;
+		*) lib_err ${EX_DATAERR} -- "${recover_type} is not a valid recover type."
+	esac
+
+	if ! lib_check_number "${interval}"; then
+		lib_err ${EX_DATAERR} -- "${interval}: interval must be a number."
+	fi
+
+	if [ ${interval} -lt 1 ]; then
+		lib_err ${EX_DATAERR} -- "${interval}: interval is valid when it is greater than 0."
+	fi
+
+	if ! lib_check_number "${recover_kill_after}"; then
+		lib_err ${EX_DATAERR} -- "${recover_kill_after}: recover_kill_after must be a number."
+	fi
+
+	if ! lib_check_number "${kill_after}"; then
+		lib_err ${EX_DATAERR} -- "${kill_after}: kill_after must be a number."
+	fi
+
+	if [ ${kill_after} -lt 1 ]; then
+		lib_err ${EX_DATAERR} -- "${kill_after}: kill_after is valid when it is greater than 0."
+	fi
+
+	if ! lib_check_signal "${recover_timeout_signal}"; then
+		lib_err ${EX_NOINPUT} -- "${recover_timeout_signal}: signal not found."
+	fi
+	
+	if ! lib_check_number "${retries}"; then
+		lib_err ${EX_DATAERR} -- "${retries}: retries must be a number."
+	fi
+
+	if ! lib_check_signal "${timeout_signal}"; then
+		lib_err ${EX_NOINPUT} -- "${timeout_signal}: signal not found."
+	fi
+
+	if ! lib_check_number "${start_period}"; then
+		lib_err ${EX_DATAERR} -- "${start_period}: start_period must be a number."
+	fi
+
+	if ! lib_check_number "${recover_total}"; then
+		lib_err ${EX_DATAERR} -- "${recover_total}: recover_total must be a number."
+	fi
+
+	if [ ${recover_total} -lt 1 ]; then
+		lib_err ${EX_DATAERR} -- "${recover_total}: recover_total is valid when it is greater than 0."
+	fi
+
+	if ! lib_check_number "${timeout}"; then
+		lib_err ${EX_DATAERR} -- "${timeout}: timeout must be a number."
+	fi
+
+	if [ ${timeout} -lt 1 ]; then
+		lib_err ${EX_DATAERR} -- "${timeout}: timeout is valid when it is greater than 0."
+	fi
+
+	if ! lib_check_number "${recover_timeout}"; then
+		lib_err ${EX_DATAERR} -- "${recover_timeout}: recover_timeout must be a number."
+	fi
+
+	if [ ${recover_timeout} -lt 1 ]; then
+		lib_err ${EX_DATAERR} -- "${recover_timeout}: recover_timeout is valid when it is greater than 0."
+	fi
+
+	# Creates base dir.
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/health"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ "${nro}" = "auto" ]; then
+		nro=`lib_getnro "${basedir}"`
+	else
+		if ! lib_check_number "${nro}"; then
+			lib_err ${EX_DATAERR} "NRO must be a number!"
+		fi
+	fi
+
+	basedir="${basedir}/${nro}"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ -z "${opt_enabled}" ]; then
+		opt_enabled=`healthcheck_get -In "${nro}" "${jail_name}" enabled`
+		opt_enabled="${opt_enabled:-1}"
+	fi
+
+	if [ ${opt_name} -eq 0 -a -z "${name}" ]; then
+		name=`healthcheck_get -In "${nro}" "${jail_name}" name`
+	fi
+
+	# Write.
+
+	printf "%s\n" "${opt_enabled}" > "${basedir}/enabled" || exit ${EX_IOERR} 
+	printf "%s\n" "${health_type}" > "${basedir}/health_type" || exit ${EX_IOERR} 
+	printf "%s\n" "${health_cmd}" > "${basedir}/health_cmd" || exit ${EX_IOERR} 
+	printf "%s\n" "${interval}" > "${basedir}/interval" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_kill_after}" > "${basedir}/recover_kill_after" || exit ${EX_IOERR} 
+	printf "%s\n" "${kill_after}" > "${basedir}/kill_after" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_timeout_signal}" > "${basedir}/recover_timeout_signal" || exit ${EX_IOERR} 
+	printf "%s\n" "${name}" > "${basedir}/name" || exit ${EX_IOERR} 
+	printf "%s\n" "${retries}" > "${basedir}/retries" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_type}" > "${basedir}/recover_type" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_cmd}" > "${basedir}/recover_cmd" || exit ${EX_IOERR} 
+	printf "%s\n" "${timeout_signal}" > "${basedir}/timeout_signal" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_total}" > "${basedir}/recover_total" || exit ${EX_IOERR} 
+	printf "%s\n" "${start_period}" > "${basedir}/start_period" || exit ${EX_IOERR} 
+	printf "%s\n" "${timeout}" > "${basedir}/timeout" || exit ${EX_IOERR} 
+	printf "%s\n" "${recover_timeout}" > "${basedir}/recover_timeout" || exit ${EX_IOERR} 
+}
+
+_healthcheck_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+healthcheck_help()
+{
+	cat << EOF
+`healthcheck_usage`
+
+${healthcheck_desc}
+
+Parameters:
+    get                              -- Get information about the healtcheckers configuration for a given target.
+    list                             -- Like \`get\` but for all NROes.
+    remove                           -- Remove all NROes or just a single NRO.
+    run                              -- Run the enabled healthcheckers.
+    set                              -- Set parameters to an existing NRO or create it if it does not exist.
+
+Options for get:
+    -e                               -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                        in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                               -- Display the name of the columns.
+    -I                               -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -i                               -- Do not complain when the NRO does not exist.
+    -p                               -- Columnate the list.
+    -t                               -- Tabulate columns and values.
+    -n nro                           -- Operate in this NRO.
+
+Options for list:
+    -e                               -- This option is the opposite in \`Options for get\`.
+    -H                               -- This option is the opposite in \`Options for get\`.
+    -I                               -- This option is the same as in \`Options for get\`.
+    -i                               -- This options is the same as in \`Options for get\`.
+    -p                               -- This option is the opposite in \`Options for get\`.
+    -t                               -- This option is the opposite in \`Options for get\`.
+    -n nro                           -- Operate in this NRO. If not set, operate in all NROes.
+
+Keywords for get and list:
+    enabled                          -- See \`set -e\` and \`set -E\`.
+    health_cmd                       -- See \`set -h\`.
+    health_type                      -- See \`set -h\`
+    interval                         -- See \`set -i\`.
+    kill_after                       -- See \`set -k\`.
+    name                             -- See \`set -N\`.
+    nro                              -- See \`set -n\`.
+    recover_cmd                      -- See \`set -r\`.
+    recover_kill_after               -- See \`set -K\`.
+    recover_timeout                  -- See \`set -u\`.
+    recover_timeout_signal           -- See \`set -l\`.
+    recover_total                    -- See \`set -T\`.
+    recover_type                     -- See \`set -r\`.
+    retries                          -- See \`set -R\`.
+    start_period                     -- See \`set -s\`.
+    status                           -- Current state of the healthchecker. \`starting\` is when the healthchecker
+                                        is initializing, \`healthy\` is when the healthchecker is healthy, \`failing\`
+					is when \`health_cmd\` is failing but the healthchecker will retry as many times
+					as \`retries\` indicates before running \`recover_cmd\`, and \`unhealthy\` is
+					when \`recover_total\`has been reached or the \`recover_cmd\` has failed.
+    timeout                          -- See \`set -t\`.
+    timeout_signal                   -- See \`set -u\`.
+
+Options for set:
+    -E                               -- Enable this NRO.
+    -e                               -- Disable this NRO.
+    -h health_cmd                    -- Command to execute to evaluate the jail health. You can specify
+                                        a \`health type\` to execute the command on the host
+					or on the jail using a syntax such as \`health type:command\`.
+					Valid \`Health types\` are \`${HEALTHCHECK_HEALTH_HOST_TYPE}\` and \`${HEALTHCHECK_HEALTH_JAIL_TYPE}\`.
+    -i interval                      -- Interval to check the jail health.
+    -K recover_kill_after            -- Send a SIGKILL to \`recover_cmd\` after the specified seconds.
+    -k kill_after                    -- Send a SIGKILL to \`health_cmd\` after the specified seconds.
+    -l recover_timeout_signal        -- Send the \`recover_timeout_signal\` signal to \`recover_cmd\`
+                                        when \`recover_timeout\` is reached.
+    -N name                          -- The name of this NRO. It is not relevant, it is only for your
+                                        convenience.
+    -n nro                           -- The NRO. If set to auto, uses last NRO plus 1. Default: auto.
+    -R retries                       -- If \`retries\` has failed retry as many times as \`retries\`
+                                        specifies.
+    -r recover_cmd                   -- Command to be executed to try to recover the healthy state.
+                                        The command can be executed on both the jail and the host.
+					See \`-h\` for more details.
+    -S timeout_signal                -- Send the \`timeout_signal\` signal to \`health_cmd\`
+                                        when \`timeout\` is reached.
+    -s start_period                  -- Wait the specified seconds before running the healthchecker
+                                        processes.
+    -T recover_total                 -- The total number of calls to \`recover_cmd\` to avoid eternal
+                                        loops. If the command fails, the healthchecker will stop.
+    -t timeout                       -- Timeout time to send the \`timeout_signal\` signal.
+    -u recover_timeout               -- Timeout time to send the \`recover_timeout_signal\` signal.
+EOF
+}
+
+healthcheck_usage()
+{
+	cat << EOF
+usage: healthcheck get [-eHIipt] -n nro jail_name
+       healthcheck list [-eHIipt] [-n nro] jail_name
+       healthcheck remove [all | nro nro] jail_name
+       healthcheck run jail_name
+       healthcheck set [-Ee] [-h health_cmd] [-i interval] [-K recover_kill_after] [-k kill_after]
+                       [-l recover_timeout_signal] [-N name] [-n nro] [-R retries] [-r recover_cmd]
+		       [-S timeout_signal] [-s start_period] [-T recover_total] [-t timeout]
+		       [-u recover_timeout] jail_name
+EOF
+}
