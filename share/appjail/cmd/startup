@@ -74,11 +74,46 @@ startup_start()
 	fi
 
 	case "${entity}" in
-		jails|nat) ;;
+		healthcheckers|jails|nat) ;;
 		*) startup_usage; exit ${EX_USAGE} ;;
 	esac
 
 	startup_start_${entity} "$@"
+}
+
+startup_start_healthcheckers()
+{
+	local jails=`"${APPJAIL_PROGRAM}" jail list -HIpt name`
+
+	local logname
+	local jail
+	local healthcheckers_are_running=0
+
+	for jail in ${jails}; do
+		if [ ! -d "${JAILDIR}/${jail}/conf/boot/health" ]; then
+			continue
+		fi
+
+		healthcheckers_are_running=1
+
+		lib_zfs_mklogdir "jails" "${jail}" "healthcheckers"
+
+		logname="jails/${jail}/healthcheckers/${STARTUP_STARTUPLOG_NAME}"
+
+		lib_debug "Starting ${jail}'s healthcheckers; Log ${logname};"
+
+		logname="${LOGDIR}/${logname}"
+
+		"${APPJAIL_PROGRAM}" healthcheck run "${jail}" >> "${logname}" 2>&1 &
+		lib_atexit_add "kill $! > /dev/null 2>&1"
+	done
+
+	lib_debug "Wait..."
+	wait
+
+	if [ ${healthcheckers_are_running} -eq 1 ]; then
+		lib_warn "Healthcheckers has been stopped!"
+	fi
 }
 
 startup_start_jails()
@@ -348,26 +383,30 @@ startup_help()
 ${startup_desc}
 
 Parameters:
-    restart         -- Execute stop and start.
-    start           -- Start the targets that have the boot flag.
-    stop            -- Stop the targets that have the boot flag in reverse order.
+    restart               -- Execute stop and start.
+    start                 -- Start the targets that have the boot flag.
+    stop                  -- Stop the targets that have the boot flag in reverse order.
+
+Parameters for start:
+    healthcheckers        -- Start or stop enabled healthcheckers.
 
 Parameters for start and stop:
-    jails           -- The priority number affects the order in which the jails start. Each jail has a
-                       priority (an arbitrary number), where \`0\` is defined as the highest priority.
-		       If two or more jails have the same priority number, they start in the order
-		       they appear.
-    nat             -- Start or stop NAT for targets that have the boot flag.
+    jails                 -- The priority number affects the order in which the jails start. Each jail has a
+                             priority (an arbitrary number), where \`0\` is defined as the highest priority.
+		             If two or more jails have the same priority number, they start in the order
+		             they appear.
+    nat                   -- Start or stop NAT for targets that have the boot flag.
 
 Parameters for start nat and stop nat:
-    networks        -- Start or stop the NAT for networks.
+    networks              -- Start or stop the NAT for networks.
 EOF
 }
 
 startup_usage()
 {
 	cat << EOF
-usage: startup [restart|start|stop] jails
+usage: startup start healthcheckers
+       startup [restart|start|stop] jails
        startup [restart|start|stop] nat networks
 EOF
 }
