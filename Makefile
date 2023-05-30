@@ -17,7 +17,7 @@ install: utils-strip
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc/rc.d"
 	
 	# rc scripts.
-.for rc_script in appjail appjail-natnet
+.for rc_script in appjail appjail-health appjail-natnet
 	${INSTALL} -m 555 etc/rc.d/${rc_script}.sh "${DESTDIR}${PREFIX}/etc/rc.d/${rc_script}"
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/etc/rc.d/${rc_script}"
 .endfor
@@ -102,6 +102,7 @@ uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-config-user"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-user"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail"
+	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-health"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-natnet"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/examples/appjail"
