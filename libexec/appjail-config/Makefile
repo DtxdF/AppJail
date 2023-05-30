@@ -74,6 +74,6 @@ cleanall: clean
 	${RM} -f ${TARGETS}
 
 strip: appjail-config tok
-.for p in ${.ALLSRC}
+.for p in ${TARGETS}
 	${STRIP_CMD} ${p}
 .endfor
