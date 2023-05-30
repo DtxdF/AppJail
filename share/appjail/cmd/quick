@@ -1851,7 +1851,7 @@ quick_run_limits()
 
 	lib_debug "Configuring limits rules ..."
 
-	lib_keys_list "limits" | sort -n | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_LIMITS}" | sort -n | while IFS= read -r nro
 	do
 		limits_set_cmd="appjail limits set"
 
