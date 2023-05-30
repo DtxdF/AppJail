@@ -1845,6 +1845,8 @@ quick_set_cpuset()
 
 quick_run_limits()
 {
+	local errlevel
+
 	if [ ${QUICK_OPTION_USE_LIMITS} -eq 0 ]; then
 		return 0
 	fi
