@@ -61,6 +61,7 @@ QUICK_KEY_DHCP="dhcp"
 QUICK_KEY_ETHER="ether"
 QUICK_KEY_EXPOSE="expose"
 QUICK_KEY_FSTAB="fstab"
+QUICK_KEY_HEALTH="healthcheck"
 QUICK_KEY_IP4="ip4"
 QUICK_KEY_IP6="ip6"
 QUICK_KEY_JNG="jng"
@@ -99,6 +100,7 @@ QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
 QUICK_OPTION_FILES=
 QUICK_OPTION_FSTAB=0
+QUICK_OPTION_HEALTH=0
 QUICK_OPTION_INITSCRIPT=
 QUICK_OPTION_INSTALL_METHOD="${DEFAULT_INSTALL_METHOD}"
 QUICK_OPTION_IP4=0
@@ -174,7 +176,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -224,11 +226,14 @@ quick_main()
 	local startup_options
 	startup_options="boot priority"
 
+	local health_options
+	health_options="healthcheck"
+
 	local args_options
 	args_options="create_args start_args run_args stop_args"
 
 	local all_options
-	all_options="${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${args_options}"
+	all_options="${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
 
 	for option in ${all_options}; do
 		quick_run_${option}
@@ -2379,6 +2384,250 @@ quick_set_priority()
 	QUICK_OPTION_PRIORITY="${priority}"
 }
 
+quick_run_healthcheck()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_HEALTH} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring healthcheckers ..."
+
+	lib_keys_list "${QUICK_KEY_HEALTH}" | sort -n | while IFS= read -r nro
+	do
+		hchk_set_cmd="appjail healthcheck set"
+
+		health_cmd=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "health_cmd"`
+		if ! lib_check_empty "${health_cmd}"; then
+			escape_health_cmd=`lib_escape_string "${health_cmd}"`
+			hchk_set_cmd="${hchk_set_cmd} -h \"${escape_health_cmd}\""
+		fi
+
+		interval=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "interval"`
+		if ! lib_check_empty "${interval}"; then
+			escape_interval=`lib_escape_string "${interval}"`
+			hchk_set_cmd="${hchk_set_cmd} -i \"${escape_interval}\""
+		fi
+
+		kill_after=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "kill_after"`
+		if ! lib_check_empty "${kill_after}"; then
+			escape_kill_after=`lib_escape_string "${kill_after}"`
+			hchk_set_cmd="${hchk_set_cmd} -k \"${escape_kill_after}\""
+		fi
+
+		name=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "name"`
+		if ! lib_check_empty "${name}"; then
+			escape_name=`lib_escape_string "${name}"`
+			hchk_set_cmd="${hchk_set_cmd} -N \"${escape_name}\""
+		fi
+
+		recover_cmd=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "recover_cmd"`
+		if ! lib_check_empty "${recover_cmd}"; then
+			escape_recover_cmd=`lib_escape_string "${recover_cmd}"`
+			hchk_set_cmd="${hchk_set_cmd} -r \"${escape_recover_cmd}\""
+		fi
+
+		recover_kill_after=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "recover_kill_after"`
+		if ! lib_check_empty "${recover_kill_after}"; then
+			escape_recover_kill_after=`lib_escape_string "${recover_kill_after}"`
+			hchk_set_cmd="${hchk_set_cmd} -K \"${escape_recover_kill_after}\""
+		fi
+
+		recover_timeout=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "recover_timeout"`
+		if ! lib_check_empty "${recover_timeout}"; then
+			escape_recover_timeout=`lib_escape_string "${recover_timeout}"`
+			hchk_set_cmd="${hchk_set_cmd} -u \"${escape_recover_timeout}\""
+		fi
+
+		recover_timeout_signal=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "recover_timeout_signal"`
+		if ! lib_check_empty "${recover_timeout_signal}"; then
+			escape_recover_timeout_signal=`lib_escape_string "${recover_timeout_signal}"`
+			hchk_set_cmd="${hchk_set_cmd} -l \"${escape_recover_timeout_signal}\""
+		fi
+
+		recover_total=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "recover_total"`
+		if ! lib_check_empty "${recover_total}"; then
+			escape_recover_total=`lib_escape_string "${recover_total}"`
+			hchk_set_cmd="${hchk_set_cmd} -T \"${escape_recover_total}\""
+		fi
+
+		retries=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "retries"`
+		if ! lib_check_empty "${retries}"; then
+			escape_retries=`lib_escape_string "${retries}"`
+			hchk_set_cmd="${hchk_set_cmd} -R \"${escape_retries}\""
+		fi
+
+		start_period=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "start_period"`
+		if ! lib_check_empty "${start_period}"; then
+			escape_start_period=`lib_escape_string "${start_period}"`
+			hchk_set_cmd="${hchk_set_cmd} -s \"${escape_start_period}\""
+		fi
+
+		timeout=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "timeout"`
+		if ! lib_check_empty "${timeout}"; then
+			escape_timeout=`lib_escape_string "${timeout}"`
+			hchk_set_cmd="${hchk_set_cmd} -t \"${escape_timeout}\""
+		fi
+
+		timeout_signal=`lib_keys_get "${QUICK_KEY_HEALTH}" "${nro}" "timeout_signal"`
+		if ! lib_check_empty "${timeout_signal}"; then
+			escape_timeout_signal=`lib_escape_string "${timeout_signal}"`
+			hchk_set_cmd="${hchk_set_cmd} -S \"${escape_timeout_signal}\""
+		fi
+
+		lib_debug "healthcheck#${nro}: health_cmd:${health_cmd} interval:${interval} kill_after:${kill_after} name:${name} recover_cmd:${recover_cmd} recover_kill_after:${recover_kill_after} recover_timeout:${recover_timeout} recover_timeout_signal:${recover_timeout_signal} recover_total:${recover_total} retries:${retries} start_period:${start_period} timeout:${timeout} timeout_signal:${timeout_signal}"
+
+		hchk_set_cmd="${hchk_set_cmd} -- \"${QUICK_JAILNAME}\""
+
+		sh -c "${hchk_set_cmd}"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "An error occurred while adding the healthchecker (${nro}) to ${QUICK_JAILNAME} jail."
+		fi
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_healthcheck()
+{
+	local params="$1"
+
+	local health_cmd=
+	local interval=
+	local kill_after=
+	local name=
+	local recover_cmd=
+	local recover_kill_after=
+	local recover_timeout=
+	local recover_timeout_signal=
+	local recover_total=
+	local retries=
+	local start_period=
+	local timeout=
+	local timeout_signal=
+
+	if ! lib_check_empty "${params}"; then
+		params=`lib_split_jailparams "${params}"` || exit $?
+		local total_items=`printf "%s\n" "${params}" | wc -l`
+		local current_index=0
+
+		local arg parameter value
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			parameter=`lib_jailparam_name "${arg}" :`
+			value=`lib_jailparam_value "${arg}" :`
+
+			case "${parameter}" in
+				health_cmd)
+					health_cmd="${value}"
+					;;
+				interval)
+					interval="${value}"
+					;;
+				kill_after)
+					kill_after="${value}"
+					;;
+				name)
+					name="${value}"
+					;;
+				recover_cmd)
+					recover_cmd="${value}"
+					;;
+				recover_kill_after)
+					recover_kill_after="${value}"
+					;;
+				recover_timeout)
+					recover_timeout="${value}"
+					;;
+				recover_timeout_signal)
+					recover_timeout_signal="${value}"
+					;;
+				recover_total)
+					recover_total="${value}"
+					;;
+				retries)
+					retries="${value}"
+					;;
+				start_period)
+					start_period="${value}"
+					;;
+				timeout)
+					timeout="${value}"
+					;;
+				timeout_signal)
+					timeout_signal="${value}"
+					;;
+				*)
+					lib_err ${EX_DATAERR} -- "${parameter} (healthcheck): parameter not found."
+					;;
+			esac
+		done
+
+		if [ -n "${interval}" ] && ! lib_check_number "${interval}"; then
+			lib_err ${EX_DATAERR} -- "${interval}: Invalid interval."
+		fi
+
+		if [ -n "${kill_after}" ] && ! lib_check_number "${kill_after}"; then
+			lib_err ${EX_DATAERR} -- "${kill_after}: Invalid kill_after."
+		fi
+
+		if [ -n "${recover_kill_after}" ] && ! lib_check_number "${recover_kill_after}"; then
+			lib_err ${EX_DATAERR} -- "${recover_kill_after}: Invalid recover_kill_after."
+		fi
+
+		if [ -n "${recover_timeout}" ] && ! lib_check_number "${recover_timeout}"; then
+			lib_err ${EX_DATAERR} -- "${recover_timeout}: Invalid recover_timeout."
+		fi
+
+		if [ -n "${recover_total}" ] && ! lib_check_number "${recover_total}"; then
+			lib_err ${EX_DATAERR} -- "${recover_total}: Invalid recover_total."
+		fi
+
+		if [ -n "${retries}" ] && ! lib_check_number "${retries}"; then
+			lib_err ${EX_DATAERR} -- "${retries}: Invalid retries."
+		fi
+
+		if [ -n "${start_period}" ] && ! lib_check_number "${start_period}"; then
+			lib_err ${EX_DATAERR} -- "${start_period}: Invalid start_period."
+		fi
+
+		if [ -n "${timeout}" ] && ! lib_check_number "${timeout}"; then
+			lib_err ${EX_DATAERR} -- "${timeout}: Invalid timeout."
+		fi
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_HEALTH}"
+	nro=`lib_keys_append "${QUICK_KEY_HEALTH}" "health_cmd" "${health_cmd}"`
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "interval" "${interval}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "kill_after" "${kill_after}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "name" "${name}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "recover_cmd" "${recover_cmd}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "recover_kill_after" "${recover_kill_after}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "recover_timeout" "${recover_timeout}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "recover_timeout_signal" "${recover_timeout_signal}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "recover_total" "${recover_total}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "retries" "${retries}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "start_period" "${start_period}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "timeout" "${timeout}"
+	lib_keys_set "${QUICK_KEY_HEALTH}" "${nro}" "timeout_signal" "${timeout_signal}"
+
+	QUICK_OPTION_HEALTH=1
+}
+
 quick_run_tzdata()
 {
 	local errlevel
@@ -2938,6 +3187,44 @@ Options:
 				 - fstab="/usr/local/www /usr/local/www"
 				 - fstab="/dev/da0s1 /mnt msdosfs"
                              Descr: Creates an fstab entry.
+
+    healthcheck           -- Syntax: [health_cmd:command] [interval:seconds] [kill_after:seconds]
+				     [name:healthchecker_name] [recover_cmd:command] [recover_kill_after:seconds]
+				     [recover_timeout:seconds] [recover_timeout_signal:signal] [recover_total:number]
+				     [retries:number] [start_period:seconds] [timeout:seconds] [timeout_signal:signal]
+			     Type: options
+			     Parameters:
+			         - health_cmd (str, optional):
+				     Command to evaluate the jail health. Use \`host:\` before putting the command
+				     and it will run on the host, use \`jail\` and it will run on the jail.
+				 - interval (int, optional):
+				     Interval to check the jail health.
+				 - kill_after (int, optional):
+				     Send a SIGKILL signal to the health command after the specified seconds.
+				 - name (str, optional):
+				     Healthchecker name.
+				 - recover_cmd (str, optional):
+				     Command to use to attempt to heal a jail when it fails.
+				 - recover_kill_after (int, optional):
+				     Send a SIGKILL signal to the recover command after the specified seconds.
+				 - recover_timeout (int, optional):
+				     Time to wait before sending the specified signal to the recover command.
+				 - recover_timeout_signal (str, optional):
+				     Signal to send when the timeout is reached.
+				 - recover_total (int, optional):
+				     Total number of recoveries before the jail is considered unhealthy.
+				 - retries (int, optinal):
+				     Number of attempts before to heal a jail when it is failing.
+				 - start_period (int, optional):
+				     Sleep the jail for the specified seconds before checking the jail health.
+				 - timeout (int, optional):
+				     Time to wait before sending the specified signal to the health command.
+				 - timeout_signal (str, optional):
+				     Signal to send when the timeout is reached.
+			     Examples:
+			         - healthcheck
+				 - healthcheck='"health_cmd:jail:service nginx status" "recover_cmd:jail:service nginx restart"'
+			     Descr: Creates a healthchecker. See \`appjail healthcheck\`.
 
     import+jail           -- Syntax: import+jail=input:in_file [compress:algo]
                              Type: options
