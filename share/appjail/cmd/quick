@@ -1152,7 +1152,7 @@ quick_set_virtualnet()
 	fi
 
 	if ! lib_check_empty "${address}"; then
-		if ! lib_check_ip4addr "${address}"; then
+		if ! lib_check_ipv4addr "${address}"; then
 			lib_err ${EX_DATAERR} -- "${address}: invalid IPv4 address."
 		fi
 	fi
