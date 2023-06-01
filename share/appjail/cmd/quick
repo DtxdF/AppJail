@@ -261,6 +261,17 @@ quick_temp_template()
 	if ! cat -- "${QUICK_OPTION_TEMPLATE}" > "${QUICK_TEMP_TEMPLATE}"; then
 		lib_err ${EX_IOERR} "Error writing ${QUICK_OPTION_TEMPLATE} to ${QUICK_TEMP_TEMPLATE}"
 	fi
+
+	local errlevel
+
+	local ajconf_out
+	ajconf_out=`lib_ajconf check -t "${QUICK_TEMP_TEMPLATE}" 2>&1`
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "appjail-config: ${ajconf_out}"
+	fi
 }
 
 quick_create_jail()
