@@ -753,6 +753,7 @@ quick_set_expose()
 	local description=
 	local ext_if=
 	local use_logopts=0 logopts=
+	local proto=
 	local network_name=
 	local on_if=
 
@@ -1113,6 +1114,7 @@ quick_set_virtualnet()
 	local interface= virtualnet=
 	local default=0
 	local address=
+	local interface_desc=
 
 	local arg parameter value
 	while [ ${current_index} -lt ${total_items} ]; do 
