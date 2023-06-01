@@ -440,6 +440,8 @@ _healthcheck_run()
 		sleep "${start_period}" || exit $?
 	fi
 
+	_healthcheck_jail_exists "${jail}"
+
 	local retries=`healthcheck_get -In "${nro}" "${jail}" retries`
 	local interval=`healthcheck_get -In "${nro}" "${jail}" interval`
 
@@ -468,6 +470,8 @@ _healthcheck_run()
 	while true; do
 		lib_debug "Sleeping (nro = ${nro}, context = health, type = ${health_type}, cmd = ${health_cmd}, interval = ${interval}) ..."
 		sleep "${interval}" || exit $?
+
+		_healthcheck_jail_exists "${jail}"
 
 		lib_debug "Executing (nro = ${nro}, context = health, type = ${health_type}, cmd = ${health_cmd}) ..."
 
@@ -525,6 +529,20 @@ _healthcheck_run()
 	done
 }
 
+_healthcheck_jail_exists()
+{
+	local jail="$1"
+
+	if [ -z "${jail}" ]; then
+		lib_err ${EX_USAGE} "usage: _healthcheck_jail_exists jail"
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_warn -- "${jail_name}: the jail is gone. Closing..."
+		exit 0
+	fi
+}
+
 _healthcheck_set_status()
 {
 	local jail="$1" nro="$2" status="$3"
@@ -532,11 +550,15 @@ _healthcheck_set_status()
 		lib_err ${EX_USAGE} "_healthcheck_set_status jail nro status"
 	fi
 
+	_healthcheck_jail_exists "${jail}"
+
 	local jail_path="${JAILDIR}/${jail}"
 	local basedir="${jail_path}/conf/boot/health"
 	local nrodir="${basedir}/${nro}"
 
-	echo "${status}" > "${nrodir}/status"
+	if ! echo "${status}" > "${nrodir}/status"; then
+		lib_err ${EX_IOERR} "Error writing ${status} to ${nrodir}/status"
+	fi
 }
 
 healthcheck_set()
