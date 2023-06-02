@@ -1497,12 +1497,12 @@ CLEAR user
 #### Syntax
 
 ```
-CMD --chroot [cmd [args ...]]
-CMD --jaildir [cmd [args ...]]
-CMD [--jexec] [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]
-CMD --local [cmd [args ...]]
-CMD --local-jaildir [cmd [args ...]]
-CMD --local-rootdir [cmd [args ...]]
+CMD --chroot cmd [args ...]
+CMD --jaildir cmd [args ...]
+CMD [--jexec] [--noclean] [--juser jail_username | --huser host_username] cmd [args ...]
+CMD --local cmd [args ...]
+CMD --local-jaildir cmd [args ...]
+CMD --local-rootdir cmd [args ...]
 ```
 
 ##### --chroot

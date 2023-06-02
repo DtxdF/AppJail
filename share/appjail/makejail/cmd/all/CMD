@@ -40,12 +40,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err - "usage: CMD --chroot [cmd [args ...]]"
-		lib_err - "       CMD --jaildir [cmd [args ...]]"
-		lib_err - "       CMD [--jexec] [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
-		lib_err - "       CMD --local [cmd [args ...]]"
-		lib_err - "       CMD --local-jaildir [cmd [args ...]]"
-		lib_err - "       CMD --local-rootdir [cmd [args ...]]"
+		lib_err - "usage: CMD --chroot cmd [args ...]"
+		lib_err - "       CMD --jaildir cmd [args ...]"
+		lib_err - "       CMD [--jexec] [--noclean] [--juser jail_username | --huser host_username] cmd [args ...]"
+		lib_err - "       CMD --local cmd [args ...]"
+		lib_err - "       CMD --local-jaildir cmd [args ...]"
+		lib_err - "       CMD --local-rootdir cmd [args ...]"
 		exit ${EX_USAGE}
 	fi
 
