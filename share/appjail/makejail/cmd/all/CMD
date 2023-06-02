@@ -63,6 +63,7 @@ main()
 	local huser=
 
 	# Arguments
+	local has_args=0
 	local args_list
 	local total_items
 	local current_index=0
@@ -121,17 +122,23 @@ main()
 				juser="${optarg}"
 				;;
 			--)
+				has_args=1
 				break
 				;;
 			--*)
 				main # usage
 				;;
 			*)
+				has_args=1
 				break
 				;;
 		esac
 	done
 	current_index=$((current_index-1))
+
+	if [ ${has_args} -eq 0 -o ${current_index} -eq ${total_items} ]; then
+		main # usage
+	fi
 
 	local escape_chars='`"\'
 
