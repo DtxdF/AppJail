@@ -175,6 +175,7 @@ main()
 	fi
 
 	args_list=`lib_split_ujailparams "${args}"`
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
 
 	local cmd_args=
 	while [ ${current_index} -lt ${total_items} ]; do 
