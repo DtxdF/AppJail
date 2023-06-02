@@ -182,7 +182,8 @@ main()
 		fi
 	done
 
-	cmd_args=`lib_replace_escape_shellvars "${cmd_args}"`
+	cmd_args=`printf "%s" "${cmd_args}" | sed -Ee 's/([\`"])/\\\\\1/g'`
+	cmd_args=`printf "%s" "${cmd_args}" | sed -Ee 's/(\\$\\()/\\\\\1/g'`
 
 	command="${command} sh -c \"${cmd_args}\""
 

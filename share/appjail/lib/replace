@@ -53,16 +53,6 @@ lib_escape_string()
 	printf "%s\n" "${str}" | sed -Ee "s/([${chars2escape}])/${escape_chars}\\1/g"
 }
 
-lib_replace_escape_shellvars()
-{
-	local str="$1"
-	if [ -z "${str}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_replace_escape_shellvars str"
-	fi
-
-	printf "%s\n" "${str}" | sed -Ee 's/\\(.)/\\\\\\\1/g; s/(^|[^\\])([`"])/\1\\\2/g; s/(\\["`])(["`])/\1\\\2/g'
-}
-
 lib_replace_changevars()
 {
 	local str="$1" new_name="$2"

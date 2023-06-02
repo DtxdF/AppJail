@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -48,7 +49,7 @@
 #define WORD_TRBCK(ret) except_addsf(ret, wrderr(ret), trbck)
 
 enum states {
-    WRITE, ESCAPE, NEW_WORD, IGNORE, END
+    WRITE, ESCAPE, NEW_WORD, WORD_WITH_WRITE, IGNORE, END
 };
 
 struct word {
@@ -59,7 +60,7 @@ struct word {
 static int  prv_test_wlwrap_mul(wordlen a, wordlen b, wordlen *r);
 
 int
-wrdinit(const char *s, word *wptr, traceback *trbck)
+wrdinit(const char *s, word *wptr, bool quotes, traceback *trbck)
 {
     word w = NULL;
     int c, d = NULL_DELIM;
@@ -83,10 +84,16 @@ wrdinit(const char *s, word *wptr, traceback *trbck)
         case WORD_CSQUOTE:
             if (d == NULL_DELIM) {
                 d = c;
-                st = IGNORE;
+                if (quotes)
+                    st = WRITE;
+                else
+                    st = IGNORE;
             } else if (d == c) {
                 d = NULL_DELIM;
-                st = NEW_WORD;
+                if (quotes)
+                    st = WORD_WITH_WRITE;
+                else
+                    st = NEW_WORD;
             } else {
                 st = WRITE;
             }
@@ -122,12 +129,15 @@ wrdinit(const char *s, word *wptr, traceback *trbck)
                 err = WDERRO;
                 goto end;
             }
+        case WORD_WITH_WRITE:
         case WRITE:
             if (bufadd(c, w->b[w->n - 1], trbck) != BFERRN) {
                 err = WDERRO;
                 goto end;
             }
-            break;
+
+            if (st != WORD_WITH_WRITE)
+                break;
         case NEW_WORD:
             if (buflen(w->b[w->n - 1]) == 0)
                 continue;

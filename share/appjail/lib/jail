@@ -103,7 +103,7 @@ lib_split_jailparams()
 
 	local errmsg ret
 
-	errmsg=`"${UTILDIR}/appjail-config/tok" "${parameter}" 2>&1`
+	errmsg=`"${UTILDIR}/appjail-config/tok" -- "${parameter}" 2>&1`
 	ret=$?
 
 	if [ ${ret} -ne 0 ]; then
@@ -121,7 +121,16 @@ lib_split_ujailparams()
 		lib_err ${EX_USAGE} "usage: lib_split_ujailparams parameter"
 	fi
 
-	printf "%s" "${parameter}" | grep -Eoe $'[^ ]+' -e $'["]([^"]|\\\\["])+["]'
+	local errmsg ret
+
+	errmsg=`"${UTILDIR}/appjail-config/tok" -Q -- "${parameter}" 2>&1`
+	ret=$?
+
+	if [ ${ret} -ne 0 ]; then
+		lib_err ${ret} -- "Tokenizer: ${errmsg}"
+	fi
+
+	printf "%s\n" "${errmsg}"
 }
 
 lib_ajconf()

@@ -1557,15 +1557,50 @@ This does not provide isolation.
 
 #### Description
 
-Execute a command using `sh(1)`.
+Execute a command using `sh(1)`. This command does its best to allow you to put any valid instruction through `sh(1)`, but it has some limitations. First of all, this command escapes some characters:
 
-The AppJail tokenizer does its best to tokenize and escape shell characters so that, in case of error, the command is executed in the jail and not on the host (except for some parameters that execute commands on the host).
+* \`   -> \\\`
+* \"   -> \\\"
+* \$\( -> \\\$\(
 
-Variables can be used in the same way as a `sh(1)` script.
+Escaping the above characters is necessary to run it on the jail instead of the host, but as you can see, the `\` is not escaped, so you can provide a malformed command. Also, the `$` character is not escaped to allow you to use a Makejail variable, for example:
 
-Characters can be escaped using `\`.
+```
+OPTION overwrite
+OPTION start
 
-It is recommended to use `RUN` instead of `CMD` when using arguments to avoid arbitrary code execution.
+ARG name=DtxdF
+
+CMD echo "Hello, ${name}"
+```
+
+Care must be taken with escape characters when necessary, for example:
+
+```
+CMD cd /usr/local/etc/opensearch/opensearch-security; for i in $(ls *.sample) ; do cp -p "\$i" $(echo \$i | sed "s|.sample||g"); done
+```
+
+`ls *.sample` is executed on the jail. `\$i` is necessary because the variable `i` is created in the for-loop.
+
+Remember that AppJail uses its own tokenizer, so the following examples print the same:
+
+```
+# "
+CMD echo "Hello, ${name}"
+# '
+CMD echo 'Hello, ${name}'
+```
+
+Of course, if you put single or double quotation marks, they are written as they are.
+
+The same care is necessary when it comes to writing a character with its literal meaning:
+
+```
+CMD echo "Literal: \\\\\" \\\\\$"
+# output: Literal: " $
+```
+
+It is recommended to use a script for advanced cases and pass arguments to it instead of trying to do many things in a single statement.
 
 #### Examples
 

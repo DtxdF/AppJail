@@ -31,34 +31,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
+#include <unistd.h>
 
 #include "except.h"
 #include "word.h"
 #include "worderr.h"
 
 static void usage(void);
-static void print_words(const char *word);
+static void print_words(const char *word, bool quotes);
 
 int
 main(int argc, char **argv)
 {
-    if (argc < 2)
+    int c;
+    bool quotes = false;
+
+    while ((c = getopt(argc, argv, ":Q")) != -1) {
+        switch (c) {
+            case 'Q':
+                quotes = true;
+                break;
+            default:
+                usage();
+        }
+    }
+
+    char *words = argv[optind++];
+
+    if (words == NULL)
         usage();
 
-    char *words = argv[1];
-
-    print_words(words);
+    print_words(words, quotes);
 
     return EXIT_SUCCESS;
 }
 
 static void
-print_words(const char *words)
+print_words(const char *words, bool quotes)
 {
     word w = NULL;
     traceback trbck = except_newtrbck();
 
-    if (wrdinit(words, &w, &trbck) != WDERRN) {
+    if (wrdinit(words, &w, quotes, &trbck) != WDERRN) {
         except_printerr(trbck);
         except_free(&trbck);
         wrdfree(&w);

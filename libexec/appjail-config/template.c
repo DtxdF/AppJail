@@ -396,7 +396,7 @@ template_setparam(const char *s, param p, traceback *trbck)
     if (err == TPERRN \
         && p->v != NULL \
         && bufget(p->v) != NULL \
-        && wrdinit(bufget(p->v), &p->c, trbck) != WDERRN) {
+        && wrdinit(bufget(p->v), &p->c, false, trbck) != WDERRN) {
         err = TPERRO;
     }
 
@@ -631,7 +631,7 @@ template_setvalue(param p, const char *v, traceback *trbck)
 
     wrdfree(&p->c);
 
-    if (wrdinit(v, &p->c, trbck) != WDERRN) {
+    if (wrdinit(v, &p->c, false, trbck) != WDERRN) {
         TEMPLATE_TRBCK(TPERRB);
         return TPERRB;
     }

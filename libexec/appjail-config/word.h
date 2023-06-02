@@ -31,6 +31,7 @@
 #ifndef WORD_H
 #define WORD_H
 
+#include <stdbool.h>
 #include <limits.h>
 
 #include "buff.h"
@@ -57,6 +58,8 @@ typedef struct word *word;
  * character followed by a character other than the quotation mark (depending on
  * whether it is single or double) will write without escaping.
  *
+ * `quotes` can be used to include single or double quotes around words.
+ *
  * Examples:
  *   - "Hello world!" "Escaping \""
  *     ```
@@ -77,7 +80,7 @@ typedef struct word *word;
  *               when parsing.
  *   - [WDERRN]: There are no errors.
  */
-int     wrdinit(const char *s, word *wptr, traceback *trbck);
+int     wrdinit(const char *s, word *wptr, bool quotes, traceback *trbck);
 
 /*
  * Like `wrdinit()` but does not parse a string for words. This function should only
