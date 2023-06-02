@@ -251,6 +251,10 @@ quick_main()
 
 quick_temp_template()
 {
+	if [ ! -f "${QUICK_OPTION_TEMPLATE}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the template \`${QUICK_OPTION_TEMPLATE}\`."
+	fi
+
 	QUICK_TEMP_TEMPLATE="`lib_generate_tempfile`" || exit $?
 
 	local escape_temp_template
