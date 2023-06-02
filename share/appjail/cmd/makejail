@@ -949,6 +949,17 @@ makejail_include()
 
 	lib_debug "Including ${makejail_file} ..."
 
+	local temp_makejail
+	temp_makejail=`lib_generate_tempfile` || exit $?
+
+	local escape_temp_makejail
+	escape_temp_makejail=`lib_escape_string "${temp_makejail}"`
+
+	lib_atexit_add "rm -f \"${escape_temp_makejail}\""
+
+	# Removes Carriege Feed to avoid problems when parsing. See issue #4.
+	cat -- "${makejail_file}" | sed -Ee 's/\r$//' > "${temp_makejail}"
+
 	local line
 	while IFS= read -r line; do
 		if lib_check_empty "${line}"; then
@@ -1001,7 +1012,7 @@ makejail_include()
 		else
 			printf "%s\n" "${line}"
 		fi
-	done < "${makejail_file}"
+	done < "${temp_makejail}"
 }
 
 _makejail_check()
