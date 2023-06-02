@@ -89,6 +89,6 @@ print_words(const char *words, bool quotes)
 static void
 usage(void)
 {
-    fprintf(stderr, "usage: tok word\n");
+    fprintf(stderr, "usage: tok [-Q] word\n");
     exit(EX_USAGE);
 }
