@@ -439,16 +439,29 @@ _network_create_bridge()
 		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge"
 	fi
 
-	if ! lib_check_iface "${bridge}"; then
-		ifconfig bridge create name "${bridge}" || exit $?
-		ifconfig -- "${bridge}" up || exit $?
-	else
-		if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
-			lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
-		fi
-	fi
+	# Avoids a race condition at startup.
 
-	lib_debug -- "${bridge}: bridge already created."
+	local total=3 tries=0
+	while [ ${tries} -lt ${total} ]; do
+		sleep 0.`random_number 3 9`
+
+		if lib_check_iface "${bridge}"; then
+			if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
+				lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
+			fi
+
+			lib_debug -- "${bridge}: bridge already created."
+
+			return 0
+		fi
+
+		tries=$((tries+1))
+	done
+
+	ifconfig bridge create name "${bridge}" || exit $?
+	ifconfig -- "${bridge}" up || exit $?
+
+	lib_debug -- "${bridge}: the bridge has been created."
 }
 
 _network_create_epair()
