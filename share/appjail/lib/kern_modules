@@ -62,13 +62,7 @@ lib_modules_load()
 		return 0
 	fi
 
-	if kldload -- "${file}"; then
-		lib_debug -- "${file} kernel module loaded."
-	else
-		lib_err ${EX_SOFTWARE} "Unable to load kernel module \`${file}\`"
-	fi
-
-        return 0
+	kldload -n -- "${file}"
 }
 
 lib_modules_linuxmods()
