@@ -30,6 +30,7 @@
 
 lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/network"
+lib_load "${LIBDIR}/repeat"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/tempfile"
@@ -388,7 +389,7 @@ expose_off()
 
 			local pf_anchor="appjail-rdr/${jail_name}"
 
-			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1 || :
 			;;
 	esac
 }
@@ -445,7 +446,7 @@ expose_on()
 
 	case "${USE_FIREWALL}" in
 		pf)
-			if ! pfctl -a "appjail-rdr/${jail_name}" -f "${expose_file}"; then
+			if ! lib_repeat_run -s random pfctl -a "appjail-rdr/${jail_name}" -f "${expose_file}"; then
 				lib_err ${EX_SOFTWARE} "An error ocurred while loading the pf rules."
 			fi
 			;;

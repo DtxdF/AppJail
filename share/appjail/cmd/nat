@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/repeat"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/tempfile"
 
@@ -848,7 +849,7 @@ nat_off_jail()
 
 			local pf_anchor="appjail-nat/jail/${jail_name}"
 
-			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1 || :
 			;;
 	esac
 }
@@ -872,7 +873,7 @@ nat_off_network()
 
 			local pf_anchor="appjail-nat/network/${network_name}"
 
-			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1
+			pfctl -a "${pf_anchor}" -Fnat > /dev/null 2>&1 || :
 			;;
 	esac
 }
@@ -931,7 +932,7 @@ nat_on_jail()
 
 	case "${USE_FIREWALL}" in
 		pf)
-			if ! pfctl -a "appjail-nat/jail/${jail_name}" -f "${rules}"; then
+			if ! lib_repeat_run -s random pfctl -a "appjail-nat/jail/${jail_name}" -f "${rules}"; then
 				lib_err - "An error occurred while parsing the pf rules for ${jail_name}:"
 				while IFS= read -r rule
 				do
@@ -968,7 +969,7 @@ nat_on_network()
 		pf)
 			local pf_anchor="appjail-nat/network/${network_name}"
 
-			if ! printf "%s\n" "${rule}" | pfctl -a "${pf_anchor}" -f -; then
+			if ! printf "%s\n" "${rule}" | lib_repeat_run -s random pfctl -a "${pf_anchor}" -f -; then
 				lib_err ${EX_DATAERR} "An error occurred while parsing the pf rule for ${network_name}: ${rule}"
 			fi
 			;;

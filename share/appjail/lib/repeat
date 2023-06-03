@@ -1,0 +1,114 @@
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/sysexits"
+
+lib_repeat_run()
+{
+	local sleep=0
+	local total=3
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: lib_repeat_run [-s random|number] [-t total] cmd [args ...]"
+	fi
+
+	while getopts ":s:t:" _o; do
+		case "${_o}" in
+			s)
+				sleep="${OPTARG}"
+				;;
+			t)
+				total="${OPTARG}"
+				;;
+			*)
+				lib_repeat_run # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local cmd="$1"; shift
+	if [ -z "${cmd}" ]; then
+		lib_repeat_run # usage
+	fi
+
+	if [ "${sleep}" != "random" ]; then
+		if ! lib_check_number "${sleep}"; then
+			lib_err ${EX_DATAERR} -- "${sleep}: sleep must be a number"
+		fi
+
+		if [ ${sleep} -lt 0 ]; then
+			lib_err ${EX_DATAERR} -- "${sleep}: sleep must be greater than 0."
+		fi
+	fi
+	
+	if ! lib_check_number "${total}"; then
+		lib_err ${EX_DATAERR} -- "${total}: total must be a number."
+	fi
+
+	if [ ${total} -le 0 ]; then
+		lib_err ${EX_DATAERR} -- "${total}: total must be greater than or equal to 0."
+	fi
+
+	local cmd_output= cmd_errlevel=0
+
+	local tries=0
+	while [ ${tries} -lt ${total} ]; do
+		if [ "${sleep}" = "random" ]; then
+			sleep `random_number 0 3`.`random_number 3 9`
+		elif [ ${sleep} -gt 0 ]; then
+			sleep ${sleep}
+		fi
+
+		cmd_output=`"${cmd}" "$@" 2>&1`
+		cmd_errlevel=$?
+
+		if [ ${cmd_errlevel} -eq 0 ]; then
+			if ! lib_check_empty "${cmd_output}"; then
+				printf "%s\n" "${cmd_output}" | while IFS= read -r line; do
+					lib_debug "${cmd}: ${line}"
+				done
+			fi
+			return 0
+		fi
+
+		tries=$((tries+1))
+	done
+
+	if ! lib_check_number "${cmd_output}"; then
+		printf "%s\n" "${cmd_output}" | while IFS= read -r line; do
+			lib_err - "${cmd}: ${line}"
+		done
+	fi
+
+	return ${errlevel}
+}
