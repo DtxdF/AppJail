@@ -443,7 +443,7 @@ _network_create_bridge()
 
 	local total=3 tries=0
 	while [ ${tries} -lt ${total} ]; do
-		sleep 0.`random_number 3 9`
+		sleep `random_number 0 3`.`random_number 3 9`
 
 		if lib_check_iface "${bridge}"; then
 			if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
