@@ -35,7 +35,7 @@ precmd()
 
 _show_logfile()
 {
-	echo "AppJail log file (NAT): ${appjail_logfile}"
+	echo "AppJail log file (NAT): ${appjail_natnet_logfile}"
 }
 
 appjail_natnet_start()
