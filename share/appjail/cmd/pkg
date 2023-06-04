@@ -189,7 +189,7 @@ pkg_jail()
 
 	case "${jail_type}" in
 		${JAIL_TYPE_DEBOOTSTRAP})
-			jexec -l "${jail_name}" apt-get "$@"
+			jexec -l "${jail_name}" apt "$@"
 			;;
 		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK})
 			if [ ${opt_jail} -eq 1 ]; then

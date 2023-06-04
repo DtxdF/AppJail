@@ -1222,8 +1222,8 @@ jail_install_standard_linux_debootstrap()
 		lib_err ${EX_SOFTWARE} "Error installing *.deb packages."
 	fi
 
-	if ! chroot "${jail_path}" sh -c "apt-get update -y"; then
-		lib_warn "Error updating repositories: run \`appjail cmd jexec \"${jail_name}\" apt-get update\` manually when possible."
+	if ! chroot "${jail_path}" sh -c "apt update -y"; then
+		lib_warn "Error updating repositories: run \`appjail cmd jexec \"${jail_name}\" apt update\` manually when possible."
 	fi
 
 	umount "${jail_path}/dev/shm"
