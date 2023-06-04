@@ -960,7 +960,7 @@ makejail_include()
 	# Removes Carriege Feed to avoid problems when parsing. See issue #4.
 	cat -- "${makejail_file}" | sed -Ee 's/\r$//' > "${temp_makejail}"
 
-	local line
+	local line lines=
 	while IFS= read -r line; do
 		if lib_check_empty "${line}"; then
 			continue
@@ -972,6 +972,22 @@ makejail_include()
 
 		# Remove tabs and spaces.
 		line=`printf "%s" "${line}" | sed -Ee 's/^[\t ]*//'`
+
+		if printf "%s" "${line}" | grep -qEe '\\[[:space:]]*$'; then
+			line=`printf "%s" "${line}" | sed -Ee 's/\\\\[[:space:]]*$//'`
+			if [ -z "${lines}" ]; then
+				lines="${line}"
+			else
+				lines="${lines}${line}"
+			fi
+			continue
+		else
+			if [ -n "${lines}" ]; then
+				line="${lines}${line}"
+			fi
+
+			lines=
+		fi
 
 		local cmd=`lib_jailparam_name "${line}" " "`
 
