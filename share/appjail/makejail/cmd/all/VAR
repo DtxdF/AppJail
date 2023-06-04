@@ -88,8 +88,6 @@ main()
 		escape_chars='`"\'
 	fi
 
-	args_list=`lib_split_ujailparams "${var}"`
-
 	var=
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
