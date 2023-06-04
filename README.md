@@ -14,6 +14,10 @@ Contribute your Makejail: https://github.com/AppJail-makejails
 
 [How does AppJail compare to other FreeBSD jail frameworks?](https://github.com/DtxdF/AppJail/wiki#comparing-appjail)
 
+## Support
+
+[Need help using AppJail?](https://github.com/DtxdF/AppJail/wiki#support)
+
 ## Features
 
 * Easy to use.
