@@ -41,8 +41,22 @@ main()
 		lib_err ${EX_USAGE} "usage: ARG name[?][=[default_value]]"
 	fi
 
+	local envdir="${MAKEJAIL_TEMPDIR}/arg_env"
+	if ! mkdir -p "${envdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${envdir}"
+	fi
+
 	if ! lib_check_mkvar "${arg}"; then
 		lib_err ${EX_DATAERR} -- "${arg}: Invalid variable."
+	fi
+
+	local name=`lib_jailparam_name "${arg}" "="`
+	name=`printf "%s" "${name}" | sed -Ee 's/^([a-zA-Z_][a-zA-Z0-9_]*)\??$/\1/'`
+
+	local env="${name}=\${${name}}"
+
+	if ! printf "%s " "\"${env}\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
+		lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
 	fi
 
 	printf "%s\n" "${arg}"

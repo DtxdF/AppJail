@@ -48,6 +48,9 @@ main()
 		lib_err - "       CMD --local-rootdir cmd [args ...]"
 		exit ${EX_USAGE}
 	fi
+	
+	# Environment.
+	get_environment
 
 	# Options
 	local use_chroot=0
@@ -190,12 +193,18 @@ main()
 		fi
 	done
 
-	cmd_args=`printf "%s" "${cmd_args}" | sed -Ee 's/([\`"])/\\\\\1/g'`
-	cmd_args=`printf "%s" "${cmd_args}" | sed -Ee 's/(\\$\\()/\\\\\1/g'`
-
-	command="${command} sh -c \"${cmd_args}\""
+	cmd_args=`printf "%s" "${cmd_args}" | sed -Ee 's/([\`"$\\])/\\\\\1/g'`
+	command="${command} env ${ENV_VARS} sh -c \"${cmd_args}\""
 
 	printf "%s\n" "${command}"
+}
+
+get_environment()
+{
+	local env_vars_file="${MAKEJAIL_TEMPDIR}/arg_env/${MAKEJAIL_CURRENT_STAGE}"
+	if [ -f "${env_vars_file}" ]; then
+		ENV_VARS=`head -1 -- "${env_vars_file}"`
+	fi
 }
 
 main "$@"

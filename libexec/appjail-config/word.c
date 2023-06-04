@@ -103,7 +103,10 @@ wrdinit(const char *s, word *wptr, bool quotes, traceback *trbck)
                 err = WDERRS;
                 st = END;
             } else if (c == d || c == WORD_CESCAPE) {
-                st = WRITE;
+                if (quotes)
+                    st = ESCAPE;
+                else
+                    st = WRITE;
             } else {
                 st = ESCAPE;
             }

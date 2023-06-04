@@ -1454,6 +1454,8 @@ Creates arguments to the current stage. See `Initscripts` for more details.
 
 If `default_value` is not defined, the argument will be a non-optional argument unless `?=` is used.
 
+This instruction passes its arguments to the `CMD` instruction through environment variables. See `CMD` for details.
+
 #### Examples
 
 ```
@@ -1561,13 +1563,9 @@ This does not provide isolation.
 
 #### Description
 
-Execute a command using `sh(1)`. This command does its best to allow you to put any valid instruction through `sh(1)`, but it has some limitations. First of all, this command escapes some characters:
+This instruction uses the AppJail tokenizer to get a valid posix shell command. It has the responsability to escape harmful characters that can be executed on the host (although this assumption is not valid when using a parameter that executes the command on the host as can be seen in `Syntax`). The idea is that any errors arising from an invalid shell command will only occur on the jail.
 
-* \`   -> \\\`
-* \"   -> \\\"
-* \$\( -> \\\$\(
-
-Escaping the above characters is necessary to run it on the jail instead of the host, but as you can see, the `\` is not escaped, so you can provide a malformed command. Also, the `$` character is not escaped to allow you to use a Makejail variable, for example:
+The `ARG` instruction can be used in conjunction with this instruction to pass variables. Internally, variables are passed using `env(1)` to the `sh(1)` subprocess that is created when entering the jail to execute the given command.
 
 ```
 OPTION overwrite
@@ -1578,33 +1576,19 @@ ARG name=DtxdF
 CMD echo "Hello, ${name}"
 ```
 
-Care must be taken with escape characters when necessary, for example:
+The above Makejail will display `Hello, DtxdF` unless you change the variable's value at runtime.
+
+This instruction has the advantage that it can execute virtually any posix shell command.
 
 ```
-CMD cd /usr/local/etc/opensearch/opensearch-security; for i in $(ls *.sample) ; do cp -p "\$i" $(echo \$i | sed "s|.sample||g"); done
+CMD cd /usr/local/etc/opensearch/opensearch-security; for i in $(ls *.sample) ; do cp -p "$i" $(echo $i | sed "s|.sample||g"); done
 ```
 
-`ls *.sample` is executed on the jail. `\$i` is necessary because the variable `i` is created in the for-loop.
+All of the above commands will be executed on the jail, not on the host, even the embedded shell commands.
 
-Remember that AppJail uses its own tokenizer, so the following examples print the same:
+Remember that this command uses the AppJail tokenizer, so you cannot use an invalid (but accepted by `sh(1)`) shell command. For example, if you run `echo "\"` in a shell script, you will get the error `Syntax error: Unterminated quoted string`, but if you run it in a Makejail you will get `Tokenizer: ERROR [ret:-4, errno:0] <Invalid syntax (WDERRS).>`.
 
-```
-# "
-CMD echo "Hello, ${name}"
-# '
-CMD echo 'Hello, ${name}'
-```
-
-Of course, if you put single or double quotation marks, they are written as they are.
-
-The same care is necessary when it comes to writing a character with its literal meaning:
-
-```
-CMD echo "Literal: \\\\\" \\\\\$"
-# output: Literal: " $
-```
-
-It is recommended to use a script for advanced cases and pass arguments to it instead of trying to do many things in a single statement.
+Feel free to use this command, but for more complex things use a shell script. It is recommended to separate complex things into simple things.
 
 #### Examples
 
@@ -1619,16 +1603,6 @@ CMD echo "<h1>Hello, world!</h1>" > /usr/local/www/darkhttpd/index.html
 
 ```
 CMD --local-jaildir sysrc -f etc/rc.conf clear_tmp_X="NO"
-```
-
-##### #3
-
-```
-# Prints the value of this variable.
-CMD echo "Hello, ${name}"
-
-# Prints ${name}.
-CMD echo "Hello, \${name}"
 ```
 
 ### COPY
