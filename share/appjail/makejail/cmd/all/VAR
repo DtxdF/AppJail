@@ -38,11 +38,12 @@ main()
 {
 	local var="$1"
 	if lib_check_empty "${var}"; then
-		lib_err ${EX_USAGE} "usage: VAR [--noexpand] name[=default_value]"
+		lib_err ${EX_USAGE} "usage: VAR [--make-arg-env] [--noexpand] name[=default_value]"
 	fi
 	
 	# options
 	local noexpand=0
+	local make_arg_env=0
 
 	# Arguments
 	local args_list
@@ -60,6 +61,9 @@ main()
 		fi
 
 		case "${arg}" in
+			--make-arg-env)
+				make_arg_env=1
+				;;
 			--noexpand)
 				noexpand=1
 				;;
@@ -107,6 +111,19 @@ main()
 
 	if ! lib_check_empty "${default_value}"; then
 		default_value=`lib_escape_string "${default_value}" "" "${escape_chars}"`
+	fi
+
+	if [ ${make_arg_env} -eq 1 ]; then
+		local envdir="${MAKEJAIL_TEMPDIR}/arg_env"
+		if ! mkdir -p "${envdir}"; then
+			lib_err ${EX_IOERR} "Error creating ${envdir}"
+		fi
+
+		local env="${name}=\${${name}}"
+
+		if ! printf "%s " "\"${env}\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
+			lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
+		fi
 	fi
 
 	printf "%s=%s\n" "${name}" "\"${default_value}\""

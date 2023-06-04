@@ -2417,8 +2417,12 @@ USER xclock
 #### Syntax
 
 ```
-VAR [--noexpand] name[=default_value]
+VAR [--make-arg-env] [--noexpand] name[=default_value]
 ```
+
+##### --make-arg-env
+
+Create an environment variable to be passed to `CMD`. See `CMD` for details.
 
 ##### --noexpand
 
