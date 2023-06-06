@@ -175,6 +175,17 @@ logs_remove()
 		exit ${EX_USAGE}
 	fi
 
+	if [ "${file}" = "all" ]; then
+		if [ "${ENABLE_ZFS}" != "0" ]; then
+			if ! lib_zfs_rrmfs -fR "${ZFS_LOGS_NAME}"; then
+				lib_err ${EX_IOERR} "Error destroying ${ZFS_LOGS_NAME}"
+			fi
+		else
+			rm -rf "${LOGDIR}"
+			return $?
+		fi
+	fi
+
 	local file_count
 
 	file=`printf "%s" "${file}" | grep -oEe '([^/]+)/?'`
@@ -210,6 +221,8 @@ logs_remove()
 
 		rm -rf "${LOGDIR}/${file}"
 	fi
+
+	return $?
 }
 
 logs_tail()
@@ -276,7 +289,7 @@ logs_usage()
 	cat << EOF
 usage: logs list [-eHp] type[/entity[/subtype[/log]]]
        logs read type/entity/subtype/log [pager_args ...]
-       logs remove type[/entity[/subtype[/log]]]
+       logs remove [all | type[/entity[/subtype[/log]]]]
        logs tail type/entity/subtype/log [tail_args ...]
 EOF
 }
