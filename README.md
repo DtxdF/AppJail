@@ -1254,6 +1254,7 @@ The entities can be a network, a jail or something similar. They are dynamic.
 **subtype**:
 
 * `jails/{ENTITY}/console`: A file to direct command output (stdout and stderr) to.
+* `jails/{ENTITY}/healthcheckers`: Where healthcheckers logs their output.
 * `{jails|nat}/{ENTITY}/{startup-start|startup-stop}`: Logs created by the `appjail startup` command.
 * `commands/{ENTITY}/output`: When `ENABLE_LOGGING_OUTPUT` is set to 1, AppJail will log all output of a command.
 
