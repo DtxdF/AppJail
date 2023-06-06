@@ -258,8 +258,7 @@ logs_help()
 ${logs_desc}
 
 Parameters:
-    list          -- Default. By default, if no keywords are provided, it displays
-                     all keywords. Valid keywords: type, entity, subtype, log.
+    list          -- Default. Display the current logs.
     read          -- Use the environment variable PAGER or less(1) if it is not
                      defined to display the contents of a log.
     remove        -- Remove a bunch of logs or a single one.
