@@ -169,20 +169,47 @@ logs_read()
 
 logs_remove()
 {
-	local errlevel=0
 	local file="$1"; shift
 	if lib_check_empty "${file}"; then
 		logs_usage
 		exit ${EX_USAGE}
 	fi
 
-	file=`_logs_get_filename "${file}"`
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
+	local file_count
+
+	file=`printf "%s" "${file}" | grep -oEe '([^/]+)/?'`
+	if lib_check_empty "${file}"; then
+		logs_usage
+		exit ${EX_USAGE}
 	fi
-	
-	rm -f "${file}"
+
+	file_count=`printf "%s\n" "${file}" | wc -l`
+	if [ ${file_count} -gt 4 ]; then
+		logs_usage
+		exit ${EX_USAGE}
+	fi
+
+	file=`printf "%s" "${file}" | tr -d '\n'`
+
+	if [ ${file_count} -le 3 ]; then
+		if [ ! -d "${LOGDIR}/${file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${file}: does not exist."
+		fi
+
+		if [ "${ENABLE_ZFS}" != "0" ]; then
+			if ! lib_zfs_rrmfs -fR "${ZFS_LOGS_NAME}/${file}"; then
+				lib_err ${EX_IOERR} "Error destroying ${ZFS_LOGS_NAME}/${file}"
+			fi
+		else
+			rm -rf "${LOGDIR}/${file}"
+		fi
+	else
+		if [ ! -f "${LOGDIR}/${file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${file}: does not exist."
+		fi
+
+		rm -rf "${LOGDIR}/${file}"
+	fi
 }
 
 logs_tail()
@@ -235,7 +262,7 @@ Parameters:
                      all keywords. Valid keywords: type, entity, subtype, log.
     read          -- Use the environment variable PAGER or less(1) if it is not
                      defined to display the contents of a log.
-    remove        -- Remove a log.
+    remove        -- Remove a bunch of logs or a single one.
     tail          -- Use tail(1) to display the contents of a log.
 
 Options for list:
@@ -250,7 +277,7 @@ logs_usage()
 	cat << EOF
 usage: logs list [-eHp] type[/entity[/subtype[/log]]]
        logs read type/entity/subtype/log [pager_args ...]
-       logs remove type/entity/subtype/log
+       logs remove type[/entity[/subtype[/log]]]
        logs tail type/entity/subtype/log [tail_args ...]
 EOF
 }

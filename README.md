@@ -1386,6 +1386,12 @@ To remove a log use `appjail logs remove`:
 appjail logs remove jails/jpriv/console/2023-02-04.log
 ```
 
+Or to remove a bunch of logs in a single command:
+
+```sh
+appjail logs remove jails/jpriv
+```
+
 `appjail logs tail` can be used to display the last part of a file.
 
 ```sh
