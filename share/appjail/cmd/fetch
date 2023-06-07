@@ -658,6 +658,8 @@ Options for debootstrap:
 Options for destroy:
     -f                        -- See -f in zfs-destroy(8).
     -R                        -- See -R in zfs-destroy(8).
+    -a osarch                 -- Release architecture. Default: ${FREEBSD_ARCH}
+    -v osversion              -- OS version of the release to be destroyed. ${FREEBSD_VERSION}
 
 Options for local and www:
     -C                        -- By default, appjail tries to download the MANIFEST file and use it to verify the
