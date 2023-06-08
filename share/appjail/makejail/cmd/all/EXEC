@@ -40,10 +40,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: EXEC [--continue-with-errors] [--verbose] [[--arg parameter[=value]] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail"
+		lib_err ${EX_USAGE} "usage: EXEC [--continue-with-errors] [--verbose] [[--after-include include_file] ...] [[--arg parameter[=value]] ...] [[--before-include include_file] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail"
 	fi
 	
 	# options
+	local after_include=
+	local before_include=
 	local parameters=
 	local opt_continue_with_errors=0
 	local opt_verbose=0
@@ -73,7 +75,7 @@ main()
 
 		local optarg=
 		case "${arg}" in
-			--arg|--build-arg|--file|--name|--option)
+			--after-include|--arg|--before-include|--build-arg|--file|--name|--option)
 				current_index=$((current_index+1))
 				if [ ${current_index} -gt ${total_items} ]; then
 					break
@@ -92,6 +94,12 @@ main()
 				;;
 			--verbose)
 				opt_verbose=1
+				;;
+			--after-include)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${optarg}" "" '"'`
+
+				after_include="${after_include} -a \"${optarg}\""
 				;;
 			--arg)
 				# get
@@ -115,6 +123,12 @@ main()
 				else
 					parameters="${parameters} ${parameter}"
 				fi
+				;;
+			--before-include)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${optarg}" "" '"'`
+
+				before_include="${before_include} -B \"${optarg}\""
 				;;
 			--build-arg)
 				local arg="${OPTARG}"
@@ -162,7 +176,7 @@ main()
 		mk_args="${mk_args} -v"
 	fi
 
-	printf "%s\n" "\"\${APPJAIL_SCRIPT}\" makejail -c ${mk_args} ${options} ${build_args} -j \"${jail_name}\" -f \"${makejail_file}\" -- ${parameters}"
+	printf "%s\n" "\"\${APPJAIL_SCRIPT}\" makejail -c ${mk_args} ${after_include} ${before_include} ${options} ${build_args} -j \"${jail_name}\" -f \"${makejail_file}\" -- ${parameters}"
 }
 
 main "$@"

@@ -1743,7 +1743,7 @@ ENV TOKEN=bba06278ca32777dc3724d42fe6fd3d9
 #### Syntax
 
 ```
-EXEC [--continue-with-errors] [--verbose] [[--arg parameter[=value]] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail
+EXEC [--continue-with-errors] [--verbose] [[--after-include include_file] ...] [[--arg parameter[=value]] ...] [[--before-include include_file] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail
 ```
 
 #### --continue-with-errors
@@ -1754,9 +1754,17 @@ See `-e` in `appjail makejail`.
 
 See `-v` in `appjail makejail`.
 
+#### --after-include
+
+See `-a` in `appjail makejail`.
+
 #### --arg
 
 Sets the value of a parameter to the Makejail to be executed.
+
+#### --before-include
+
+See `-B` in `appjail makejail`.
 
 #### --build-arg
 
@@ -1790,6 +1798,15 @@ EXEC --file gh+AppJail-makejails/hello --name hello
 
 ```
 EXEC --file build.makejail --name builder --arg "cflags=-O2 -pipe" --arg ldflags=-lm
+```
+
+##### #3
+
+```
+EXEC --before-include network.makejail \
+     --file other.makejail \
+     --name goappb \
+     --arg network=development
 ```
 
 ### INCLUDE
