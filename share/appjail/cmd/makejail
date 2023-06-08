@@ -39,6 +39,12 @@ lib_load "${LIBDIR}/replace"
 # The root directory of the first Makejail
 MAKEJAIL_ROOTDIR=
 
+# Include
+MAKEJAIL_AFTER_INCLUDE=
+MAKEJAIL_AFTER_INCLUDED=
+MAKEJAIL_BEFORE_INCLUDE=
+MAKEJAIL_BEFORE_INCLUDED=
+
 # Build args
 MAKEJAIL_BUILD_ARGS=
 
@@ -111,9 +117,9 @@ makejail_main()
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
 	local repoid=
 
-	while getopts ":cEelvb:d:f:j:o:u:" _o; do
+	while getopts ":cEelva:B:b:d:f:j:o:u:" _o; do
 		case "${_o}" in
-			b|d|f|j|o|u)
+			a|B|b|d|f|j|o|u)
 				if lib_check_empty "${OPTARG}"; then
 					makejail_usage
 					exit ${EX_USAGE}
@@ -136,6 +142,18 @@ makejail_main()
 				;;
 			v)
 				MAKEJAIL_VERBOSE=1
+				;;
+			a)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				MAKEJAIL_AFTER_INCLUDE="${MAKEJAIL_AFTER_INCLUDE} \"${arg}\""
+				;;
+			B)
+				local arg="${OPTARG}"
+				arg=`lib_escape_string "${arg}" "" '"'`
+
+				MAKEJAIL_BEFORE_INCLUDE="${MAKEJAIL_BEFORE_INCLUDE} \"${arg}\""
 				;;
 			b)
 				local arg="${OPTARG}"
@@ -960,6 +978,36 @@ makejail_include()
 	# Removes Carriege Feed to avoid problems when parsing. See issue #4.
 	cat -- "${makejail_file}" | sed -Ee 's/\r$//' > "${temp_makejail}"
 
+	# Before include
+	if [ -n "${MAKEJAIL_BEFORE_INCLUDE}" -a -z "${MAKEJAIL_BEFORE_INCLUDED}" ]; then
+		local temp_include_file
+		temp_include_file=`lib_generate_tempfile` || exit $?
+
+		local escape_temp_include_file
+		escape_temp_include_file=`lib_escape_string "${temp_include_file}"`
+
+		lib_atexit_add "rm -f \"${escape_temp_include_file}\""
+
+		lib_split_jailparams "${MAKEJAIL_BEFORE_INCLUDE}" | while IFS= read -r include_file; do
+			printf "INCLUDE %s\n" "${include_file}"
+		done >> "${temp_include_file}"
+
+		cat -- "${temp_makejail}" >> "${temp_include_file}"
+
+		temp_makejail="${temp_include_file}"
+
+		MAKEJAIL_BEFORE_INCLUDED=1
+	fi
+
+	# After include
+	if [ -n "${MAKEJAIL_AFTER_INCLUDE}" -a -z "${MAKEJAIL_AFTER_INCLUDED}" ]; then
+		lib_split_jailparams "${MAKEJAIL_AFTER_INCLUDE}" | while IFS= read -r include_file; do
+			printf "INCLUDE %s\n" "${include_file}"
+		done >> "${temp_makejail}"
+
+		MAKEJAIL_AFTER_INCLUDED=1
+	fi
+
 	local line lines=
 	while IFS= read -r line; do
 		if lib_check_empty "${line}"; then
@@ -973,6 +1021,7 @@ makejail_include()
 		# Remove tabs and spaces.
 		line=`printf "%s" "${line}" | sed -Ee 's/^[\t ]*//'`
 
+		# Support for line-continuation.
 		if printf "%s" "${line}" | grep -qEe '\\[[:space:]]*$'; then
 			line=`printf "%s" "${line}" | sed -Ee 's/\\\\[[:space:]]*$//'`
 			if [ -z "${lines}" ]; then
@@ -1466,31 +1515,34 @@ makejail_help()
 ${makejail_desc}
 
 Parameters:
-    -c                  -- Default. Create a jail using a Makejail.
-    -d id               -- Delete a cloned repository. \`id\` is a hexadecimal number representing the repository to delete. It is
-                           possible to specify only the initial numbers to write less, but if two repositories match, you must add
-                           more numbers to match the exact repository. To make an exact match use \`-E\`.
-    -l                  -- List cloned repositories.
-    -u id               -- Update cloned repositories. This parameter uses the same function to get a list of repositories as \`-d\`,
-                           but updates all matching repositories.
+    -c                     -- Default. Create a jail using a Makejail.
+    -d id                  -- Delete a cloned repository. \`id\` is a hexadecimal number representing the repository to delete. It is
+                              possible to specify only the initial numbers to write less, but if two repositories match, you must add
+                              more numbers to match the exact repository. To make an exact match use \`-E\`.
+    -l                     -- List cloned repositories.
+    -u id                  -- Update cloned repositories. This parameter uses the same function to get a list of repositories as \`-d\`,
+                              but updates all matching repositories.
 
 Options for -c:
-    -e                  -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
-    -v                  -- Use \`set -vx\` to display the commands in the buildscript.
-    -b build_arg        -- Arguments that will be replaced when all Makejails are included in a single Makejail.
-    -f makejail         -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
-    -j jail_name        -- Jail name. If not defined, a random string is used.
-    -o option           -- Additional options to be used by the \`appjail quick\` command.
+    -e                     -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
+    -v                     -- Use \`set -vx\` to display the commands in the buildscript.
+    -a include_file        -- Include a Makejail before all instructions.
+    -B include_file        -- Include a Makejail after all instructions.
+    -b build_arg           -- Arguments that will be replaced when all Makejails are included in a single Makejail.
+    -f makejail            -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
+    -j jail_name           -- Jail name. If not defined, a random string is used.
+    -o option              -- Additional options to be used by the \`appjail quick\` command.
 
 Options for -d, -u:
-    -E                  -- Exact match.
+    -E                     -- Exact match.
 EOF
 }
 
 makejail_usage()
 {
 	cat << EOF
-usage: makejail [-c] [-ev] [[-b build_arg[=[value]]] ...] [-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
+usage: makejail [-c] [-ev] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
+		[-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
        makejail [-E] -d id
        makejail -l
        makejail [-E] -u id
