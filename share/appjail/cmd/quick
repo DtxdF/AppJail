@@ -54,6 +54,7 @@ QUICK_TEMPDIR=
 # Misc
 QUICK_ESCAPE_TEMPLATE=3
 QUICK_IFNAMSIZ=15
+QUICK_USE_AJNET=0
 
 # Directories
 QUICK_KEY_BRIDGE="bridge"
@@ -1176,6 +1177,27 @@ quick_set_virtualnet()
 
 	interface=`lib_jailparam_value "${virtualnet}" :`
 	virtualnet=`lib_jailparam_name "${virtualnet}" :`
+
+	if printf "%s" "${virtualnet}" | grep -qEe '^:'; then
+		interface=`printf "%s" "${virtualnet}" | sed -Ee 's/^:(.+)$/\1/'`
+		virtualnet="${AUTO_NETWORK_NAME}"
+
+		if [ ${QUICK_USE_AJNET} -eq 1 ]; then
+			lib_err - "Virtual network \`${virtualnet}\` cannot be used again."
+			lib_err - "It is necessary to provide a virtual network explicitly."
+			exit ${EX_CONFIG}
+		fi
+
+		lib_info "Virtual network was not specified, using \`${virtualnet}\` as the virtual network ..."
+
+		if [ ! -d "${NETWORKDIR}/${virtualnet}" ]; then
+			lib_debug -- "Virtual network \`${virtualnet}\` does not exist, creating ..."
+
+			appjail network auto-create || exit $?
+		fi
+
+		QUICK_USE_AJNET=1
+	fi
 
 	if lib_check_ifacelen "${virtualnet}"; then
 		lib_err ${EX_DATAERR} -- "${virtualnet}: network name too long."
@@ -3524,11 +3546,11 @@ Options:
                              Descr: If empty, copy /etc/localtime from the host to the jail. If set, use a symbolic link
 			            from /usr/share/zoneinfo inside the jail.
 
-    virtualnet            -- Syntax: virtualnet:interface [default] [address:ipv4_address] [interface_desc:interface_description] 
+    virtualnet            -- Syntax: [virtualnet]:interface [default] [address:ipv4_address] [interface_desc:interface_description] 
                              Type: options
 			     Parameters:
-			         - virtualnet (str, required):
-				     Network name.
+			         - virtualnet (str, optional):
+				     Network name. If not defined \`${AUTO_NETWORK_NAME}\` is used.
 				 - interface (str, required):
 				     \`if_epair(4)\` interface to create.
 				 - default (bool, optional):

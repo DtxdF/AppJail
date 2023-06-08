@@ -266,6 +266,14 @@ PING 10.42.0.2 (10.42.0.2): 56 data bytes
 round-trip min/avg/max/stddev = 0.163/0.167/0.175/0.005 ms
 ```
 
+You can create a jail with the `virtualnet` option without specifying a virtual network.
+
+```sh
+appjail quick hello virtualnet=":hello" overwrite start
+```
+
+In the above case, `appjail quick` will run `appjail network auto-create` which will create a virtual network using `AUTO_NETWORK_NAME` (default: `ajnet`) as its name, `AUTO_NETWORK_ADDR` (default: `10.0.0.0/10`) and `AUTO_NETWORK_DESC` (default: `AppJail network`) as its description.
+
 ### alias & Virtual Network
 
 The main motivation for combining the `alias` and `virtualnet` options is to provide a way for jails that do not use VNET, such as LinuxJails.
