@@ -182,8 +182,9 @@ logs_remove()
 			fi
 		else
 			rm -rf "${LOGDIR}"
-			return $?
 		fi
+
+		return $?
 	fi
 
 	local file_count
