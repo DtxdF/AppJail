@@ -58,7 +58,7 @@ network_main()
 
 	case "${entity}" in
 		add|assign|fix|get|hosts|list|remove|reserve) ;;
-		attach|detach|plug|unplug) _network_load_modules ;;
+		attach|auto-create|detach|plug|unplug) _network_load_modules ;;
 		*) network_usage; exit ${EX_USAGE} ;;
 	esac
 
@@ -520,6 +520,11 @@ _network_create_epair()
 	else
 		lib_debug "${name}: epair already created."
 	fi
+}
+
+network_auto-create()
+{
+	network_add -d "${AUTO_NETWORK_DESC}" -- "${AUTO_NETWORK_NAME}" "${AUTO_NETWORK_ADDR}"
 }
 
 network_detach()
@@ -1635,6 +1640,7 @@ Parameters:
     add                             -- Add a new network.
     assign                          -- Assign a non-reserved IP address to a jail and its e-pair within it.
     attach                          -- Attach an interface to a bridge.
+    auto-create                     -- Create a virtual network using the default settings.
     detach                          -- Detach an interface from a bridge.
     fix                             -- Fixes some problems that may occur when using virtual networks.
     get                             -- Get keywords from a specific network.
@@ -1762,6 +1768,7 @@ network_usage()
 usage: network add [-O] [-d description] network_name network_address/cidr
        network assign -e ether_name -j jail_name -n network_name [-d] [-a auto|forceauto|address]
        network attach [-b bridge] [[epair|iface]:]interface ...
+       network auto-create
        network detach [-Ddi] [-b bridge] [[epair|iface]:]interface ...
        network fix [all | dup | addr] [-n network_name]
        network get [-eHIpt] network_name [keyword ...]
