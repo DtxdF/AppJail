@@ -176,6 +176,10 @@ logs_remove()
 	fi
 
 	if [ "${file}" = "all" ]; then
+		if [ ! -d "${LOGDIR}" ]; then
+			lib_err ${EX_NOINPUT} -- "${LOGDIR}: does not exist."
+		fi
+
 		if [ "${ENABLE_ZFS}" != "0" ]; then
 			if ! lib_zfs_rrmfs -fR "${ZFS_LOGS_NAME}"; then
 				lib_err ${EX_IOERR} "Error destroying ${ZFS_LOGS_NAME}"
