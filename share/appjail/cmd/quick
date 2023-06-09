@@ -68,6 +68,7 @@ QUICK_KEY_IP6="ip6"
 QUICK_KEY_JNG="jng"
 QUICK_KEY_LIMITS="limits"
 QUICK_KEY_NAT="nat"
+QUICK_KEY_NETWORK="network"
 QUICK_KEY_NONAT="nonat"
 QUICK_KEY_SLAAC="slaac"
 QUICK_KEY_VIRTUALNET="virtualnet"
@@ -118,6 +119,7 @@ QUICK_OPTION_LOGIN_USER="${DEFAULT_LOGIN_USER}"
 QUICK_OPTION_MACADDR=0
 QUICK_OPTION_MOUNT_DEVFS="${DEFAULT_MOUNT_DEVFS}"
 QUICK_OPTION_NAT=0
+QUICK_OPTION_NETWORK=0
 QUICK_OPTION_NONAT=0
 QUICK_OPTION_OSARCH="${FREEBSD_ARCH}"
 QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
@@ -177,7 +179,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -203,6 +205,9 @@ quick_main()
 	local jng_options
 	jng_options="jng"
 
+	local network_options
+	network_options="network"
+
 	local virtualnet_options
 	virtualnet_options="virtualnet"
 
@@ -216,7 +221,7 @@ quick_main()
 	nat_options="nat nonat expose"
 
 	local network_options
-	network_options="${vnet_options} ${bridge_options} ${alias_options} ${virtualnet_options} ${interface_options} ${jng_options} ${autoconf_options} ${nat_options}"
+	network_options="${vnet_options} ${bridge_options} ${alias_options} ${network_options} ${virtualnet_options} ${interface_options} ${jng_options} ${autoconf_options} ${nat_options}"
 
 	local limits_options
 	limits_options="cpuset limits"
@@ -523,6 +528,76 @@ quick_set_nat()
 	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "on_if" "${on_if}"
 
 	QUICK_OPTION_NAT=1
+}
+
+quick_run_network()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_NETWORK} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_keys_list "${QUICK_KEY_NETWORK}" | while IFS= read -r network
+	do
+		network_add_cmd="appjail network add"
+
+		name=`lib_keys_get "${QUICK_KEY_NETWORK}" "${network}" "name"`
+		escape_name=`lib_escape_string "${name}"`
+
+		address=`lib_keys_get "${QUICK_KEY_NETWORK}" "${network}" "address"`
+		escape_address=`lib_escape_string "${address}"`
+
+		descr=`lib_keys_get "${QUICK_KEY_NETWORK}" "${network}" "descr"`
+		if ! lib_check_empty "${descr}"; then
+			escape_descr=`lib_escape_string "${descr}"`
+			network_add_cmd="${network_add_cmd} -d \"${descr}\""
+		fi
+
+		lib_debug "Creating network name:${name} address:${address} descr:${descr} ..."
+
+		sh -c "${network_add_cmd} -- \"${escape_name}\" \"${escape_address}\"" || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_network()
+{
+	local params
+
+	params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "network syntax: name address [description]"
+	fi
+
+	params=`lib_split_jailparams "${params}"` || exit $?
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+
+	local name=`printf "%s\n" "${params}" | head -1 | tail -n 1`
+	local address=`printf "%s\n\n" "${params}" | head -2 | tail -n 1`
+	local description=`printf "%s\n\n\n" "${params}" | head -3 | tail -n 1`
+
+	if lib_check_empty "${name}" || lib_check_empty "${address}"; then
+		quick_set_network # usage
+	fi
+
+	if [ -d "${NETWORKDIR}/${name}" ]; then
+		lib_debug "Virtual network \`${name}\` is already created. Ignoring ..."
+		return 0
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_NETWORK}"
+	nro=`lib_keys_append "${QUICK_KEY_NETWORK}" "name" "${name}"`
+	lib_keys_set "${QUICK_KEY_NETWORK}" "${nro}" "address" "${address}"
+	lib_keys_set "${QUICK_KEY_NETWORK}" "${nro}" "descr" "${description}"
+
+	QUICK_OPTION_NETWORK=1
 }
 
 quick_run_nonat()
@@ -3395,6 +3470,19 @@ Options:
 				 - network (str, optional): See \`expose\`.
 				 - on_if (str, optional): See \`expose\`.
                              Descr: Mask the IP address of the jail using the IP address of the \`ext_if\` interface on the \`on_if\` interface.
+
+    network               -- Syntax: network="name address [description]"
+                             Type: options
+			     Parameters:
+				 - name (str, required):
+				     Network name.
+				 - address (str, required):
+				     Network address.
+				 - description (str, optional):
+				     Description of the network.
+			     Examples:
+			         - network="dns 172.0.0.0/10 \"DNS network\""
+			     Descr: Create a new network if it does not exist.
 
     noboot                -- Syntax: noboot
                              Type: bool

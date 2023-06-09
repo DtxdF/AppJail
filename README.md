@@ -274,6 +274,14 @@ appjail quick hello virtualnet=":hello" overwrite start
 
 In the above case, `appjail quick` will run `appjail network auto-create` which will create a virtual network using `AUTO_NETWORK_NAME` (default: `ajnet`) as its name, `AUTO_NETWORK_ADDR` (default: `10.0.0.0/10`) and `AUTO_NETWORK_DESC` (default: `AppJail network`) as its description.
 
+Instead of using `appjail network add` to create a new virtual network, you can specify one using the `network` option in `appjail quick`.
+
+```sh
+appjail quick jdns network="dns 12.0.0.0/8" virtualnet="dns:jdns default" nat start overwrite
+```
+
+This is useful for when you need to run a Makejail in multiple environments without resorting to `appjail network add`, but for simple use cases consider the auto-created network using `appjail network auto-create`.
+
 ### alias & Virtual Network
 
 The main motivation for combining the `alias` and `virtualnet` options is to provide a way for jails that do not use VNET, such as LinuxJails.
