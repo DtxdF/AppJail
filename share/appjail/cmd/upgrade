@@ -274,7 +274,7 @@ upgrade_release()
 				fi
 
 				if ! lib_zfs_mkdir "${RELEASEDIR}/${freebsd_arch}/${new_version}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${new_version}"; then
-					lib_err ${EX_IOERR} "Error creating ${releasedir}"
+					lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}/${freebsd_arch}/${new_version}"
 				fi
 
 				local dataset_src="${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"
