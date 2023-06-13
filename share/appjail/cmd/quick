@@ -92,17 +92,23 @@ QUICK_OPTION_ALIAS=0
 QUICK_OPTION_ALIAS_IFACE=
 QUICK_OPTION_BOOT="${DEFAULT_BOOT}"
 QUICK_OPTION_BRIDGE=0
+QUICK_OPTION_CLONE_JAIL=0
+QUICK_OPTION_CLONE_RELEASE=0
+QUICK_OPTION_COPY=0
 QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
 QUICK_OPTION_CPUSET=
 QUICK_OPTION_CREATE_ARGS=
 QUICK_OPTION_DEFNET=
 QUICK_OPTION_DEVFS_RULESET="${DEFAULT_DEVFS_RULESET}"
 QUICK_OPTION_DHCP=0
+QUICK_OPTION_EMPTY=0
 QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
 QUICK_OPTION_FILES=
 QUICK_OPTION_FSTAB=0
 QUICK_OPTION_HEALTH=0
+QUICK_OPTION_IMPORT_JAIL=0
+QUICK_OPTION_IMPORT_ROOT=0
 QUICK_OPTION_INITSCRIPT=
 QUICK_OPTION_INSTALL_METHOD="${DEFAULT_INSTALL_METHOD}"
 QUICK_OPTION_IP4=0
@@ -133,6 +139,7 @@ QUICK_OPTION_START="${DEFAULT_START}"
 QUICK_OPTION_START_ARGS=
 QUICK_OPTION_STOP_ARGS=
 QUICK_OPTION_TEMPLATE="${DEFAULT_TEMPLATE}"
+QUICK_OPTION_TINY_IMPORT=0
 QUICK_OPTION_TMPDIR=0
 QUICK_OPTION_USE_LIMITS=0
 QUICK_OPTION_USE_RESOLV_CONF="${USE_RESOLV_CONF}"; QUICK_OPTION_RESOLV_CONF="${DEFAULT_RESOLV_CONF}"
@@ -141,6 +148,8 @@ QUICK_OPTION_VIRTUALNET=0
 QUICK_OPTION_VNET=0
 QUICK_OPTION_VNET_INTERFACES=
 QUICK_OPTION_X11=0
+QUICK_OPTION_ZFS_IMPORT_JAIL=0
+QUICK_OPTION_ZFS_IMPORT_ROOT=0
 
 quick_desc="Create a pre-configured jail."
 
@@ -2964,71 +2973,242 @@ quick_set_type()
 
 quick_set_clone+jail()
 {
+	if [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "clone+jail" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "clone+jail" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "clone+jail" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "clone+jail" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "clone+jail" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "clone+jail" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "clone+jail" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "clone+jail" "zfs+import+root"
+	fi
+
 	local jail2clone
 	jail2clone="$1"; quick_reqoption "clone+jail" "${jail2clone}"
 
 	QUICK_OPTION_INSTALL_METHOD="clone+jail=${jail2clone}"
+	QUICK_OPTION_CLONE_JAIL=1
 }
 
 quick_set_clone+release()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "clone+release" "clone+jail"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "clone+release" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "clone+release" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "clone+release" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "clone+release" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "clone+release" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "clone+release" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "clone+release" "zfs+import+root"
+	fi
+
 	local snapshot_name
 	snapshot_name="$1"; quick_reqoption "clone+release" "${snapshot_name}"
 
 	QUICK_OPTION_INSTALL_METHOD="clone+release=${snapshot_name}"
+	QUICK_OPTION_CLONE_RELEASE=1
 }
 
 quick_set_copy()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "copy" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "copy" "clone+release"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "copy" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "copy" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "copy" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "copy" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "copy" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "copy" "zfs+import+root"
+	fi
+
 	local jail2copy
 	jail2copy="$1"; quick_reqoption "copy" "${jail2copy}"
 
 	QUICK_OPTION_INSTALL_METHOD="copy=${jail2copy}"
+	QUICK_OPTION_COPY=1
 }
 
 quick_set_empty()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "empty" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "empty" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "empty" "copy"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "empty" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "empty" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "empty" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "empty" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "empty" "zfs+import+root"
+	fi
+
 	QUICK_OPTION_INSTALL_METHOD="empty"
+	QUICK_OPTION_EMPTY=1
 }
 
 quick_set_import+jail()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "import+jail" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "import+jail" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "import+jail" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "import+jail" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "import+jail" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "import+jail" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "import+jail" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "import+jail" "zfs+import+root"
+	fi
+
 	local image
 	image="$1"; quick_reqoption "import+jail" "${image}"
 
 	QUICK_OPTION_INSTALL_METHOD="import+jail=${image}"
+	QUICK_OPTION_IMPORT_JAIL=1
 }
 
 quick_set_import+root()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "import+root" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "import+root" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "import+root" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "import+root" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "import+root" "import+jail"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "import+root" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "import+root" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "import+root" "zfs+import+root"
+	fi
+
 	local image
 	image="$1"; quick_reqoption "import+root" "${image}"
 
 	QUICK_OPTION_INSTALL_METHOD="import+root=${image}"
+	QUICK_OPTION_IMPORT_ROOT=1
 }
 
 quick_set_tiny+import()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "tiny+import" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "tiny+import" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "tiny+import" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "tiny+import" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "tiny+import" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "tiny+import" "import+root"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "tiny+import" "zfs+import+jail"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "tiny+import" "zfs+import+root"
+	fi
+
 	local image
 	image="$1"; quick_reqoption "tiny+import" "${image}"
 
 	QUICK_OPTION_INSTALL_METHOD="tiny+import=${image}"
+	QUICK_OPTION_TINY_IMPORT=1
 }
 
 quick_set_zfs+import+jail()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "zfs+import+jail" "zfs+import+root"
+	fi
+
 	local image
 	image="$1"; quick_reqoption "zfs+import+jail" "${image}"
 
 	QUICK_OPTION_INSTALL_METHOD="zfs+import+jail=${image}"
+	QUICK_OPTION_ZFS_IMPORT_JAIL=1
 }
 
 quick_set_zfs+import+root()
 {
+	if [ ${QUICK_OPTION_CLONE_JAIL} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "clone+jail"
+	elif [ ${QUICK_OPTION_CLONE_RELEASE} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "clone+release"
+	elif [ ${QUICK_OPTION_COPY} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "copy"
+	elif [ ${QUICK_OPTION_EMPTY} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "empty"
+	elif [ ${QUICK_OPTION_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "import+jail"
+	elif [ ${QUICK_OPTION_IMPORT_ROOT} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "import+root"
+	elif [ ${QUICK_OPTION_TINY_IMPORT} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "tiny+import"
+	elif [ ${QUICK_OPTION_ZFS_IMPORT_JAIL} -eq 1 ]; then
+		quick_exclusive "zfs+import+root" "zfs+import+jail"
+	fi
+
 	local image
 	image="$1"; quick_reqoption "zfs+import+root" "${image}"
 
 	QUICK_OPTION_INSTALL_METHOD="zfs+import+root=${image}"
+	QUICK_OPTION_ZFS_IMPORT_ROOT=1
 }
 
 quick_set_osarch()
@@ -3185,14 +3365,17 @@ Options:
 
     clone+jail            -- Syntax: clone+jail=jail2clone@snapname
                              Type: options
+			     Conflicts: clone+release, copy, empty, import+jail, import+root, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     clone+release         -- Syntax: clone+release
                              Type: bool
+			     Conflicts: clone+jail, copy, empty, import+jail, import+root, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     copy                  -- Syntax: copy=jail2copy
                              Type: str
+			     Conflicts: clone+jail, clone+release, empty, import+jail, import+root, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     copydir               -- Syntax: copydir="directory"
@@ -3233,6 +3416,7 @@ Options:
 
     empty                 -- Syntax: empty.
                              Type: bool
+			     Conflicts: clone+jail, clone+release, copy, import+jail, import+root, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: Create an empty jail.
 
     expose                -- Syntax: expose="hport[:jport]
@@ -3344,10 +3528,12 @@ Options:
 
     import+jail           -- Syntax: import+jail=input:in_file [compress:algo]
                              Type: options
+			     Conflicts: clone+jail, clone+release, copy, empty, import+root, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     import+root           -- Syntax: import+root=input:in_file [compress:algo]
                              Type: options
+			     Conflicts: clone+jail, clone+release, copy, empty, import+jail, tiny+import, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     initscript            -- Syntax: initscript="path/to/initscript".
@@ -3612,6 +3798,7 @@ Options:
 
     tiny+import           -- Syntax: tiny+import=path/to/appjail_file
                              Type: str
+			     Conflicts: clone+jail, clone+release, copy, empty, import+jail, import+root, zfs+import+jail, zfs+import+root
                              Descr: See \`appjail jail\`.
 
     tmpdir                -- Syntax: tmpdir
@@ -3669,10 +3856,12 @@ Options:
 
    zfs+import+jail        -- Syntax: zfs+import+jail=input:in_file [compress:algo]
                              Type: options
+			     Conflicts: clone+jail, clone+release, copy, empty, import+jail, import+root, tiny+import, zfs+import+root
                              Descr: See \`appjail jail\`.
 
    zfs+import+root        -- Syntax: zfs+import+root=input:in_file [compress:algo]
                              Type: options
+			     Conflicts: clone+jail, clone+release, copy, empty, import+jail, import+root, tiny+import, zfs+import+jail
                              Descr: See \`appjail jail\`.
 EOF
 }
