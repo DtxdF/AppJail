@@ -3316,12 +3316,16 @@ appjail jail create -I export+root="output:nginx-root.tzst compress:zstd" nginx
 ##### Syntax
 
 ```
-input:in_file [compress:algo]
+input:in_file [portable] [compress:algo]
 ```
 
 ###### input
 
 Tarball to import.
+
+###### portable
+
+Ignored, but used by `import+root`.
 
 ###### compress
 
@@ -3356,12 +3360,16 @@ appjail quick nginx \
 ##### Syntax
 
 ```
-input:in_file [compress:algo]
+input:in_file [portable] [compress:algo]
 ```
 
 ###### input
 
 See `import+jail`.
+
+###### portable
+
+Include only portable files. These are the jail directory, the configuration file describing the jail and the initscript.
 
 ###### compress
 
@@ -3463,12 +3471,16 @@ appjail jail create -I zfs+export+root="output:myjail-root.zsnap.xz compress:xz"
 ##### Syntax
 
 ```
-input:in_file [compress:algo]
+input:in_file [portable] [compress:algo]
 ```
 
 ###### input
 
 The file to import.
+
+###### portable
+
+Ignored, but used by `import+root`.
 
 ###### compress
 
@@ -3502,12 +3514,16 @@ appjail quick mysql \
 ##### Syntax
 
 ```
-input:in_file [compress:algo]
+input:in_file [portable] [compress:algo]
 ```
 
 ###### input
 
 See `zfs+import+jail`.
+
+###### portable
+
+Ignored, but used by `import+root`.
 
 ###### compress
 
