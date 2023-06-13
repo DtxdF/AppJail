@@ -3245,12 +3245,16 @@ You can probably open a tarball on unix-like and non-unix operating systems, so 
 ##### Syntax
 
 ```
-output:out_name [compress:algo]
+output:out_name [portable] [compress:algo]
 ```
 
 ###### output
 
 Tarball name.
+
+###### portable
+
+Ignored, but used by `export+root`.
 
 ###### compress
 
@@ -3282,12 +3286,16 @@ appjail jail create -I export+jail="output:nginx.tzst compress:zstd" nginx
 ##### Syntax
 
 ```
-output:out_name [compress:algo]
+output:out_name [portable] [compress:algo]
 ```
 
 ###### output
 
 See `export+jail`.
+
+###### portable
+
+Include only portable files. These are the jail directory, the configuration file describing the jail and the initscript.
 
 ###### compress
 
@@ -3395,12 +3403,16 @@ Before using this method, read the `ZFS` section to configure it.
 ##### Syntax
 
 ```
-output:out_name [compress:algo]
+output:out_name [portable] [compress:algo]
 ```
 
 ###### output
 
 Output name.
+
+###### portable
+
+Ignored, but used by `export+root`.
 
 ###### compress
 
@@ -3421,12 +3433,16 @@ appjail jail create -I zfs+export+jail="output:myjail.zsnap.gz compress:gzip" my
 ##### Syntax
 
 ```
-output:out_name [compress:algo]
+output:out_name [portable] [compress:algo]
 ```
 
 ###### output
 
 See `zfs+export+jail`.
+
+###### portable
+
+Ignored, but used by `export+root`.
 
 ###### compress
 

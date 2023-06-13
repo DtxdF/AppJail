@@ -376,7 +376,7 @@ _jail_export()
 	fi
 
 	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: jail_install_${function} -j jail_name output:out_name [compress:algo]"
+		lib_err ${EX_USAGE} "usage: jail_install_${function} -j jail_name output:out_name [portable] [compress:algo]"
 	fi
 
 	while getopts ":j:" _o; do
@@ -397,7 +397,7 @@ _jail_export()
 
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [compress:algo]"
+		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [portable] [compress:algo]"
 	fi
 
 	lib_info "Exporting ${jail_name} ..."
@@ -421,6 +421,7 @@ _jail_export()
 	params=`lib_split_jailparams "${args}"` || exit $?
 	total_items=`printf "%s\n" "${params}" | wc -l`
 
+	local portable=0
 	local compress= output=
 	local parameter= value= arg
 
@@ -431,6 +432,9 @@ _jail_export()
 		value=`lib_jailparam_value "${arg}" :`
 
 		case "${parameter}" in
+			portable)
+				portable=1
+				;;
 			compress)
 				compress="${value}"
 				;;
@@ -444,7 +448,7 @@ _jail_export()
 	done
 
 	if lib_check_empty "${output}"; then
-		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [compress:algo]"
+		lib_err ${EX_DATAERR} "${function} syntax: output:out_name [portable] [compress:algo]"
 	fi
 
 	lib_debug "Generating ${output} ..."
@@ -471,7 +475,20 @@ _jail_export()
 			local escape_jail_path=`lib_escape_string "${jail_path}"`
 			local escape_output=`lib_escape_string "${output}"`
 
-			if ! sh -c "tar -C \"${escape_jail_path}\" ${tar_args} -cf \"${escape_output}\" . "; then
+			local include_files
+			if [ ${portable} -eq 0 -o "${function}" = "export+jail" ]; then
+				include_files="."
+			else
+				mkdir -p "${jail_path}/jail" || exit $?
+				touch "${jail_path}/init" || exit $?
+				chmod +x "${jail_path}/init" || exit $?
+				mkdir -p "${jail_path}/conf" || exit $?
+				touch "${jail_path}/conf/config.conf" || exit $?
+
+				include_files="./jail/ ./init ./conf/config.conf"
+			fi
+
+			if ! sh -c "tar -C \"${escape_jail_path}\" ${tar_args} -cf \"${escape_output}\" ${include_files}"; then
 				lib_err ${EX_CANTCREAT} "Error generating ${output}."
 			fi
 			;;
