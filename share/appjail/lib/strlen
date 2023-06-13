@@ -39,7 +39,7 @@ lib_strlen()
 		lib_err ${EX_USAGE} "usage: lib_strlen string"
 	fi
 
-	echo "${_str}" | wc -c | tr -d ' '
+	printf "%s" "${_str}" | wc -c | tr -d ' '
 }
 
 lib_countfiles()
