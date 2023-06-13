@@ -1254,7 +1254,7 @@ makejail_getinclude_fetch()
 	
 	fetch_cmd=`lib_multi_replace "${MAKEJAIL_FETCH_CMD}" o "\"${escape_output}\"" u "\"${escape_url}\""`
 
-	lib_debug "Running (fetch): ${fetch_args}"
+	lib_debug "Running (fetch): ${fetch_cmd}"
 
 	sh -c "${fetch_cmd}"
 
