@@ -1,0 +1,161 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+. "${AJ_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/replace"
+
+COPY_OPTION_SRC=1
+COPY_OPTION_DST=2
+
+main()
+{
+	local args="$1"
+	if lib_check_empty "${args}"; then
+		lib_err ${EX_USAGE} "usage: FROM [--ajspec ajspec_name] [--entrypoint entrypoint] [--platform platform] image[:tag]"
+	fi
+	
+	# Options
+	local ajspec=".ajspec"
+	local entrypoint=
+	local platform="${IMAGE_ARCH}"
+	
+	# Arguments
+	local has_args=0
+	local args_list
+	local total_items
+	local current_index=0
+
+	args_list=`lib_split_jailparams "${args}"` || exit $?
+	total_items=`printf "%s\n" "${args_list}" | wc -l`
+	
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		local optarg=
+		case "${arg}" in
+			--ajspec|--entrypoint|--platform)
+				current_index=$((current_index+1))
+				if [ ${current_index} -eq ${total_items} ]; then
+					main # usage
+				fi
+
+				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${optarg}"; then
+					main # usage
+				fi
+				;;
+		esac
+
+		case "${arg}" in
+			--ajspec)
+				ajspec="${optarg}"
+				;;
+			--entrypoint)
+				entrypoint="${optarg}"
+				;;
+			--platform)
+				platform="${optarg}"
+				;;
+			--)
+				has_args=1
+				break
+				;;
+			--*)
+				main # usage
+				;;
+			*)
+				has_args=1
+				break
+				;;
+		esac
+	done
+	current_index=$((current_index-1))
+
+	if [ ${has_args} -eq 0 -o ${current_index} -eq ${total_items} ]; then
+		main # usage
+	fi
+
+	local image name tag
+
+	current_index=$((current_index+1))
+	image=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+
+	if lib_check_empty "${image}"; then
+		main # usage
+	fi
+
+	name=`lib_jailparam_name "${image}" :`
+	tag=`lib_jailparam_value "${image}" :`
+
+	if lib_check_empty "${tag}"; then
+		tag="${IMAGE_TAG}"
+	fi
+
+	local imagesdir="${MAKEJAIL_TEMPDIR}/images"
+	if ! mkdir -p "${imagesdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${imagesdir}"
+	fi
+
+	local escape_chars
+	escape_chars='`"\'
+
+	platform=`lib_escape_string "${platform}" "" "${escape_chars}"`
+	if ! printf "%s\n" "${platform}" > "${imagesdir}/platform"; then
+		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/platform"
+	fi
+
+	name=`lib_escape_string "${name}" "" "${escape_chars}"`
+	if ! printf "%s\n" "${name}" > "${imagesdir}/name"; then
+		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/name"
+	fi
+
+	tag=`lib_escape_string "${tag}" "" "${escape_chars}"`
+	if ! printf "%s\n" "${tag}" > "${imagesdir}/tag"; then
+		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/tag"
+	fi
+
+	if [ -n "${entrypoint}" ]; then
+		ajspec=`lib_escape_string "${ajspec}" "" "${escape_chars}"`
+		entrypoint=`lib_escape_string "${entrypoint}" "" "${escape_chars}"`
+
+		echo "\"\${APPJAIL_SCRIPT}\" image import -a \"${platform}\" -N "${ajspec}" -n \"${name}\" -t \"${tag}\" -- \"${entrypoint}\""
+	fi
+}
+
+main "$@"

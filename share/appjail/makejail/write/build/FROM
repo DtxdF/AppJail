@@ -30,20 +30,7 @@
 
 main()
 {
-	local options=`cat "$1" | tr '\n' ' '`
-
-	local platform name tag
-	local imagesdir="${MAKEJAIL_TEMPDIR}/images"
-
-	if [ -d "${imagesdir}" ]; then
-		platform=`head -1 -- "${imagesdir}/platform"`
-		name=`head -1 -- "${imagesdir}/name"`
-		tag=`head -1 -- "${imagesdir}/tag"`
-
-		echo "\"\${APPJAIL_SCRIPT}\" image jail -a \"${platform}\" -i \"${name}\" -t \"${tag}\" -- \"\${APPJAIL_JAILNAME}\" ${options}"
-	else
-		echo "\"\${APPJAIL_SCRIPT}\" quick \"\${APPJAIL_JAILNAME}\" ${options}"
-	fi
+	cat -- "$1"
 }
 
 main "$@"

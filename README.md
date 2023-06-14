@@ -1825,6 +1825,44 @@ EXEC --before-include network.makejail \
      --arg network=development
 ```
 
+### FROM (build)
+
+#### Syntax
+
+```
+FROM [--ajspec ajspec_name] [--entrypoint entrypoint] [--platform platform] image[:tag]
+```
+
+##### --ajspec
+
+See `-N` in `appjail image import`.
+
+##### --entrypoint
+
+See `appjail image import`.
+
+##### --platform
+
+See `-a` in `appjail image import` and `appjail image jail`.
+
+##### image
+
+Image name.
+
+##### tag
+
+Tag to be used. If not specified, `IMAGE_TAG` (default: `latest`) is used instead.
+
+#### Description
+
+Use an image as the jail.
+
+#### Examples
+
+```
+FROM --entrypoint gh+DtxdF/nginx-image nginx:132
+```
+
 ### INCLUDE
 
 #### Syntax

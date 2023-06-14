@@ -98,6 +98,7 @@ MAKEJAIL_STAGES="${MAKEJAIL_STAGE_BUILD} ${MAKEJAIL_INIT_STAGES}"
 
 # Commands
 MAKEJAIL_CMD_ARG="ARG"
+MAKEJAIL_CMD_FROM="FROM"
 MAKEJAIL_CMD_INCLUDE="INCLUDE"
 MAKEJAIL_CMD_OPTION="OPTION"
 MAKEJAIL_CMD_STAGE="STAGE"
@@ -603,6 +604,9 @@ makejail_write()
 
 	# ARG
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_ARG}"
+	
+	# FROM
+	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_FROM}"
 
 	# Additional options provided by the user.
 	if [ -n "${MAKEJAIL_OPTIONS}" ]; then
