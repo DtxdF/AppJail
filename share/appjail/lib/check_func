@@ -30,6 +30,7 @@
 lib_load "${LIBDIR}/jail_types"
 lib_load "${LIBDIR}/log"
 lib_load "${LIBDIR}/network"
+lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/sysexits"
 lib_load "${LIBDIR}/zfs"
 
@@ -143,6 +144,36 @@ lib_check_stagename()
 	fi
 
 	if _lib_check_humanname "${stage_name}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_tagname()
+{
+	local tagname="$1"
+
+	if [ -z "${tagname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_tagname tagname"
+	fi
+
+	if _lib_check_humanname "${tagname}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_imagename()
+{
+	local imagename="$1"
+
+	if [ -z "${imagename}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_imagename imagename"
+	fi
+
+	if _lib_check_humanname "${imagename}"; then
 		return 0
 	else
 		return 1
@@ -883,4 +914,39 @@ lib_check_macaddr()
 	else
 		return 1
 	fi
+}
+
+lib_check_arch()
+{
+	local arch="$1"
+	if [ -z "${arch}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_arch arch"
+	fi
+
+	case "${arch}" in
+		arm64|aarch64) ;;
+		amd64) ;;
+		arm|armv6|armv7) ;;
+		i386) ;;
+		mips|mipsel|mips64|mips64el|mipshf|mipselhf|mips64elhf|mipsn32) ;;
+		powerpc|powerpcspe|powerpc64|powerpc64le) ;;
+		riscv|riscv64|riscv64sf) ;;
+		*) return 1 ;;
+	esac
+
+	return 0
+}
+
+lib_check_sum()
+{
+	local sum="$1"
+	if [ -z "${sum}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_sum sum"
+	fi
+
+	if ! lib_check_hexnumber "${sum}" || [ `lib_strlen "${sum}"` -ne 64 ]; then
+		return 1
+	fi
+
+	return 0
 }

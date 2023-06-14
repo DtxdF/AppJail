@@ -31,6 +31,7 @@ lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 
 ZFS_COMPONENTS_NAME="components"
+ZFS_IMAGES_NAME="images"
 ZFS_JAILS_NAME="jails"
 ZFS_LOGS_NAME="logs"
 ZFS_NETWORK_NAME="networks"

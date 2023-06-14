@@ -1,0 +1,1803 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mksum"
+lib_load "${LIBDIR}/strlen"
+
+IMAGE_DEFAULT_NAME="image.appjail"
+IMAGE_DEFAULT_AJSPEC=".ajspec"
+
+image_desc="Create, list, remove, update images and much more."
+
+image_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		export|get|import|jail|list|metadata|remove|update) ;;
+		*) image_usage; exit ${EX_USAGE} ;;
+	esac
+
+	image_${entity} "$@"
+}
+
+image_export()
+{
+	local _o
+	local opt_force=0
+	local compress="${IMAGE_COMPRESS}"
+	local name=
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":fc:n:t:" _o; do
+		case "${_o}" in
+			c|n|t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			c)
+				compress="${OPTARG}"
+				;;
+			n)
+				name="${OPTARG}"
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail="$1"
+	_image_chk_jail "${jail}"
+
+	if lib_jail_exists "${jail}"; then
+		if lib_jail_created_by_appjail "${jail}"; then
+			lib_err ${EX_NOPERM} -- "${jail} is currently running."
+		fi
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+	fi
+
+	if [ -z "${name}" ]; then
+		name="${jail}"
+	fi
+
+	if ! lib_check_imagename "${name}"; then
+		lib_err ${EX_DATAERR} -- "${name}: invalid image name."
+	fi
+
+	lib_set_logprefix " [`random_color`${name}${COLOR_DEFAULT}]"
+
+	if ! lib_zfs_mkdir "${IMAGESDIR}" "${ZFS_IMAGES_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${IMAGESDIR}"
+	fi
+
+	if [ "${compress}" = "none" ]; then
+		compress=
+	else
+		compress="compress:${compress}"
+		compress=`lib_escape_string "${compress}" "" '\"'`
+	fi
+
+	local rootdir
+	rootdir="${IMAGESDIR}/${name}"
+
+	if ! mkdir -p "${rootdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${rootdir}"
+	fi
+
+	local arch
+	arch=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" arch`
+
+	if lib_check_empty "${arch}"; then
+		lib_err ${EX_CONFIG} -- "${jail}: no architecture is set."
+	fi
+
+	local image_name
+	image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+
+	local image_file
+	image_file="${rootdir}/${image_name}"
+
+	local done_file
+	done_file="${rootdir}/.done-${image_name}"
+
+	local escape_image_file
+	escape_image_file=`lib_escape_string "${image_file}" "" '\"'`
+
+	if [ -f "${done_file}" -a ${opt_force} -eq 0 ]; then
+		lib_err ${EX_NOPERM} "Cannot overwrite \"${name}\" (arch:${arch}, tag:${tag}). Use -f to force it."
+	fi
+	
+	"${APPJAIL_PROGRAM}" jail create \
+		-I export+root="portable \"output:${escape_image_file}\" \"${compress}\"" -- "${jail}" || exit $?
+
+	local ajspec="${rootdir}/${IMAGE_DEFAULT_AJSPEC}"
+
+	touch "${ajspec}"
+
+	local ajspec_key ajspec_value ajspec_keys
+	
+	ajspec_keys="name timestamp sum size"
+
+	for ajspec_key in ${ajspec_keys}; do
+		case "${ajspec_key}" in
+			name)
+				ajspec_value="\"${name}\""
+				;;
+			timestamp)
+				ajspec_value=`date +"%s"`
+				;;
+			sum)
+				ajspec_key="sum.${arch}"
+				ajspec_value=`lib_mksum "${image_file}"`
+				;;
+			size)
+				ajspec_key="size.${arch}"
+				ajspec_value=`wc -c -- "${image_file}" | awk '{print $1}'`
+				;;
+			*)
+				lib_err ${EX_SOFTWARE} "${ajspec_key} isn't a valid ajspec key."
+				;;
+		esac
+
+		lib_debug "Setting (ajspec): ${tag}.${ajspec_key}: ${ajspec_value}"
+
+		lib_ajconf set -Vt "${ajspec}" ${tag}.${ajspec_key}="${ajspec_value}"
+	done
+
+	touch "${done_file}"
+
+	lib_info "Saved as ${image_file}"
+}
+
+image_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local image_name
+
+	local flag_has_metadata=0
+	local flag_name=0
+	
+	while getopts ":eHIpt" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	image_name="$1"; shift
+	_image_chk "${image_name}"
+
+	local rootdir
+	rootdir="${IMAGESDIR}/${image_name}"
+
+	lib_set_logprefix " [`random_color`${image_name}${COLOR_DEFAULT}]"
+
+	if [ $# -eq 0 ]; then
+		set -- "name"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword value
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			has_metadata|name) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${keywords}" | tr '[:lower:]' '[:upper:]' | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				name)
+					value="${image_name}"
+					;;
+				has_metadata)
+					if [ -f "${rootdir}/${IMAGE_DEFAULT_AJSPEC}" ]; then
+						value=1
+					else
+						value=0
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+image_import()
+{
+	local _o
+	local opt_force=0
+	local arch="${IMAGE_ARCH}"
+	local ajspec_name="${IMAGE_DEFAULT_AJSPEC}"
+	local name=
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":fa:N:n:t:" _o; do
+		case "${_o}" in
+			a|N|n|t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_force=1
+				;;
+			a)
+				arch="${OPTARG}"
+				;;
+			N)
+				ajspec_name="${OPTARG}"
+				;;
+			n)
+				name="${OPTARG}"
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local ajspec="$1"
+	if lib_check_empty "${ajspec}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+	fi
+
+	local ajspec_file
+	ajspec_file=`_image_getajspec "${ajspec}" "${ajspec_name}"` || exit $?
+
+	if ! _image_chktag "${tag}" "${ajspec_file}"; then
+		lib_err ${EX_NOINPUT} "Cannot find tag \`${tag}\`"
+	fi
+
+	if ! lib_check_arch "${arch}"; then
+		lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+	fi
+
+	if ! _image_chkarch "${arch}" "${ajspec_file}"; then
+		lib_err ${EX_NOINPUT} "Cannot find architecture \`${arch}\`"
+	fi
+
+	if lib_check_empty "${name}"; then
+		name=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" name`
+
+		if lib_check_empty "${name}"; then
+			lib_err ${EX_CONFIG} "Name is not defined in the ajspec file, use -n to set one."
+		fi
+	fi
+
+	if ! lib_check_imagename "${name}"; then
+		lib_err ${EX_DATAERR} -- "${name}: invalid image name."
+	fi
+
+	lib_set_logprefix " [`random_color`${name}${COLOR_DEFAULT}]"
+
+	if ! lib_zfs_mkdir "${IMAGESDIR}" "${ZFS_IMAGES_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${IMAGESDIR}"
+	fi
+
+	local checksum
+	checksum=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" sum:${arch}`
+
+	if lib_check_empty "${checksum}"; then
+		lib_err ${EX_CONFIG} "Checksum is not defined."
+	fi
+
+	if ! lib_check_sum "${checksum}"; then
+		lib_err ${EX_DATAERR} -- "${checksum}: invalid checksum."
+	fi
+
+	local rootdir
+	rootdir="${IMAGESDIR}/${name}"
+
+	if ! mkdir -p "${rootdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${rootdir}"
+	fi
+
+	image_metadata_set -ft "${tag}" -- "${ajspec_file}" entrypoint="${ajspec}" || exit $?
+
+	local current_ajspec
+	current_ajspec="${rootdir}/${IMAGE_DEFAULT_AJSPEC}"
+
+	local current_timestamp=
+	if [ -f "${current_ajspec}" ]; then
+		current_timestamp=`image_metadata_get -fit "${tag}" -- "${current_ajspec}" timestamp`
+	fi
+
+	local timestamp
+	timestamp=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" timestamp`
+
+	local timestamp_mismatch
+	if lib_check_empty "${timestamp}" || ! lib_check_number "${timestamp}"; then
+		timestamp=`date +"%s"`
+
+		lib_warn "Timestamp is not defined. New timestamp: ${timestamp}"
+		image_metadata_set -ft "${tag}" -- "${ajspec_file}" timestamp="${timestamp}" || exit $?
+
+		timestamp_mismatch=1
+	elif lib_check_empty "${current_timestamp}" || ! lib_check_number "${current_timestamp}"; then
+		timestamp_mismatch=1
+	elif [ "${timestamp}" -ne "${current_timestamp}" ]; then
+		timestamp_mismatch=1
+	else
+		timestamp_mismatch=0
+	fi
+
+	local image_name
+	image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+
+	local image_file
+	image_file="${rootdir}/${image_name}"
+
+	local done_file
+	done_file="${rootdir}/.done-${image_name}"
+
+	if [ -f "${done_file}" -a ${timestamp_mismatch} -eq 0 -a ${opt_force} -eq 0 ]; then
+		lib_info -- "${name} (arch:${arch}, tag:${tag}): already up to date."
+		return 0
+	fi
+
+	if ! cp "${ajspec_file}" "${current_ajspec}"; then
+		lib_err ${EX_IOERR} "Error copying ${ajspec_file}"
+	fi
+
+	local sources
+	sources=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" source:${arch}`
+
+	if lib_check_empty "${sources}"; then
+		lib_err ${EX_CONFIG} "Sources are not defined."
+	fi
+
+	printf "%s\n" "${sources}" | while IFS= read -r source; do
+		escape_url=`lib_escape_string "${source}"`
+		escape_output=`lib_escape_string "${image_file}"`
+		fetch_cmd=`lib_multi_replace "${IMAGE_FETCH_CMD}" o "\"${escape_output}\"" u "\"${escape_url}\""`
+
+		lib_debug "Fetching ${name} from ${source}: ${fetch_cmd}"
+
+		if sh -c "${fetch_cmd}"; then
+			break
+		else
+			lib_warn -- "${source}: error retrieving \`${name}\`"
+			continue
+		fi
+	done
+
+	if [ ! -f "${image_file}" ]; then
+		lib_err ${EX_NOINPUT} -- "${name}: no file has been downloaded."
+	fi
+
+	local current_checksum
+	current_checksum=`lib_mksum "${image_file}"`
+
+	if [ "${checksum}" != "${current_checksum}" ]; then
+		lib_err ${EX_DATAERR} -- "${name}: checksum mismatch: ${checksum} != ${current_checksum}"
+	fi
+
+	local size
+	size=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" size:${arch}`
+
+	local current_size
+	current_size=`wc -c -- "${image_file}" | awk '{print $1}'`
+
+	local incorrect_size=0
+
+	if lib_check_empty "${size}"; then
+		incorrect_size=1
+		lib_warn "The image size has not been defined."
+	elif ! lib_check_number "${size}"; then
+		incorrect_size=1
+		lib_warn "The image size is not a number."
+	elif [ ${size} -ne ${current_size} ]; then
+		incorrect_size=1
+		lib_warn "Image size mismatch."
+	fi
+
+	if [ ${incorrect_size} -eq 1 ]; then
+		lib_warn "New image size: ${current_size}"
+		image_metadata_set -t "${tag}" -- "${name}" size:${arch}="${current_size}" || exit $?
+	fi
+
+	# ajspec name.
+	image_metadata_set -t "${tag}" -- "${name}" ajspec="${ajspec_name}" || exit $?
+
+	touch -- "${done_file}"
+
+	lib_info "Saved as ${image_file}"
+}
+
+_image_chktag()
+{
+	local tag2chk="$1" ajspec_file="$2"
+	if [ -z "${tag2chk}" -o -z "${ajspec_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _image_chktag tag2chk ajspec_file"
+	fi
+
+	local tag
+	for tag in `image_metadata_get -fi -- "${ajspec_file}" tags`; do
+		if [ "${tag}" = "${tag2chk}" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+_image_chkarch()
+{
+	local arch2chk="$1" ajspec_file="$2"
+	if [ -z "${arch2chk}" -o -z "${ajspec_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _image_chkarch arch2chk ajspec_file"
+	fi
+
+	local arch
+	for arch in `image_metadata_get -fi -- "${ajspec_file}" arch`; do
+		if [ "${arch}" = "${arch2chk}" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+_image_getajspec()
+{
+	local ajspec="$1" ajspec_name="$2"
+	if [ -z "${ajspec}" -o -z "${ajspec_name}" ]; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	local method=`lib_jailparam_name "${ajspec}" "+"`
+	file=`lib_jailparam_value "${ajspec}" "+"`
+
+	if lib_check_empty "${file}"; then
+		file="${method}"
+		method="file"
+	fi
+
+	if lib_check_empty "${file}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi	
+
+	case "${method}" in
+		cmd|git|fetch|file)
+			;;
+		gh|github)
+			method="github"
+			;;
+		gh-ssh|github-ssh)
+			method="github_ssh"
+			;;
+		gl|gitlab)
+			method="gitlab"
+			;;
+		gl-ssh|gitlab-ssh)
+			method="gitlab_ssh"
+			;;
+		*)
+			lib_err ${EX_DATAERR} -- "${method}: Invalid method."
+			;;
+	esac
+
+	local output
+	output=`lib_generate_tempfile` || exit $?
+
+	local escape_output
+	escape_output=`lib_escape_string "${output}"`
+
+	lib_atexit_add "rm -f \"${escape_output}\""
+
+	_image_getajspec_${method} "${file}" "${ajspec_name}" > "${output}" &&
+		printf "%s\n" "${output}"
+}
+
+_image_getajspec_cmd()
+{
+	local cmd="$1"
+
+	lib_debug "Running (cmd): ${cmd}"
+
+	sh -c "${cmd}"
+}
+
+_image_getajspec_git()
+{
+	local repo="$1" ajspec="$2"
+
+	if ! which -s "git"; then
+		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
+	fi
+
+	local repodir
+	repodir=`lib_generate_tempdir` || exit $?
+
+	local escape_repodir
+	escape_repodir=`lib_escape_string "${repodir}"`
+
+	lib_atexit_add "rm -rf \"${escape_repodir}\" > /dev/null 2>&1"
+
+	lib_debug "Cloning ${repo} as ${repodir} ..."
+
+	local errlevel
+
+	git clone --depth 1 -q -o origin -- "${repo}" "${repodir}" >&2
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Failed to get ${repo} using git(1)."
+	fi
+
+	if [ ! -f "${repodir}/${ajspec}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the ajspec \`${ajspec}\` in \`${repo}\`"
+	fi
+
+	cat -- "${repodir}/${ajspec}"
+}
+
+_image_getajspec_fetch()
+{
+	local url="$1"
+
+	local output
+	output=`lib_generate_tempfile` || exit $?
+
+	local escape_output=`lib_escape_string "${output}"`
+	lib_atexit_add "rm -f \"${escape_output}\""
+
+	local escape_url=`lib_escape_string "${url}"`
+	
+	local fetch_cmd=`lib_multi_replace "${IMAGE_FETCH_CMD}" o "\"${escape_output}\"" u "\"${escape_url}\""`
+
+	lib_debug "Running (fetch): ${fetch_cmd}"
+
+	local errlevel
+
+	sh -c "${fetch_cmd}"
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error executing \`${fetch_cmd}\`"
+	fi
+
+	cat -- "${output}"
+}
+
+_image_getajspec_file()
+{
+	local file="$1"
+
+	if [ ! -f "${file}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the ajspec \`${file}\`"
+	fi
+
+	cat -- "${file}"
+}
+
+_image_getajspec_github()
+{
+	local repo="$1" ajspec="$2"
+
+	_image_getajspec_git "https://github.com/${repo}" "${ajspec}"
+}
+
+_image_getajspec_github_ssh()
+{
+	local repo="$1" ajspec="$2"
+
+	_image_getajspec_git "git@github.com:${repo}" "${ajspec}"
+}
+
+_image_getajspec_gitlab()
+{
+	local repo="$1" ajspec="$2"
+
+	_image_getajspec_git "https://gitlab.com/${repo}" "${ajspec}"
+}
+
+_image_getajspec_gitlab_ssh()
+{
+	local repo="$1" ajspec="$2"
+
+	_image_getajspec_git "git@gitlab.com:${repo}" "${ajspec}"
+}
+
+image_jail()
+{
+	local _o
+	local arch="${IMAGE_ARCH}"
+	local image=
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":a:i:t:" _o; do
+		case "${_o}" in
+			a|i|t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			a)
+				arch="${OPTARG}"
+				;;
+			i)
+				image="${OPTARG}"
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if lib_check_empty "${image}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail="$1"; shift
+	if lib_check_empty "${jail}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+	fi
+
+	if ! lib_check_arch "${arch}"; then
+		lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+	fi
+
+	if ! lib_check_imagename "${image}"; then
+		lib_err ${EX_DATAERR} -- "${image}: invalid image name."
+	fi
+
+	local rootdir
+	rootdir="${IMAGESDIR}/${image}"
+
+	local image_name
+	image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+
+	local image_file
+	image_file="${rootdir}/${image_name}"
+
+	if [ ! -f "${image_file}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the image \`${image}\` (arch:${arch}, tag:${tag})"
+	fi
+
+	local done_file
+	done_file="${rootdir}/.done-${image_name}"
+
+	if [ ! -f "${image_file}" ]; then
+		lib_err ${EX_NOPERM} "Apparently, the installation of the \`${image}\` (arch:${arch}, tag:${tag}) image is incomplete."
+	fi
+
+	local escape_image_file
+	escape_image_file=`lib_escape_string "${image_file}" "" '\"'`
+
+	"${APPJAIL_PROGRAM}" quick "${jail}" import+root="\"input:${escape_image_file}\" portable" "$@"
+}
+
+image_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local image_name=
+
+	while getopts ":eHIpti:" _o; do
+		case "${_o}" in
+			i)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			i)
+				image_name="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${image_name}" ]; then
+		image_get ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -- "${image_name}" "$@"
+		return $?
+	fi
+
+	if [ ! -d "${IMAGESDIR}" ]; then
+		return
+	fi
+
+	ls -A "${IMAGESDIR}" | while IFS= read -r image_name; do
+		image_get ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${image_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+image_metadata()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		del|edit|get|info|set) ;;
+		*) image_usage; exit ${EX_USAGE} ;;
+	esac
+
+	image_metadata_${entity} "$@"
+}
+
+image_metadata_del()
+{
+	local _o
+	local opt_ignunk=0
+	local opt_file=0
+	local opt_image=1
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":fIit:" _o; do
+		case "${_o}" in
+			t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_file=1
+				opt_image=0
+				;;
+			I)
+				opt_image=1
+				opt_file=0
+				;;
+			i)
+				opt_ignunk=1
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target="$1" keyword="$2"
+
+	local ajspec=
+	if [ ${opt_image} -eq 1 ]; then
+		_image_chk "${target}"
+		ajspec="${IMAGESDIR}/${target}/${IMAGE_DEFAULT_AJSPEC}"
+	else
+		if lib_check_empty "${target}"; then
+			image_usage
+			exit ${EX_USAGE}
+		fi
+
+		ajspec="${target}"
+	fi
+
+	if [ ! -f "${ajspec}" ]; then
+		lib_err ${EX_NOINPUT} -- "${ajspec}: no metadata file found."
+	fi
+
+	if lib_check_empty "${keyword}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} "Invalid tag \"${tag}\""
+	fi
+
+	local arch=
+
+	case "${keyword}" in
+		name|timestamp|timestamp:human|maintainer|comment|url|description|entrypoint|ajspec)
+			;;
+		sum:*|source:*|size:*)
+			local arch=`lib_jailparam_value "${keyword}" :`
+			if lib_check_empty "${arch}"; then
+				image_usage
+				exit ${EX_USAGE}
+			fi
+
+			if ! lib_check_arch "${arch}"; then
+				lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+			fi
+			;;
+		*)
+			image_usage
+			exit ${EX_USAGE}
+			;;
+	esac
+
+	local ignore_arg=
+	if [ ${opt_ignunk} -eq 1 ]; then
+		ignore_arg="-i"
+	fi
+
+	case "${keyword}" in
+		name)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.name
+			;;
+		timestamp)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.timestamp
+			;;
+		maintainer)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.maintainer
+			;;
+		comment)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.comment
+			;;
+		url)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.url
+			;;
+		description)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.description
+			;;
+		sum:*)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.sum.${arch}
+			;;
+		source:*)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.source.${arch}
+			;;
+		size:*)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.size.${arch}
+			;;
+		entrypoint)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.entrypoint
+			;;
+		ajspec)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.ajspec
+			;;
+	esac
+}
+
+image_metadata_edit()
+{
+	local _o
+	local opt_file=0
+	local opt_image=1
+
+	while getopts ":fI" _o; do
+		case "${_o}" in
+			f)
+				opt_file=1
+				opt_image=0
+				;;
+			I)
+				opt_image=1
+				opt_file=0
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target="$1"
+
+	local ajspec=
+	if [ ${opt_image} -eq 1 ]; then
+		_image_chk "${target}"
+		ajspec="${IMAGESDIR}/${target}/${IMAGE_DEFAULT_AJSPEC}"
+	else
+		if lib_check_empty "${target}"; then
+			image_usage
+			exit ${EX_USAGE}
+		fi
+
+		ajspec="${target}"
+	fi
+
+	if [ ! -f "${ajspec}" ]; then
+		if ! touch -- "${ajspec}"; then
+			lib_err ${EX_IOERR} "Error creating \`${ajspec}\`"
+		fi
+	fi
+
+	lib_ajconf edit -t "${ajspec}"
+}
+
+image_metadata_get()
+{
+	local _o
+	local opt_ignunk=0
+	local opt_file=0
+	local opt_image=1
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":fIit:" _o; do
+		case "${_o}" in
+			t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_file=1
+				opt_image=0
+				;;
+			I)
+				opt_image=1
+				opt_file=0
+				;;
+			i)
+				opt_ignunk=1
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target="$1" keyword="$2"
+
+	local ajspec=
+	if [ ${opt_image} -eq 1 ]; then
+		_image_chk "${target}"
+		ajspec="${IMAGESDIR}/${target}/${IMAGE_DEFAULT_AJSPEC}"
+	else
+		if lib_check_empty "${target}"; then
+			image_usage
+			exit ${EX_USAGE}
+		fi
+
+		ajspec="${target}"
+	fi
+
+	if [ ! -f "${ajspec}" ]; then
+		lib_err ${EX_NOINPUT} -- "${ajspec}: no metadata file found."
+	fi
+
+	if lib_check_empty "${keyword}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} "Invalid tag \"${tag}\""
+	fi
+
+	local arch=
+
+	case "${keyword}" in
+		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
+			;;
+		sum:*|source:*|size:*)
+			local arch=`lib_jailparam_value "${keyword}" :`
+			if lib_check_empty "${arch}"; then
+				image_usage
+				exit ${EX_USAGE}
+			fi
+
+			if ! lib_check_arch "${arch}"; then
+				lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+			fi
+			;;
+		*)
+			image_usage
+			exit ${EX_USAGE}
+			;;
+	esac
+
+	local ignore_arg=
+	if [ ${opt_ignunk} -eq 1 ]; then
+		ignore_arg="-i"
+	fi
+
+	local file_arg=
+	if [ ${opt_file} -eq 1 ]; then
+		file_arg="-f"
+	fi
+
+	case "${keyword}" in
+		name)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.name
+			;;
+		timestamp)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.timestamp
+			;;
+		timestamp:human)
+			local timestamp=`image_metadata_get ${file_arg} -t "${tag}" -- "${target}" timestamp` || exit $?
+
+			date -r${timestamp} +"%c"
+			;;
+		maintainer)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -VpP ${tag}.maintainer
+			;;
+		comment)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.comment
+			;;
+		url)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.url
+			;;
+		description)
+			lib_ajconf get ${ignore_arg} -t "${ajspec}" -VnP ${tag}.description | while IFS= read -r line; do
+				lib_split_ujailparams "${line}" | while IFS= read -r line; do
+					sh -c "echo -n \"${line} \""
+				done || exit $?
+				echo
+			done || exit $?
+			;;
+		sum:*)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.sum.${arch}
+			;;
+		arch)
+			_image_get_arch "${ajspec}"
+			;;
+		source:*)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -VpP ${tag}.source.${arch}
+			;;
+		tags)
+			_image_get_tag "${ajspec}"
+			;;
+		size:*)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.size.${arch}
+			;;
+		entrypoint)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.entrypoint
+			;;
+		ajspec)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.ajspec
+			;;
+	esac
+}
+
+image_metadata_info()
+{
+	local image_name="$1"
+
+	if lib_check_empty "${image_name}"; then
+		image_list -HIpt name
+	else
+		image_list -HIpt -i "${image_name}" name
+		_image_chk "${image_name}"
+	fi | while IFS= read -r image_name; do
+		has_metadata=`image_get -I "${image_name}" has_metadata`
+		if [ ${has_metadata} -eq 0 ]; then
+			continue
+		fi
+
+		tags=`image_metadata_get -- "${image_name}" tags`
+		build_on=`image_metadata_get -- "${image_name}" arch`
+
+		output=`lib_generate_tempfile` || exit $?
+		escape_output=`lib_escape_string "${output}"`
+
+		lib_atexit_add "rm -f \"${escape_output}\""
+
+		for tag in ${tags}; do
+			name=`image_metadata_get -it "${tag}" -- "${image_name}" name`
+			if ! lib_check_empty "${name}"; then
+				echo "Name            :    ${name} (${tag})"
+			fi
+
+			timestamp_human=`image_metadata_get -it "${tag}" -- "${image_name}" timestamp:human`
+			if ! lib_check_empty "${timestamp_human}"; then
+
+				echo "Timestamp       :    ${timestamp_human}"
+			fi
+
+			maintainers=`image_metadata_get -it "${tag}" -- "${image_name}" maintainer`
+			if ! lib_check_empty "${maintainers}"; then
+				echo "Maintainer(s)   :"
+				printf "%s\n" "${maintainers}" | while IFS= read -r maintainer; do
+					echo "  - ${maintainer}"
+				done
+			fi
+
+			comment=`image_metadata_get -it "${tag}" -- "${image_name}" comment`
+			if ! lib_check_empty "${comment}"; then
+				echo "Comment         :    ${comment}"
+			fi
+
+			if ! lib_check_empty "${build_on}"; then
+				echo "Build on        :"
+				for arch in ${build_on}; do
+					echo "  - ${arch}"
+				done
+
+				for arch in ${build_on}; do
+					echo "Image           :    ${arch}"
+
+					sum=`image_metadata_get -it "${tag}" -- "${image_name}" sum:${arch}`
+					if ! lib_check_empty "${sum}"; then
+						echo "  - SHA256 = ${sum}"
+					fi
+
+					size=`image_metadata_get -it "${tag}" -- "${image_name}" size:${arch}`
+					if ! lib_check_empty "${size}"; then
+						echo "  - SIZE = ${size}"
+					fi
+				done
+
+				for arch in ${build_on}; do
+					echo "Source          :    ${arch}"
+
+					image_metadata_get -it "${tag}" -- "${image_name}" source:${arch} | while IFS= read -r source; do
+						echo "  - ${source}"
+					done
+				done
+			fi
+
+			url=`image_metadata_get -it "${tag}" -- "${image_name}" url`
+			if ! lib_check_empty "${url}"; then
+				echo "WWW             :    ${url}"
+			fi
+
+			entrypoint=`image_metadata_get -it "${tag}" -- "${image_name}" entrypoint`
+			if ! lib_check_empty "${entrypoint}"; then
+				echo "Entrypoint      :    ${entrypoint}"
+			fi
+
+			ajspec=`image_metadata_get -it "${tag}" -- "${image_name}" ajspec`
+			if ! lib_check_empty "${ajspec}"; then
+				echo "AJSPEC          :    ${ajspec}"
+			fi
+
+			description=`image_metadata_get -it "${tag}" -- "${image_name}" description`
+			if [ -n "${description}" ]; then
+				echo "Description     :"
+				printf "%s\n" "${description}"
+			fi
+		done > "${output}"
+
+		cat -- "${output}" && rm -f "${output}"
+	done
+}
+
+_image_get_tag()
+{
+	local ajspec="$1"
+	if [ -z "${ajspec}" ]; then
+		lib_err ${EX_USAGE} "usage: _image_get_tag ajspec"
+	fi
+
+	lib_ajconf getAll -t "${ajspec}" | sed -Ee 's/(^[a-zA-Z0-9_][a-zA-Z0-9_-]*)\..+/\1/' | sort | uniq
+}
+
+_image_get_arch()
+{
+	local ajspec="$1"
+	if [ -z "${ajspec}" ]; then
+		lib_err ${EX_USAGE} "usage: _image_get_arch ajspec"
+	fi
+
+	lib_ajconf getAll -t "${ajspec}" | grep -oEe '^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.[a-zA-Z0-9]+\.[a-zA-Z0-9]+' | sed -Ee 's/^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.[a-zA-Z0-9]+\.([a-zA-Z0-9]+)$/\1/' | sort | uniq
+}
+
+image_metadata_set()
+{
+	local _o
+	local opt_file=0
+	local opt_image=1
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":fIt:" _o; do
+		case "${_o}" in
+			t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			f)
+				opt_file=1
+				opt_image=0
+				;;
+			I)
+				opt_image=1
+				opt_file=0
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target="$1" param="$2"
+
+	local ajspec=
+	if [ ${opt_image} -eq 1 ]; then
+		_image_chk "${target}"
+		ajspec="${IMAGESDIR}/${target}/${IMAGE_DEFAULT_AJSPEC}"
+	else
+		if lib_check_empty "${target}"; then
+			image_usage
+			exit ${EX_USAGE}
+		fi
+
+		ajspec="${target}"
+	fi
+
+	if [ ! -f "${ajspec}" ]; then
+		if ! touch -- "${ajspec}"; then
+			lib_err ${EX_IOERR} "Error creating \`${ajspec}\`"
+		fi
+	fi
+
+	if lib_check_empty "${param}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} "Invalid tag \"${tag}\""
+	fi
+
+	local keyword=`lib_jailparam_name "${param}" =`
+	local value=`lib_jailparam_value "${param}" =`
+
+	if lib_check_empty "${keyword}"; then
+		image_usage
+		exit ${EX_USAGE}
+	elif lib_check_empty "${value}"; then
+		# Keywords that may have an empty value.
+		case "${keyword}" in
+			description+) ;;
+			*) image_usage; exit ${EX_USAGE}
+		esac
+	fi
+
+	local opt_append=0
+	if printf "%s" "${keyword}" | grep -qEe '^[a-zA-Z0-9]+(:[a-zA-Z0-9]+)?\+$'; then
+		opt_append=1
+		keyword=`printf "%s" "${keyword}" | sed -Ee 's/^([a-zA-Z0-9]+(:[a-zA-Z0-9]+)?)\+$/\1/'`
+	fi
+
+	local arch=
+
+	case "${keyword}" in
+		name|timestamp|timestamp:human|maintainer|comment|url|description|entrypoint|ajspec)
+			;;
+		sum:*|source:*|size:*)
+			local arch=`lib_jailparam_value "${keyword}" :`
+			if lib_check_empty "${arch}"; then
+				image_usage
+				exit ${EX_USAGE}
+			fi
+
+			if ! lib_check_arch "${arch}"; then
+				lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+			fi
+			;;
+		*)
+			image_usage
+			exit ${EX_USAGE}
+			;;
+	esac
+
+	local append_arg=
+	if [ ${opt_append} -eq 1 ]; then
+		# Check if the parameter is valid append parameter.
+		case "${keyword}" in
+			maintainer|description|source:*)
+				;;
+			*)
+				lib_err ${EX_DATAERR} "The keyword \`${keyword}\` is not a valid append parameter."
+				;;
+		esac
+		
+		append_arg="-I"
+	else
+		# Reset the value.
+		image_metadata_del -fit "${tag}" -- "${ajspec}" "${keyword}"
+	fi
+
+	local escape_string=
+
+	# Check for the correct data type.
+	case "${keyword}" in
+		name)
+			if ! lib_check_imagename "${value}"; then
+				lib_err ${EX_DATAERR} -- "${name}: invalid image name."
+			fi
+
+			escape_value="\"${value}\""
+			;;
+		description)
+			if ! lib_check_empty "${value}"; then
+				escape_value=`lib_escape_string "${value}" "" '\"'`
+			fi
+			escape_value="\"${escape_value}\""
+			;;
+		maintainer|comment|url|source:*|entrypoint|ajspec)
+			escape_value=`lib_escape_string "${value}" "" '\"'`
+			escape_value="\"${escape_value}\""
+			;;
+		sum:*)
+			if ! lib_check_sum "${value}"; then
+				lib_err ${EX_DATAERR} -- "${value}: invalid checksum."
+			fi
+			;;
+		size:*)
+			if ! lib_check_number "${value}"; then
+				lib_err ${EX_DATAERR} -- "${value}: invalid size."
+			fi
+			;;
+	esac
+
+	case "${keyword}" in
+		name)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.name="${escape_value}"
+			;;
+		timestamp)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.timestamp="${escape_value}"
+			;;
+		maintainer)
+			lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.maintainer="${escape_value}"
+			;;
+		comment)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.comment="${escape_value}"
+			;;
+		url)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.url="${escape_value}"
+			;;
+		description)
+			lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.description="${escape_value}"
+			;;
+		sum:*)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.sum.${arch}="${value}"
+			;;
+		source:*)
+			lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.source.${arch}="${escape_value}"
+			;;
+		size:*)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.size.${arch}="${value}"
+			;;
+		entrypoint)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.entrypoint="${escape_value}"
+			;;
+		ajspec)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.ajspec="${escape_value}"
+			;;
+	esac
+}
+
+image_remove()
+{
+	local name="$1"
+	_image_chk "${name}"
+
+	if [ "${ENABLE_ZFS}" != "0" ]; then
+		if ! lib_zfs_rrmfs -fR "${ZFS_IMAGES_NAME}/${name}"; then
+			lib_err ${EX_IOERR} "Error destroying ${ZFS_IMAGES_NAME}/${name}"
+		fi
+	else
+		rm -rf "${IMAGESDIR}/${name}"
+	fi
+}
+
+image_update()
+{
+	local image_name="$1"
+
+	if lib_check_empty "${image_name}"; then
+		image_list -HIpt name
+	else
+		image_list -HIpt -i "${image_name}" name
+		_image_chk "${image_name}"
+	fi | while IFS= read -r image_name; do
+		lib_set_logprefix " [`random_color`${image_name}${COLOR_DEFAULT}]"
+
+		tags=`image_metadata_get -- "${image_name}" tags`
+		if lib_check_empty "${tags}"; then
+			continue
+		fi
+
+		build_on=`image_metadata_get -- "${image_name}" arch`
+		if lib_check_empty "${build_on}"; then
+			continue
+		fi
+
+		rootdir="${IMAGESDIR}/${image_name}"
+
+		for tag in ${tags}; do
+			entrypoint=`image_metadata_get -it "${tag}" -- "${image_name}" entrypoint`
+			if lib_check_empty "${entrypoint}"; then
+				lib_debug -- "${image_name}: no entrypoint has been set. Ignoring ..."
+				continue
+			fi
+
+			ajspec=`image_metadata_get -it "${tag}" -- "${image_name}" ajspec`
+			if lib_check_empty "${ajspec}"; then
+				ajspec="${IMAGE_DEFAULT_AJSPEC}"
+			fi
+
+			for arch in ${build_on}; do
+				image_filename="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+				image_file="${rootdir}/${image_filename}"
+
+				if [ ! -f "${image_file}" ]; then
+					lib_debug -- "${image_name}: image not found (arch:${arch}, tag:${tag}). Ignoring ..."
+					continue
+				fi
+
+				lib_info "Updating ${image_name} (arch:${arch}, tag:${tag}) ..."
+
+				image_import -a "${arch}" -t "${tag}" -N "${ajspec}" -n "${image_name}" -- "${entrypoint}"
+			done
+		done
+	done
+}
+
+_image_chk()
+{
+	local name="$1"
+	if lib_check_empty "${name}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_imagename "${name}"; then
+		lib_err ${EX_DATAERR} -- "${name}: invalid image name."
+	fi
+
+	if [ ! -d "${IMAGESDIR}/${name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the image \`${name}\`"
+	fi
+}
+
+_image_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		healthcheck_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+image_help()
+{
+	cat << EOF
+`image_usage`
+
+Parameters:
+    export                    -- Export a jail.
+    get                       -- Get information about a image.
+    import                    -- Import an image.
+    jail                      -- Create a jail using an image.
+    list                      -- Like \`get\` but for all images.
+    metadata                  -- Manipulate the metadata of the given image.
+    remove                    -- Remove an image.
+    update                    -- Update one or all images.
+
+Options for get:
+    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
+                                 in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                        -- Display the name of the columns.
+    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                        -- Columnate the list.
+    -t                        -- Tabulate columns and values.
+
+Options for list:
+    -e                        -- This option is the opposite in \`Options for get\`.
+    -H                        -- This option is the opposite in \`Options for get\`.
+    -I                        -- This option is the same as in \`Options for get\`.
+    -p                        -- This option is the opposite in \`Options for get\`.
+    -t                        -- This option is the opposite in \`Options for get\`.
+    -i image                  -- Operate in this image. If not set operate in all images.
+
+Methods for import:
+    cmd                       -- Use the output of a posix shell command as the ajspec.
+    git                       -- Clone a git repository and use the ajspec from it.
+    fetch                     -- Download an ajspec file using HTTP or FTP (depending on what you are using).
+    file                      -- Use the file in the local file system.
+    gh, github                -- Wrapper for the \`git\` method but using \`https://github.com/\` as URL prefix.
+    gh-ssh, github-ssh        -- Wrapper for the \`git\` method but using \`git@github.com:\` as URL prefix.
+    gl, gitlab                -- Wrapper for the \`git\` method but using \`https://gitlab.com/\` as URL prefix.
+    gl-ssh, gitlab-ssh        -- Wrapper for the \`git\` method but using \`git@gitlab.com:\` as URL prefix.
+
+Options for export, import, jail, metadata del, metadata get and metadata set:
+    -t tag                    -- Operate in this tag. Default: ${IMAGE_TAG}
+
+Options for import and jail:
+    -a arch                   -- Operate in this architecture. Default: ${IMAGE_ARCH}
+
+Options for export and import:
+    -f                        -- Overwrites the image. When the -f is not used, on export AppJail will complain when the
+                                 image has been previously saved successfully. On import AppJail will not complain but
+				 will report that the image is already updated only when the timestamp is set.
+    -n name                   -- Image name. If you are exporting and the name is not defined, the name of the jail used.
+                                 If you are importing and the name is not defined, the name specified by the ajspec file
+				 is used, but if it does not have the name keyword, AppJail will complain and you will
+				 have to specify the name explicitly.
+
+Options for import:
+    -N ajspec_name            -- ajspec filename. Only used by git and git-like methods. Default: ${IMAGE_DEFAULT_AJSPEC}
+
+Parameters for metadata:
+    del                       -- Remove the keyword.
+    edit                      -- Open an editor to edit the ajspec file interactively.
+    get                       -- Get a keyword.
+    info                      -- Display information of one or all images in a user-friendly format.
+    set                       -- Update a value of an existing keyword or create a new one. For the keywords \`maintainer\`,
+                                 \`description\` and \`source:<arch>\` you can use \`+=\` to add the value instead of
+				 replacing it.
+
+Parameters for metadata del, metadata edit, metadata get and metadata set:
+    -f                        -- Use a file as the target.
+    -I                        -- Use an image as the target.
+
+Options for metadata del and metadata get:
+    -i                        -- Don't complain when the given keyword does not exist
+
+Keywords for metadata del, metadata get and metadata set:
+    You have to replace \`<arch>\` with the given architecture.
+
+    name                      -- Image name.
+    timestamp                 -- Timestamp.
+    maintainer                -- Image's maintainer(s).
+    comment                   -- One-line description.
+    url                       -- Home page.
+    description               -- Long description.
+    sum:<arch>                -- Checksum.
+    source:<arch>             -- Sites where the image will be downloaded.
+    size:<arch>               -- Image size.
+    entrypoint                -- The method used by the \`import\` command.
+    ajspec                    -- ajspec filename.
+
+Keywords for metadata get:
+    timestamp:human           -- Display \`timestamp\` in a human-readable form.
+    arch                      -- Image architectures.
+    tags                      -- Image tags.
+EOF
+}
+
+image_usage()
+{
+	cat << EOF
+usage: image export [-f] [-c compress] [-n name] [-t tag] jail
+       image get [-eHIpt] image
+       image import [-f] [-a arch] [-N ajspec_name] [-n name] [-t tag] [method+]path
+       image jail [-a arch] [-i image] [-t tag] jail [options ...]
+       image list [-eHIpt] [-i image] [keyword ...]
+       image remove image
+       image update [image]
+
+usage: image metadata del [-f | -I] [-i] [-t tag] target keyword
+       image metadata edit [-f | -I] target
+       image metadata get [-f | -I] [-i] [-t tag] target keyword
+       image metadata info [image]
+       image metadata set [-f | -I] [-t tag] target keyword[+]=value
+EOF
+}
