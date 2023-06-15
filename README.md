@@ -4296,7 +4296,7 @@ Suppose we are writing an application that depending on the installed dependenci
 
 ### AJSPEC
 
-An ajspec file provides information about the image, such as the checksum, the site where the image will be downloaded, etc. The syntax of the ajspec file is the same as used in templates, but internally there some things that have a special meaning, such as `<tag>` and `<arch>`. `<tag>` is the tag and is used to identify the variant of the image. An image can have more than one tag. `<arch>` is the architecture of the image, since the image can be valid for a lot of platforms.
+An ajspec file provides information about the image, such as the checksum, the site where the image will be downloaded, etc. The syntax of the ajspec file is the same as used in templates, but internally there are some things that have a special meaning, such as `<tag>` and `<arch>`. `<tag>` is the tag and is used to identify the variant of the image. An image can have more than one tag. `<arch>` is the architecture of the image, since the image can be valid for a lot of platforms.
 
 A valid ajspec file has the following parameters:
 
