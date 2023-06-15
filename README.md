@@ -4319,7 +4319,7 @@ You probably won't need to manipulate an ajspec file many times, especially if y
 Before editing, it is worth looking at what we need to edit.
 
 ```
-# appjail metadata info nginx
+# appjail image metadata info nginx
 Name            :    nginx (132)
 Timestamp       :    Tue Jun 13 20:05:19 2023
 Maintainer(s)   :
@@ -4336,7 +4336,7 @@ Entrypoint      :    gh+DtxdF/nginx-image
 AJSPEC          :    .ajspec
 ```
 
-The `nginx` image has useful information. `appjail metadata info` will show information for all tags, so since it only shows one, the `nginx` image only has one tag. In this case it is `132`. `Timestamp` specifies when the image was last updated. `Maintainer(s)` provides information on who is responsible for fixing problems and improving the image. This image was built in `amd64` and the checksum and size are also provided. `Source` are the sites where the image will be downloaded. You can specify many `Sources` and AppJail will try to download the image for the first site, if it fails, it tries the second and so on. `Entrypoint` is what we use in the `appjail image import` command to retrieve the ajspec file. `AJSPEC` is the name of the ajspec file but it is only used by git and git-like methods.
+The `nginx` image has useful information. `appjail image metadata info` will show information for all tags, so since it only shows one, the `nginx` image only has one tag. In this case it is `132`. `Timestamp` specifies when the image was last updated. `Maintainer(s)` provides information on who is responsible for fixing problems and improving the image. This image was built in `amd64` and the checksum and size are also provided. `Source` are the sites where the image will be downloaded. You can specify many `Sources` and AppJail will try to download the image for the first site, if it fails, it tries the second and so on. `Entrypoint` is what we use in the `appjail image import` command to retrieve the ajspec file. `AJSPEC` is the name of the ajspec file but it is only used by git and git-like methods.
 
 This image is descriptive, but a description and perhaps other data are very important, such as the home page and a one-line description.
 
