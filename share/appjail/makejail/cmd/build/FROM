@@ -45,6 +45,10 @@ main()
 	if lib_check_empty "${args}"; then
 		lib_err ${EX_USAGE} "usage: FROM [--ajspec ajspec_name] [--entrypoint entrypoint] [--platform platform] image[:tag]"
 	fi
+
+	if [ -d "${MAKEJAIL_TEMPDIR}/images" ]; then
+		lib_err ${EX_IOERR} "FROM cannot be used more than once."
+	fi
 	
 	# Options
 	local ajspec=".ajspec"
