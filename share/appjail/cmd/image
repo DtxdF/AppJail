@@ -130,7 +130,7 @@ image_export()
 	local rootdir
 	rootdir="${IMAGESDIR}/${name}"
 
-	if ! mkdir -p "${rootdir}"; then
+	if ! lib_zfs_mkdir "${rootdir}" "${ZFS_IMAGES_NAME}/${name}"; then
 		lib_err ${EX_IOERR} "Error creating ${rootdir}"
 	fi
 
@@ -429,7 +429,7 @@ image_import()
 	local rootdir
 	rootdir="${IMAGESDIR}/${name}"
 
-	if ! mkdir -p "${rootdir}"; then
+	if ! lib_zfs_mkdir "${rootdir}" "${ZFS_IMAGES_NAME}/${name}"; then
 		lib_err ${EX_IOERR} "Error creating ${rootdir}"
 	fi
 
@@ -1594,9 +1594,9 @@ image_remove()
 		if ! lib_zfs_rrmfs -fR "${ZFS_IMAGES_NAME}/${name}"; then
 			lib_err ${EX_IOERR} "Error destroying ${ZFS_IMAGES_NAME}/${name}"
 		fi
-	else
-		rm -rf "${IMAGESDIR}/${name}"
 	fi
+
+	rm -rf "${IMAGESDIR}/${name}"
 }
 
 image_update()
