@@ -4288,6 +4288,190 @@ nginx is running as pid 48490.
 [00:01:04] [ debug ] [jtest] Sleeping (nro = 1, context = health, type = jail, cmd = service nginx status, interval = 30) ...
 ```
 
+## Images
+
+Analogously for a program, a Makejail is like a source code and the Image is like the binary. Technically they are independent, but when combined they are useful for some types of applications.
+
+Suppose we are writing an application that depending on the installed dependencies will provide us with more or less features and we want to share all the variants with a co-worker. What we have to do is to create a jail, export it and put it in a place that our co-worker can download, but he doesn't need to manually download the image, he needs an ajspec file.
+
+### AJSPEC
+
+An ajspec file provides information about the image, such as the checksum, the site where the image will be downloaded, etc. The syntax of the ajspec file is the same as used in templates, but internally there some things that have a special meaning, such as `<tag>` and `<arch>`. `<tag>` is the tag and is used to identify the variant of the image. An image can have more than one tag. `<arch>` is the architecture of the image, since the image can be valid for a lot of platforms.
+
+A valid ajspec file has the following parameters:
+
+* `<tag>.name`
+* `<tag>.timestamp`
+* `<tag>.maintainer`
+* `<tag>.comment`
+* `<tag>.url`
+* `<tag>.description`
+* `<tag>.sum.<arch>`
+* `<tag>.source.<arch>`
+* `<tag>.size.<arch>`
+* `<tag>.entrypoint`
+* `<tag>.ajspec`
+
+See `appjail image` for more details.
+
+You probably won't need to manipulate an ajspec file many times, especially if you only want to use the image, but for when you need to edit it, `appjail image metadata` if your best friend.
+
+Before editing, it is worth looking at what we need to edit.
+
+```
+# appjail metadata info nginx
+Name            :    nginx (132)
+Timestamp       :    Tue Jun 13 20:05:19 2023
+Maintainer(s)   :
+  - Francis Ford Coppola <fcoppola@example.org>
+  - Quentin Tarantino <qtarantino@example.org>
+Build on        :
+  - amd64
+Image           :    amd64
+  - SHA256 = 481f09014b94433430efb2f0da52c7bdd2cc4e9b478ac9336b06710dab9d2ea5
+  - SIZE = 27360
+Source          :    amd64
+  - http://192.168.1.105:8080/AppJail-images/nginx/132-amd64-image.appjail
+Entrypoint      :    gh+DtxdF/nginx-image
+AJSPEC          :    .ajspec
+```
+
+The `nginx` image has useful information. `appjail metadata info` will show information for all tags, so since it only shows one, the `nginx` image only has one tag. In this case it is `132`. `Timestamp` specifies when the image was last updated. `Maintainer(s)` provides information on who is responsible for fixing problems and improving the image. This image was built in `amd64` and the checksum and size are also provided. `Source` are the sites where the image will be downloaded. You can specify many `Sources` and AppJail will try to download the image for the first site, if it fails, it tries the second and so on. `Entrypoint` is what we use in the `appjail image import` command to retrieve the ajspec file. `AJSPEC` is the name of the ajspec file but it is only used by git and git-like methods.
+
+This image is descriptive, but a description and perhaps other data are very important, such as the home page and a one-line description.
+
+```
+# appjail image metadata set -t 132 nginx comment="Robust and small WWW server"
+# appjail image metadata set -t 132 nginx url="https://nginx.org/"
+# cat << EOF | while IFS= read -r line; do appjail image metadata set -t 132 nginx description+="${line}"; done
+NGINX is a high performance edge web server with the lowest memory footprint
+and the key features to build modern and efficient web infrastructure.
+
+NGINX functionality includes HTTP server, HTTP and mail reverse proxy, caching,
+load balancing, compression, request throttling, connection multiplexing and
+reuse, SSL offload and HTTP media streaming.
+EOF
+# appjail image metadata info nginx
+Name            :    nginx (132)
+Timestamp       :    Tue Jun 13 20:05:19 2023
+Maintainer(s)   :
+  - Francis Ford Coppola <fcoppola@example.org>
+  - Quentin Tarantino <qtarantino@example.org>
+Comment         :    Robust and small WWW server
+Build on        :
+  - amd64
+Image           :    amd64
+  - SHA256 = 481f09014b94433430efb2f0da52c7bdd2cc4e9b478ac9336b06710dab9d2ea5
+  - SIZE = 27976978
+Source          :    amd64
+  - http://localhost:8080/132-amd64-image.appjail
+WWW             :    https://nginx.org/
+Entrypoint      :    gh+DtxdF/nginx-image
+AJSPEC          :    .ajspec
+Description     :
+NGINX is a high performance edge web server with the lowest memory footprint
+and the key features to build modern and efficient web infrastructure.
+
+NGINX functionality includes HTTP server, HTTP and mail reverse proxy, caching,
+load balancing, compression, request throttling, connection multiplexing and
+reuse, SSL offload and HTTP media streaming.
+```
+
+### Getting started with Images
+
+After understanding the ajspec file, we can proceed smoothly with the creation of the image. To create a jail we first need an existing jail, then we can make changes to custumize it, stop the jail and finally export it. A very important step that will probably be necessary after stopping the jail and before exporting it is to remove sensitive data such as private keys and/or non-portable files like `/etc/rc.conf`. Of course, removing `/etc/rc.conf` is unnecessary when we know the non-portable parameters that can affect the jail when it is installed on the target (e.g.: `defaultrouter`).
+
+```
+# appjail quick webapp virtualnet=":webapp default" nat start overwrite
+...
+# appjail login webapp
+...
+# appjail stop webapp
+...
+# appjail image export -t py -c zstd webapp
+[00:00:01] [ info  ] [webapp] Exporting webapp ...
+[00:00:01] [ debug ] [webapp] Generating /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail ...
+[00:00:02] [ info  ] [webapp] Done.
+[00:00:02] [ debug ] [webapp] Setting (ajspec): py.name: "webapp"
+[00:00:02] [ debug ] [webapp] Setting (ajspec): py.timestamp: 1686817856
+[00:00:02] [ debug ] [webapp] Setting (ajspec): py.sum.amd64: d0c295468755b3989d983ef51351e73e949242591c0ff3aeb76329fab9f5cc91
+[00:00:02] [ debug ] [webapp] Setting (ajspec): py.size.amd64: 847895
+[00:00:02] [ info  ] [webapp] Saved as /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
+# appjail image metadata info webapp
+Name            :    webapp (py)
+Timestamp       :    Thu Jun 15 04:30:56 2023
+Build on        :
+  - amd64
+Image           :    amd64
+  - SHA256 = d0c295468755b3989d983ef51351e73e949242591c0ff3aeb76329fab9f5cc91
+  - SIZE = 847895
+Source          :    amd64
+```
+
+After exporting a jail as an image we will probably want to make it public. You need to put the ajspec in a safe place that ensures it is only handled by trusted people and you can put the image anywhere, but it is advisable to put it in a safe place if you can. Remember that AppJail when importing an image will check the checksum to see if they match, so the ajspec file must be in a safe place.
+
+In this case we will use Github to save our ajspec file in our repository. The image will be placed in two servers, because if the first one fails, AppJail will try with the second one, and if it fails with the third one, and so on.
+
+```
+# scp \
+    /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail \
+    root@192.168.1.107:/var/mks/makejails/darkhttpd/appdata/AppJail-images/webapp
+...
+# cp /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail /tmp/imgs/AppJail-images/webapp
+# git clone git@github.com:DtxdF/webapp-image
+...
+# cp /usr/local/appjail/cache/images/webapp/.ajspec webapp-image
+# appjail image metadata set -t py -f webapp-image/.ajspec source:amd64="http://localhost:8080/AppJail-images/webapp/py-amd64-image.appjail"
+# appjail image metadata set -t py -f webapp-image/.ajspec source:amd64+="http://192.168.1.107:8080/AppJail-images/webapp/py-amd64-image.appjail"
+# git -C webapp-image add .ajspec
+# git -C webapp-image commit -m 'Add ajspec file'
+# git -C webapp-image push
+...
+```
+
+Now anyone can import the image (assuming the image is placed on a public site).
+
+```
+# appjail image import -t py gh+DtxdF/webapp-image
+[00:00:01] [ debug ] Cloning https://github.com/DtxdF/webapp-image as /usr/local/appjail/cache/tmp/.appjail/appjail.UWiaAZq4 ...
+[00:00:02] [ debug ] [webapp] Fetching webapp from http://localhost:8080/AppJail-images/webapp/py-amd64-image.appjail: fetch -Rpm -o "/usr/local/appjail/cache/images/webapp/py-amd64-image.appjail" "http://localhost:8080/AppJail-images/webapp/py-amd64-image.appjail"
+/usr/local/appjail/cache/images/webapp/py-amd6         828 kB   95 MBps    00s
+[00:00:02] [ info  ] [webapp] Saved as /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
+# appjail image list
+NAME
+webapp
+# appjail image jail -t py -i webapp webapp01 virtualnet=":webapp01 default" nat start overwrite
+...
+```
+
+AppJail can update images for you. You just need to use `appjail image update`.
+
+```
+# appjail image update
+[00:00:00] [ info  ] [webapp] Updating webapp (arch:amd64, tag:py) ...
+[00:00:00] [ debug ] [webapp] Cloning https://github.com/DtxdF/webapp-image as /usr/local/appjail/cache/tmp/.appjail/appjail.ih3dse3c ...
+[00:00:01] [ info  ] [webapp] webapp (arch:amd64, tag:py): already up to date.
+```
+
+### Images & Makejails
+
+To take advantage of the images we can use an image in a Makejail using the `FROM` instruction. After the instruction takes effect, the new jail will have the files contained in the image.
+
+```
+FROM --entrypoint gh+DtxdF/webapp-image webapp:py
+
+OPTION start
+OPTION overwrite
+OPTION virtualnet=:webapp01 default
+OPTION nat
+```
+
+All we have to do is run `appjail makejail`.
+
+```
+appjail makejail -j webapp01
+```
+
 ## Design decisions
 
 Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`. Network names and custom stage names use the same regex. For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`. For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.
