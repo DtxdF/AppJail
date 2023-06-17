@@ -120,7 +120,7 @@ enable_start()
 				;;
 			c)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '"'`
+				arg=`lib_escape_string "${arg}" "" '\"'`
 
 				create_args="${create_args} \"${arg}\""
 				;;
@@ -129,7 +129,7 @@ enable_start()
 				;;
 			s)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '"'`
+				arg=`lib_escape_string "${arg}" "" '\"'`
 
 				start_args="${start_args} \"${arg}\""
 				;;
@@ -195,7 +195,7 @@ enable_stop()
 				;;
 			p)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '"'`
+				arg=`lib_escape_string "${arg}" "" '\"'`
 
 				args="${args} \"${arg}\""
 				;;
@@ -246,7 +246,7 @@ enable_run()
 				;;
 			p)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '"'`
+				arg=`lib_escape_string "${arg}" "" '\"'`
 
 				args="${args} \"${arg}\""
 				;;

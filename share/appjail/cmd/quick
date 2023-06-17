@@ -2158,7 +2158,7 @@ quick_set_start_args()
 	local start_args
 
 	start_args="$1"; quick_reqoption "start_args" "${start_args}"
-	start_args=`lib_escape_string "${start_args}" "" '"'`
+	start_args=`lib_escape_string "${start_args}" "" '\"'`
 
 	if [ -z "${QUICK_OPTION_START_ARGS}" ]; then
 		QUICK_OPTION_START_ARGS="\"${start_args}\""
@@ -2181,7 +2181,7 @@ quick_set_create_args()
 	local create_args
 
 	create_args="$1"; quick_reqoption "create_args" "${create_args}"
-	create_args=`lib_escape_string "${create_args}" "" '"'`
+	create_args=`lib_escape_string "${create_args}" "" '\"'`
 
 	if [ -z "${QUICK_OPTION_CREATE_ARGS}" ]; then
 		QUICK_OPTION_CREATE_ARGS="\"${create_args}\""
@@ -2204,7 +2204,7 @@ quick_set_run_args()
 	local run_args
 
 	run_args="$1"; quick_reqoption "run_args" "${run_args}"
-	run_args=`lib_escape_string "${run_args}" "" '"'`
+	run_args=`lib_escape_string "${run_args}" "" '\"'`
 
 	if [ -z "${QUICK_OPTION_RUN_ARGS}" ]; then
 		QUICK_OPTION_RUN_ARGS="\"${run_args}\""
@@ -2227,7 +2227,7 @@ quick_set_stop_args()
 	local stop_args
 
 	stop_args="$1"; quick_reqoption "stop_args" "${stop_args}"
-	stop_args=`lib_escape_string "${stop_args}" "" '"'`
+	stop_args=`lib_escape_string "${stop_args}" "" '\"'`
 
 	if [ -z "${QUICK_OPTION_STOP_ARGS}" ]; then
 		QUICK_OPTION_STOP_ARGS="\"${stop_args}\""
@@ -2909,7 +2909,7 @@ quick_set_file()
 	local file
 
 	file="$1"; quick_reqoption "file" "${file}"
-	file=`lib_escape_string "${file}" "" '"'`
+	file=`lib_escape_string "${file}" "" '\"'`
 
 	if [ -z "${QUICK_OPTION_FILE}" ]; then
 		QUICK_OPTION_FILE="\"${file}\""
@@ -2927,7 +2927,7 @@ quick_set_files()
 		lib_err ${EX_NOINPUT} -- "${files}: file does not exist."
 	fi
 
-	files=`lib_escape_string "${files}" "" '"'`
+	files=`lib_escape_string "${files}" "" '\"'`
 	if [ -z "${QUICK_OPTION_FILES}" ]; then
 		QUICK_OPTION_FILES="\"${files}\""
 	else
