@@ -99,7 +99,7 @@ main()
 				local arg="${OPTARG}"
 				arg=`lib_escape_string "${optarg}" "" '"'`
 
-				after_include="${after_include} -a \"${optarg}\""
+				after_include="${after_include} -a \"${arg}\""
 				;;
 			--arg)
 				# get
@@ -128,13 +128,13 @@ main()
 				local arg="${OPTARG}"
 				arg=`lib_escape_string "${optarg}" "" '"'`
 
-				before_include="${before_include} -B \"${optarg}\""
+				before_include="${before_include} -B \"${arg}\""
 				;;
 			--build-arg)
 				local arg="${OPTARG}"
 				arg=`lib_escape_string "${optarg}" "" '"'`
 
-				build_args="${options} -b \"${optarg}\""
+				build_args="${options} -b \"${arg}\""
 				;;
 			--file)
 				makejail_file="${optarg}"
@@ -146,7 +146,7 @@ main()
 				local arg="${OPTARG}"
 				arg=`lib_escape_string "${optarg}" "" '"'`
 
-				options="${options} -o \"${optarg}\""
+				options="${options} -o \"${arg}\""
 				;;
 			--)
 				break
