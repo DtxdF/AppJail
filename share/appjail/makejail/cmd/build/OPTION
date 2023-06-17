@@ -42,7 +42,7 @@ main()
 		lib_err ${EX_USAGE} "usage: OPTION option"
 	fi
 
-	local escape_chars='`"\'
+	local escape_chars='`"'
 	option=`lib_escape_string "${option}" "" "${escape_chars}"`
 
 	printf "%s\n" "\"${option}\""
