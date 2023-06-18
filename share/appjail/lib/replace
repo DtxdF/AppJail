@@ -36,10 +36,10 @@ lib_load "${LIBDIR}/whitespaces"
 
 lib_escape_string()
 {
-	local str="$1" level="$2" chars2escape="$3"
+	local str="$1" level="$2" chars2escape="$3" extra_regex="$4"
 
 	if [ -z "${str}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_escape_string str [level] [chars2escape]"
+		lib_err ${EX_USAGE} "usage: lib_escape_string str [level] [chars2escape] [-|extra_regex]"
 	fi
 
 	level="${level:-1}"
@@ -50,7 +50,14 @@ lib_escape_string()
 	local escape_chars
 	escape_chars=`lib_generate_char "${level}" '\\'`
 
-	printf "%s\n" "${str}" | sed -Ee "s/([${chars2escape}])/${escape_chars}\\1/g"
+	if [ "${extra_regex}" = "-" ]; then
+		extra_regex=
+	else
+		extra_regex="${extra_regex:-\\$\\(}"
+		extra_regex="|${extra_regex}"
+	fi
+
+	printf "%s\n" "${str}" | sed -Ee "s/([${chars2escape}]${extra_regex})/${escape_chars}\\1/g"
 }
 
 lib_replace_changevars()
@@ -96,7 +103,7 @@ lib_replace_var()
 	lib_atexit_add "rm -f \"${escape_temp_file}\""
 
 	if [ -n "${new}" ]; then
-		new=`lib_escape_string "${new}" "" '\#'`
+		new=`lib_escape_string "${new}" "" '\#' ""`
 	fi
 
 	if ! cat -- "${file}" | sed -Ee "s#(^%\{${old}\}|([^%])%\{${old}\})#\\2${new}#g" > "${temp_file}"; then
@@ -232,8 +239,8 @@ lib_replace_macrovar()
 	lib_atexit_add "rm -f \"${escape_temp_file}\""
 
 	if [ -n "${value}" ]; then
-		value=`lib_escape_string "${value}" "" '}'`
-		value=`lib_escape_string "${value}" "" '\/'`
+		value=`lib_escape_string "${value}" "" '}' ""`
+		value=`lib_escape_string "${value}" "" '\/' ""`
 	fi
 
 	if ! cat -- "${file}" | sed -Ee "s/(^%|([^%])%)\{(${name}(!|:)(([^}]|\\\})+)?)\}/%{${name}:${value}}/g" > "${temp_file}"; then
