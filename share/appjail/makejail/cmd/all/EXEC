@@ -97,7 +97,7 @@ main()
 				;;
 			--after-include)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" '"'`
+				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				after_include="${after_include} -a \"${arg}\""
 				;;
@@ -126,13 +126,13 @@ main()
 				;;
 			--before-include)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" '"'`
+				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				before_include="${before_include} -B \"${arg}\""
 				;;
 			--build-arg)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" '"'`
+				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				build_args="${options} -b \"${arg}\""
 				;;
@@ -144,7 +144,7 @@ main()
 				;;
 			--option)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" '"'`
+				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				options="${options} -o \"${arg}\""
 				;;
