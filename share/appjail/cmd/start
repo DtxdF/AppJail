@@ -79,7 +79,7 @@ start_main()
 				;;
 			c)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				create_args="${create_args} \"${arg}\""
 				;;
@@ -88,7 +88,7 @@ start_main()
 				;;
 			s)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				start_args="${start_args} \"${arg}\""
 				;;

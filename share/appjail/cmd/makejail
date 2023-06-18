@@ -146,19 +146,19 @@ makejail_main()
 				;;
 			a)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				MAKEJAIL_AFTER_INCLUDE="${MAKEJAIL_AFTER_INCLUDE} \"${arg}\""
 				;;
 			B)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				MAKEJAIL_BEFORE_INCLUDE="${MAKEJAIL_BEFORE_INCLUDE} \"${arg}\""
 				;;
 			b)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				MAKEJAIL_BUILD_ARGS="${MAKEJAIL_BUILD_ARGS} \"${arg}\""
 				;;

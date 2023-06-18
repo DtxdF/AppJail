@@ -103,7 +103,7 @@ lib_replace_var()
 	lib_atexit_add "rm -f \"${escape_temp_file}\""
 
 	if [ -n "${new}" ]; then
-		new=`lib_escape_string "${new}" "" '\#' ""`
+		new=`lib_escape_string "${new}" "" '\#' "-"`
 	fi
 
 	if ! cat -- "${file}" | sed -Ee "s#(^%\{${old}\}|([^%])%\{${old}\})#\\2${new}#g" > "${temp_file}"; then
@@ -239,8 +239,8 @@ lib_replace_macrovar()
 	lib_atexit_add "rm -f \"${escape_temp_file}\""
 
 	if [ -n "${value}" ]; then
-		value=`lib_escape_string "${value}" "" '}' ""`
-		value=`lib_escape_string "${value}" "" '\/' ""`
+		value=`lib_escape_string "${value}" "" '}' "-"`
+		value=`lib_escape_string "${value}" "" '\/' "-"`
 	fi
 
 	if ! cat -- "${file}" | sed -Ee "s/(^%|([^%])%)\{(${name}(!|:)(([^}]|\\\})+)?)\}/%{${name}:${value}}/g" > "${temp_file}"; then

@@ -124,7 +124,7 @@ image_export()
 		compress=
 	else
 		compress="compress:${compress}"
-		compress=`lib_escape_string "${compress}" "" '\"'`
+		compress=`lib_escape_string "${compress}" "" '\"' "-"`
 	fi
 
 	local rootdir
@@ -151,7 +151,7 @@ image_export()
 	done_file="${rootdir}/.done-${image_name}"
 
 	local escape_image_file
-	escape_image_file=`lib_escape_string "${image_file}" "" '\"'`
+	escape_image_file=`lib_escape_string "${image_file}" "" '\"' "-"`
 
 	if [ -f "${done_file}" -a ${opt_force} -eq 0 ]; then
 		lib_err ${EX_NOPERM} "Cannot overwrite \"${name}\" (arch:${arch}, tag:${tag}). Use -f to force it."
@@ -821,7 +821,7 @@ image_jail()
 	fi
 
 	local escape_image_file
-	escape_image_file=`lib_escape_string "${image_file}" "" '\"'`
+	escape_image_file=`lib_escape_string "${image_file}" "" '\"' "-"`
 
 	"${APPJAIL_PROGRAM}" quick "${jail}" import+root="\"input:${escape_image_file}\" portable" "$@"
 }
@@ -1528,12 +1528,12 @@ image_metadata_set()
 			;;
 		description)
 			if ! lib_check_empty "${value}"; then
-				escape_value=`lib_escape_string "${value}" "" '\"'`
+				escape_value=`lib_escape_string "${value}" "" '\"' "-"`
 			fi
 			escape_value="\"${escape_value}\""
 			;;
 		maintainer|comment|url|source:*|entrypoint|ajspec)
-			escape_value=`lib_escape_string "${value}" "" '\"'`
+			escape_value=`lib_escape_string "${value}" "" '\"' "-"`
 			escape_value="\"${escape_value}\""
 			;;
 		sum:*)

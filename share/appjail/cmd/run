@@ -59,7 +59,7 @@ run_main()
 				;;
 			p)
 				local arg="${OPTARG}"
-				arg=`lib_escape_string "${arg}" "" '\"'`
+				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				args="${args} \"${arg}\""
 				;;
