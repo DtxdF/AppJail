@@ -30,7 +30,9 @@ status_cmd="${name}_status"
 
 precmd()
 {
-	install -m 640 /dev/null "${appjail_natnet_logfile}"
+	if [ ! -f "${appjail_natnet_logfile}" ]; then
+		install -m 640 /dev/null "${appjail_natnet_logfile}"
+	fi
 }
 
 _show_logfile()

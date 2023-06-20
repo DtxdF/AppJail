@@ -31,7 +31,9 @@ status_cmd="${name}_status"
 
 precmd()
 {
-	install -m 640 /dev/null "${appjail_logfile}"
+	if [ ! -f "${appjail_logfile}" ]; then
+		install -m 640 /dev/null "${appjail_logfile}"
+	fi
 }
 
 _show_logfile()

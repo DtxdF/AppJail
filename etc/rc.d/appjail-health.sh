@@ -32,8 +32,10 @@ command_interpreter="/bin/sh"
 
 appjail_health_precmd()
 {
-	install -m 640 /dev/null "${appjail_health_logfile}" &&
-		echo "AppJail log file (Health): ${appjail_health_logfile}"
+	if [ ! -f "${appjail_health_logfile}" ]; then
+		install -m 640 /dev/null "${appjail_health_logfile}"
+	fi
+	echo "AppJail log file (Health): ${appjail_health_logfile}"
 }
 
 load_rc_config ${name}
