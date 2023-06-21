@@ -1673,7 +1673,7 @@ _image_chk_jail()
 {
 	local jail_name="$1"
 	if lib_check_empty "${jail_name}"; then
-		healthcheck_usage
+		image_usage
 		exit ${EX_USAGE}
 	fi
 
