@@ -476,10 +476,6 @@ image_import()
 		return 0
 	fi
 
-	if ! cp "${ajspec_file}" "${current_ajspec}"; then
-		lib_err ${EX_IOERR} "Error copying ${ajspec_file}"
-	fi
-
 	local sources
 	sources=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" source:${arch}`
 
@@ -534,11 +530,15 @@ image_import()
 
 	if [ ${incorrect_size} -eq 1 ]; then
 		lib_warn "New image size: ${current_size}"
-		image_metadata_set -t "${tag}" -- "${name}" size:${arch}="${current_size}" || exit $?
+		image_metadata_set -ft "${tag}" -- "${ajspec_file}" size:${arch}="${current_size}" || exit $?
 	fi
 
 	# ajspec name.
-	image_metadata_set -t "${tag}" -- "${name}" ajspec="${ajspec_name}" || exit $?
+	image_metadata_set -ft "${tag}" -- "${ajspec_file}" ajspec="${ajspec_name}" || exit $?
+
+	if ! cp "${ajspec_file}" "${current_ajspec}"; then
+		lib_err ${EX_IOERR} "Error copying ${ajspec_file}"
+	fi
 
 	touch -- "${done_file}"
 
