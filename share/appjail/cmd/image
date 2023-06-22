@@ -1332,9 +1332,7 @@ image_metadata_info()
 					if ! lib_check_empty "${size}"; then
 						echo "  - SIZE = ${size}"
 					fi
-				done
 
-				for arch in ${build_on}; do
 					echo "Source          :    ${arch}"
 
 					image_metadata_get -it "${tag}" -- "${image_name}" source:${arch} | while IFS= read -r source; do
