@@ -1320,6 +1320,9 @@ image_metadata_info()
 					echo "  - ${arch}"
 				done
 
+				imagedir="${IMAGESDIR}/${image_name}"
+
+				has_any=0
 				for arch in ${build_on}; do
 					echo "Image           :    ${arch}"
 
@@ -1338,7 +1341,20 @@ image_metadata_info()
 					image_metadata_get -it "${tag}" -- "${image_name}" source:${arch} | while IFS= read -r source; do
 						echo "  - ${source}"
 					done
+
+					if [ -f "${imagedir}/.done-${tag}-${arch}-${IMAGE_DEFAULT_NAME}" ]; then
+						has_any=1
+					fi
 				done
+
+				if [ ${has_any} -eq 1 ]; then
+					echo "Installed       :"
+					for arch in ${build_on}; do
+						if [ -f "${imagedir}/.done-${tag}-${arch}-${IMAGE_DEFAULT_NAME}" ]; then
+							echo "  - ${imagedir}/${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+						fi
+					done
+				fi
 			fi
 
 			url=`image_metadata_get -it "${tag}" -- "${image_name}" url`
