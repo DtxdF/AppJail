@@ -89,6 +89,12 @@ startup_start_healthcheckers()
 	local jail
 	local healthcheckers_are_running=0
 
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
 	for jail in ${jails}; do
 		if [ ! -d "${JAILDIR}/${jail}/conf/boot/health" ]; then
 			continue
@@ -105,7 +111,7 @@ startup_start_healthcheckers()
 		logname="${LOGDIR}/${logname}"
 
 		"${APPJAIL_PROGRAM}" healthcheck run "${jail}" >> "${logname}" 2>&1 &
-		lib_atexit_add "kill $! > /dev/null 2>&1"
+		lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 	done
 
 	lib_debug "Wait..."
@@ -121,12 +127,20 @@ startup_start_jails()
 	local tmpdir
 	tmpdir=`_startup_get_jails "DOWN"` || exit $?
 
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
 	local current=1 total
 
 	total=`find "${tmpdir}" -type f | xargs wc -l | tail -n1 | awk '{print $1}'`
 
-	ls -A -- "${tmpdir}" | sort -n | while IFS= read -r priority
-	do
+	local priority priorities
+	priorities=`ls -A -- "${tmpdir}" | sort -n`
+
+	for priority in ${priorities}; do
 		jails="${tmpdir}/${priority}"
 
 		while IFS= read -r jail_name; do
@@ -142,7 +156,7 @@ startup_start_jails()
 				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1
 			else
 				"${APPJAIL_PROGRAM}" start -- "${jail_name}" >> "${logname}" 2>&1 &
-				lib_atexit_add "kill $! > /dev/null 2>&1"
+				lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 			fi
 
 			current=$((current+1))
@@ -191,6 +205,12 @@ startup_start_nat_networks()
 	total=`cat -- "${networks}" | wc -l`
 	total=$((total+0))
 
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
 	local network_name
 	while IFS= read -r network_name; do
 		lib_zfs_mklogdir "nat" "${network_name}" "startup-start"
@@ -206,7 +226,7 @@ startup_start_nat_networks()
 			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1
 		else
 			"${APPJAIL_PROGRAM}" nat on network "${network_name}" >> "${logname}" 2>&1 &
-			lib_atexit_add "kill $! > /dev/null 2>&1"
+			lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 		fi
 
 		current=$((current+1))
@@ -255,10 +275,18 @@ startup_stop_jails()
 
 	local current=1 total
 
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
 	total=`find "${tmpdir}" -type f | xargs wc -l | tail -n1 | awk '{print $1}'`
 
-	ls -A -- "${tmpdir}" | sort -n | tail -r | while IFS= read -r priority
-	do
+	local priority priorities
+	priorities=`ls -A -- "${tmpdir}" | sort -n`
+
+	for priority in ${priorities}; do
 		jails="${tmpdir}/${priority}"
 
 		while IFS= read -r jail_name; do
@@ -274,7 +302,7 @@ startup_stop_jails()
 				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1
 			else
 				"${APPJAIL_PROGRAM}" rstop "${jail_name}" >> "${logname}" 2>&1 &
-				lib_atexit_add "kill $! > /dev/null 2>&1"
+				lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 			fi
 
 			current=$((current+1))
@@ -352,6 +380,12 @@ startup_stop_nat_networks()
 	total=`cat -- "${networks}" | wc -l`
 	total=$((total+0))
 
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
 	local network_name
 	while IFS= read -r network_name; do
 		lib_zfs_mklogdir "nat" "${network_name}" "startup-stop"
@@ -367,7 +401,7 @@ startup_stop_nat_networks()
 			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1
 		else
 			"${APPJAIL_PROGRAM}" nat off network "${network_name}" >> "${logname}" 2>&1 &
-			lib_atexit_add "kill $! > /dev/null 2>&1"
+			lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 		fi
 
 		current=$((current+1))

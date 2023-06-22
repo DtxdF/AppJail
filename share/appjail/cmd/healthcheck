@@ -404,6 +404,12 @@ healthcheck_run()
 	lib_debug "Starting healthchecking ..."
 
 	local enabled
+
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
 	
 	for nro in `healthcheck_list -HIpt "${jail_name}" nro`; do
 		enabled=`healthcheck_get -In "${nro}" "${jail_name}" enabled`
@@ -416,7 +422,7 @@ healthcheck_run()
 
 		_healthcheck_run "${jail_name}" ${nro} &
 
-		lib_atexit_add "kill $! > /dev/null 2>&1"
+		lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p $! > /dev/null 2>&1"
 	done
 
 	lib_debug "All healthcheckers has been started. Waiting..."
