@@ -1585,16 +1585,67 @@ image_metadata_set()
 
 image_remove()
 {
+	local _o
+	local arch=
+	local tag=
+
+	while getopts ":a:t:" _o; do
+		case "${_o}" in
+			a|t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				arch="${OPTARG}"
+				if ! lib_check_arch "${arch}"; then
+					lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+				fi
+				;;
+			t)
+				tag="${OPTARG}"
+				if ! lib_check_tagname "${tag}"; then
+					lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+				fi
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
 	local name="$1"
 	_image_chk "${name}"
 
-	if [ "${ENABLE_ZFS}" != "0" ]; then
-		if ! lib_zfs_rrmfs -fR "${ZFS_IMAGES_NAME}/${name}"; then
-			lib_err ${EX_IOERR} "Error destroying ${ZFS_IMAGES_NAME}/${name}"
-		fi
-	fi
+	local imagedir
+	imagedir="${IMAGESDIR}/${name}"
 
-	rm -rf "${IMAGESDIR}/${name}"
+	if [ -n "${arch}" -a -n "${tag}" ]; then
+		local image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+
+		rm -vf "${imagedir}/.done-${image_name}"
+		rm -vf "${imagedir}/${image_name}"
+	elif [ -n "${arch}" ]; then
+		rm -vf "${imagedir}/.done-"*"-${arch}-${IMAGE_DEFAULT_NAME}"
+		rm -vf "${imagedir}/"*"-${arch}-${IMAGE_DEFAULT_NAME}"
+	elif [ -n "${tag}" ]; then
+		rm -vf "${imagedir}/.done-${tag}-"*"-${IMAGE_DEFAULT_NAME}"
+		rm -vf "${imagedir}/${tag}-"*"-${IMAGE_DEFAULT_NAME}"
+	else
+		if [ "${ENABLE_ZFS}" != "0" ]; then
+			if ! lib_zfs_rrmfs -fR "${ZFS_IMAGES_NAME}/${name}"; then
+				lib_err ${EX_IOERR} "Error destroying ${ZFS_IMAGES_NAME}/${name}"
+			fi
+		fi
+
+		rm -rf "${imagedir}"
+	fi
 }
 
 image_update()
@@ -1725,10 +1776,10 @@ Methods for import:
     gl, gitlab                -- Wrapper for the \`git\` method but using \`https://gitlab.com/\` as URL prefix.
     gl-ssh, gitlab-ssh        -- Wrapper for the \`git\` method but using \`git@gitlab.com:\` as URL prefix.
 
-Options for export, import, jail, metadata del, metadata get and metadata set:
+Options for export, import, jail, metadata del, metadata get, metadata set and remove:
     -t tag                    -- Operate in this tag. Default: ${IMAGE_TAG}
 
-Options for import and jail:
+Options for import, jail, remove:
     -a arch                   -- Operate in this architecture. Default: ${IMAGE_ARCH}
 
 Options for export and import:
@@ -1789,7 +1840,7 @@ usage: image export [-f] [-c compress] [-n name] [-t tag] jail
        image import [-f] [-a arch] [-N ajspec_name] [-n name] [-t tag] [method+]path
        image jail [-a arch] [-i image] [-t tag] jail [options ...]
        image list [-eHIpt] [-i image] [keyword ...]
-       image remove image
+       image remove [-a arch] [-t tag] image
        image update [image]
 
 usage: image metadata del [-f | -I] [-i] [-t tag] target keyword
