@@ -3147,6 +3147,27 @@ ce6281c4df1de63f37ca6fe890fb4c97bc0bc1d3bd393dd26760aedfde132df6  https://github
 [00:00:02] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Done.
 ```
 
+To update all Makejails we can use `*`.
+
+```
+# appjail makejail -u '*'
+[00:00:00] [ info  ] [5981af7fe1ecbcbd9421e0e697af0722c50dbca51efd4c7dfb58545eafbb6f90] Updating (url = https://github.com/AppJail-makejails/hello-world) ...
+[00:00:01] [ info  ] [5981af7fe1ecbcbd9421e0e697af0722c50dbca51efd4c7dfb58545eafbb6f90] Already up to date.
+[00:00:01] [ info  ] [157981f0000f21eaaaac1feae20bf89370a060d89dff4e301806ae708ee21358] Updating (url = https://github.com/AppJail-makejails/go) ...
+[00:00:02] [ info  ] [157981f0000f21eaaaac1feae20bf89370a060d89dff4e301806ae708ee21358] Already up to date.
+[00:00:02] [ info  ] [1682ec25677094ddd737a4f8da60e9d3b0be35535921653d55fa04f532e6be65] Updating (url = https://github.com/AppJail-makejails/nginx) ...
+[00:00:02] [ info  ] [1682ec25677094ddd737a4f8da60e9d3b0be35535921653d55fa04f532e6be65] Already up to date.
+[00:00:03] [ info  ] [b9188b2095948e43c91ab26a753a7feb10e456d7e5fa15be65d2d9466b90623e] Updating (url = https://github.com/AppJail-makejails/debian) ...
+[00:00:03] [ info  ] [b9188b2095948e43c91ab26a753a7feb10e456d7e5fa15be65d2d9466b90623e] Already up to date.
+[00:00:03] [ info  ] [ce6281c4df1de63f37ca6fe890fb4c97bc0bc1d3bd393dd26760aedfde132df6] Updating (url = https://github.com/AppJail-makejails/lxde) ...
+[00:00:04] [ info  ] [ce6281c4df1de63f37ca6fe890fb4c97bc0bc1d3bd393dd26760aedfde132df6] Already up to date.
+[00:00:04] [ info  ] [64d3082bab0f936c42b54ed444246567c58d528db0bb8606efc0680ef7856aaf] Updating (url = https://github.com/AppJail-makejails/python) ...
+[00:00:05] [ info  ] [64d3082bab0f936c42b54ed444246567c58d528db0bb8606efc0680ef7856aaf] Already up to date.
+[00:00:05] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Updating (url = https://github.com/AppJail-makejails/hello) ...
+[00:00:05] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Already up to date.
+[00:00:05] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Done.
+```
+
 ### Empty jails
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.

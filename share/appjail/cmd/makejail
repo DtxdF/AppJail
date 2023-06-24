@@ -318,9 +318,10 @@ makejail_update()
 {
 	local _o
 	local opt_exact_match=0
+	local opt_match_all=0
 
 	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: makejail_update [-E] repoid"
+		lib_err ${EX_USAGE} "usage: makejail_update [-E] [repoid|*]"
 	fi
 
 	_makejail_check_git # check
@@ -343,12 +344,17 @@ makejail_update()
 		makejail_delete # usage
 	fi
 
-	if ! lib_check_hexnumber "${repoid}"; then
+	if [ "${repoid}" = "*" ]; then
+		opt_match_all=1
+		repoid=
+	fi
+
+	if [ ${opt_match_all} -eq 0 ] && ! lib_check_hexnumber "${repoid}"; then
 		lib_err ${EX_DATAERR} -- "${repoid}: invalid ID."
 	fi
-	
+
 	local use_glob="*"
-	if [ ${opt_exact_match} -eq 1 ]; then
+	if [ "${opt_match_all}" -eq 0 ] && [ ${opt_exact_match} -eq 1 ]; then
 		use_glob=
 	fi
 
@@ -361,7 +367,11 @@ makejail_update()
 	match_n=`echo "${match}" | wc -w`
 
 	if [ ${match_n} -eq 0 ]; then
-		lib_err ${EX_NOINPUT} -- "${repoid}: repository not found."
+		if [ ${opt_match_all} -eq 0 ]; then
+			lib_err ${EX_NOINPUT} -- "${repoid}: repository not found."
+		else
+			lib_err ${EX_NOINPUT} -- "There is no repositories yet."
+		fi
 	else
 		local current_commit url
 		for repoid in ${match}; do
@@ -1525,7 +1535,7 @@ Parameters:
                               more numbers to match the exact repository. To make an exact match use \`-E\`.
     -l                     -- List cloned repositories.
     -u id                  -- Update cloned repositories. This parameter uses the same function to get a list of repositories as \`-d\`,
-                              but updates all matching repositories.
+                              but updates all matching repositories. Use \`*\` to update all cloned repositories.
 
 Options for -c:
     -e                     -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
@@ -1549,6 +1559,6 @@ usage: makejail [-c] [-ev] [-a include_file] [-B include_file] [[-b build_arg[=[
 		[-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
        makejail [-E] -d id
        makejail -l
-       makejail [-E] -u id
+       makejail [-E] -u [id|*]
 EOF
 }
