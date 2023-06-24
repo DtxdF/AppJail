@@ -4290,7 +4290,7 @@ nginx is running as pid 48490.
 
 ## Images
 
-Analogously for a program, a Makejail is like a source code and the Image is like the binary. Technically they are independent, but when combined they are useful for some types of applications.
+Analogously for a program, a Makejail is like a source code and the Image is like the resulting executable file. Technically they are independent, but when combined they are useful for some types of applications.
 
 Suppose we are writing an application that depending on the installed dependencies will provide us with more or less features and we want to share all the variants with a co-worker. What we have to do is to create a jail, export it and put it in a place that our co-worker can download, but he doesn't need to manually download the image, he needs an ajspec file.
 
