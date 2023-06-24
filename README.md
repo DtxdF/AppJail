@@ -1409,6 +1409,8 @@ Or to remove a bunch of logs in a single command:
 appjail logs remove jails/jpriv
 ```
 
+**WARNING**: When using ZFS as the backend file system `appjail logs remove` will recursively remove all datasets including all references, such as clones. Be careful.
+
 `appjail logs tail` can be used to display the last part of a file.
 
 ```sh
@@ -4551,6 +4553,8 @@ If we no longer want an image, we can simply remove it using `appjail image remo
 NAME
 gonic
 ```
+
+**WARNING**: When using ZFS as the backend file system `appjail image remove` will recursively remove all datasets including all references, such as clones. Be careful.
 
 But what happens when we want to remove a specific tag?
 
