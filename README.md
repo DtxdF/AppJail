@@ -3125,6 +3125,28 @@ Let's suppose we finish developing our python application and we don't need the 
 
 We can use only the first characters as ID to write less, but if two or more Makejails match, it is necessary to write more characters to make the ID unique.
 
+Makejails are automatically updated by default since the value of `AUTO_GIT_UPDATE` is `1`, but we can manually update a Makejail using `appjail makejail -u`.
+
+```
+# appjail makejail -l
+ID                                                                URL
+157981f0000f21eaaaac1feae20bf89370a060d89dff4e301806ae708ee21358  https://github.com/AppJail-makejails/go
+1682ec25677094ddd737a4f8da60e9d3b0be35535921653d55fa04f532e6be65  https://github.com/AppJail-makejails/nginx
+1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c  https://github.com/AppJail-makejails/hello
+5981af7fe1ecbcbd9421e0e697af0722c50dbca51efd4c7dfb58545eafbb6f90  https://github.com/AppJail-makejails/hello-world
+64d3082bab0f936c42b54ed444246567c58d528db0bb8606efc0680ef7856aaf  https://github.com/AppJail-makejails/python
+b9188b2095948e43c91ab26a753a7feb10e456d7e5fa15be65d2d9466b90623e  https://github.com/AppJail-makejails/debian
+ce6281c4df1de63f37ca6fe890fb4c97bc0bc1d3bd393dd26760aedfde132df6  https://github.com/AppJail-makejails/lxde
+# appjail makejail -u 1
+[00:00:00] [ info  ] [157981f0000f21eaaaac1feae20bf89370a060d89dff4e301806ae708ee21358] Updating (url = https://github.com/AppJail-makejails/go) ...
+[00:00:00] [ info  ] [157981f0000f21eaaaac1feae20bf89370a060d89dff4e301806ae708ee21358] Already up to date.
+[00:00:01] [ info  ] [1682ec25677094ddd737a4f8da60e9d3b0be35535921653d55fa04f532e6be65] Updating (url = https://github.com/AppJail-makejails/nginx) ...
+[00:00:01] [ info  ] [1682ec25677094ddd737a4f8da60e9d3b0be35535921653d55fa04f532e6be65] Already up to date.
+[00:00:01] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Updating (url = https://github.com/AppJail-makejails/hello) ...
+[00:00:02] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Updated.
+[00:00:02] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Done.
+```
+
 ### Empty jails
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.
