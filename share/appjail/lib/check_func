@@ -158,7 +158,7 @@ lib_check_tagname()
 		lib_err ${EX_USAGE} "usage: lib_check_tagname tagname"
 	fi
 
-	if _lib_check_humanname "${tagname}"; then
+	if printf "%s" "${tagname}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9._-]*$'; then
 		return 0
 	else
 		return 1

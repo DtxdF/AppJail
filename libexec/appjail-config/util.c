@@ -271,6 +271,7 @@ bool
 test_param(int c)
 {
     switch ((unsigned char)c) {
+    case '-':
     case '_':
     case '.':
         return true;
