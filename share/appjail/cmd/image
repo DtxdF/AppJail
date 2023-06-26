@@ -168,6 +168,12 @@ image_export()
 	
 	ajspec_keys="name timestamp sum size"
 
+	lib_debug "Setting (ajspec): tags: ${tag}"
+	image_metadata_set -f -- "${ajspec}" tags+="${tag}"
+
+	lib_debug "Setting (ajspec): ${tag}.arch: ${arch}"
+	image_metadata_set -ft "${tag}" -- "${ajspec}" arch+="${arch}"
+
 	for ajspec_key in ${ajspec_keys}; do
 		case "${ajspec_key}" in
 			name)
@@ -1003,7 +1009,7 @@ image_metadata_del()
 	local arch=
 
 	case "${keyword}" in
-		name|timestamp|timestamp:human|maintainer|comment|url|description|entrypoint|ajspec)
+		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
 			;;
 		sum:*|source:*|size:*)
 			local arch=`lib_jailparam_value "${keyword}" :`
@@ -1051,6 +1057,12 @@ image_metadata_del()
 			;;
 		source:*)
 			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.source.${arch}
+			;;
+		arch)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.arch
+			;;
+		tags)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP tags
 			;;
 		size:*)
 			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.size.${arch}
@@ -1246,13 +1258,13 @@ image_metadata_get()
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.sum.${arch}
 			;;
 		arch)
-			_image_get_arch "${ajspec}"
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -VpP ${tag}.arch | sort | uniq
 			;;
 		source:*)
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -VpP ${tag}.source.${arch}
 			;;
 		tags)
-			_image_get_tag "${ajspec}"
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -VpP tags | sort | uniq
 			;;
 		size:*)
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.size.${arch}
@@ -1281,8 +1293,7 @@ image_metadata_info()
 			continue
 		fi
 
-		tags=`image_metadata_get -- "${image_name}" tags`
-		build_on=`image_metadata_get -- "${image_name}" arch`
+		tags=`image_metadata_get -i -- "${image_name}" tags`
 
 		output=`lib_generate_tempfile` || exit $?
 		escape_output=`lib_escape_string "${output}"`
@@ -1314,6 +1325,7 @@ image_metadata_info()
 				echo "Comment         :    ${comment}"
 			fi
 
+			build_on=`image_metadata_get -it "${tag}" -- "${image_name}" arch`
 			if ! lib_check_empty "${build_on}"; then
 				echo "Build on        :"
 				for arch in ${build_on}; do
@@ -1381,26 +1393,6 @@ image_metadata_info()
 
 		cat -- "${output}" && rm -f "${output}"
 	done
-}
-
-_image_get_tag()
-{
-	local ajspec="$1"
-	if [ -z "${ajspec}" ]; then
-		lib_err ${EX_USAGE} "usage: _image_get_tag ajspec"
-	fi
-
-	lib_ajconf getAll -t "${ajspec}" | sed -Ee 's/(^[a-zA-Z0-9_][a-zA-Z0-9_-]*)\..+/\1/' | sort | uniq
-}
-
-_image_get_arch()
-{
-	local ajspec="$1"
-	if [ -z "${ajspec}" ]; then
-		lib_err ${EX_USAGE} "usage: _image_get_arch ajspec"
-	fi
-
-	lib_ajconf getAll -t "${ajspec}" | grep -oEe '^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.[a-zA-Z0-9]+\.[a-zA-Z0-9]+' | sed -Ee 's/^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.[a-zA-Z0-9]+\.([a-zA-Z0-9]+)$/\1/' | sort | uniq
 }
 
 image_metadata_set()
@@ -1493,7 +1485,7 @@ image_metadata_set()
 	local arch=
 
 	case "${keyword}" in
-		name|timestamp|timestamp:human|maintainer|comment|url|description|entrypoint|ajspec)
+		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
 			;;
 		sum:*|source:*|size:*)
 			local arch=`lib_jailparam_value "${keyword}" :`
@@ -1516,7 +1508,7 @@ image_metadata_set()
 	if [ ${opt_append} -eq 1 ]; then
 		# Check if the parameter is valid append parameter.
 		case "${keyword}" in
-			maintainer|description|source:*)
+			maintainer|description|source:*|arch|tags)
 				;;
 			*)
 				lib_err ${EX_DATAERR} "The keyword \`${keyword}\` is not a valid append parameter."
@@ -1560,6 +1552,16 @@ image_metadata_set()
 				lib_err ${EX_DATAERR} -- "${value}: invalid size."
 			fi
 			;;
+		arch)
+			if ! lib_check_arch "${value}"; then
+				lib_err ${EX_DATAERR} -- "${value}: invalid architecture."
+			fi
+			;;
+		tags)
+			if ! lib_check_tagname "${value}"; then
+				lib_err ${EX_DATAERR} "Invalid tag \"${value}\""
+			fi
+			;;
 	esac
 
 	case "${keyword}" in
@@ -1586,6 +1588,38 @@ image_metadata_set()
 			;;
 		source:*)
 			lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.source.${arch}="${escape_value}"
+			;;
+		arch)
+			local build_on
+			build_on=`image_metadata_get -fit "${tag}" -- "${ajspec}" arch` || exit $?
+
+			local tocmp append=1
+			for tocmp in ${build_on}; do
+				if [ "${tocmp}" = "${value}" ]; then
+					append=0
+					break
+				fi
+			done
+
+			if [ ${append} -eq 1 ]; then
+				lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.arch="${value}"
+			fi
+			;;
+		tags)
+			local tags
+			tags=`image_metadata_get -fi -- "${ajspec}" tags` || exit $?
+
+			local tocmp append=1
+			for tocmp in ${tags}; do
+				if [ "${tocmp}" = "${value}" ]; then
+					append=0
+					break
+				fi
+			done
+
+			if [ ${append} -eq 1 ]; then
+				lib_ajconf set -t "${ajspec}" ${append_arg} -V tags="${value}"
+			fi
 			;;
 		size:*)
 			lib_ajconf set -t "${ajspec}" -V ${tag}.size.${arch}="${value}"
@@ -1829,7 +1863,9 @@ Options for metadata del and metadata get:
 Keywords for metadata del, metadata get and metadata set:
     You have to replace \`<arch>\` with the given architecture.
 
+    arch                      -- Image architectures.
     name                      -- Image name.
+    tags                      -- Image tags.
     timestamp                 -- Timestamp.
     maintainer                -- Image's maintainer(s).
     comment                   -- One-line description.
@@ -1843,8 +1879,6 @@ Keywords for metadata del, metadata get and metadata set:
 
 Keywords for metadata get:
     timestamp:human           -- Display \`timestamp\` in a human-readable form.
-    arch                      -- Image architectures.
-    tags                      -- Image tags.
 EOF
 }
 
