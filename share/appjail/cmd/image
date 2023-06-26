@@ -1348,11 +1348,13 @@ image_metadata_info()
 						echo "  - SIZE = ${size}"
 					fi
 
-					echo "Source          :    ${arch}"
-
-					image_metadata_get -it "${tag}" -- "${image_name}" source:${arch} | while IFS= read -r source; do
-						echo "  - ${source}"
-					done
+					sources=`image_metadata_get -it "${tag}" -- "${image_name}" source:${arch}`
+					if ! lib_check_empty "${sources}"; then
+						echo "Source          :    ${arch}"
+						printf "%s\n" "${sources}" | while IFS= read -r source; do
+							echo "  - ${source}"
+						done
+					fi
 
 					if [ -f "${imagedir}/.done-${tag}-${arch}-${IMAGE_DEFAULT_NAME}" ]; then
 						has_any=1
