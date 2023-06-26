@@ -4356,6 +4356,8 @@ A valid ajspec file has the following parameters:
 * `<tag>.size.<arch>`
 * `<tag>.entrypoint`
 * `<tag>.ajspec`
+* `<tag>.arch`
+* `tags`
 
 See `appjail image` for more details.
 
@@ -4437,20 +4439,23 @@ After understanding the ajspec file, we can proceed smoothly with the creation o
 [00:00:01] [ info  ] [webapp] Exporting webapp ...
 [00:00:01] [ debug ] [webapp] Generating /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail ...
 [00:00:02] [ info  ] [webapp] Done.
-[00:00:02] [ debug ] [webapp] Setting (ajspec): py.name: "webapp"
-[00:00:02] [ debug ] [webapp] Setting (ajspec): py.timestamp: 1686817856
-[00:00:02] [ debug ] [webapp] Setting (ajspec): py.sum.amd64: d0c295468755b3989d983ef51351e73e949242591c0ff3aeb76329fab9f5cc91
-[00:00:02] [ debug ] [webapp] Setting (ajspec): py.size.amd64: 847895
-[00:00:02] [ info  ] [webapp] Saved as /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
+[00:00:02] [ debug ] [webapp] Setting (ajspec): tags: py
+[00:00:02] [ debug ] [webapp] Setting (ajspec): py.arch: amd64
+[00:00:03] [ debug ] [webapp] Setting (ajspec): py.name: "webapp"
+[00:00:03] [ debug ] [webapp] Setting (ajspec): py.timestamp: 1687814074
+[00:00:03] [ debug ] [webapp] Setting (ajspec): py.sum.amd64: 7317ab3cb8bb03b48b1df7187b032dc7a99b5cb4b2a500eac88a0e1c4603ffc6
+[00:00:03] [ debug ] [webapp] Setting (ajspec): py.size.amd64: 847852
+[00:00:03] [ info  ] [webapp] Saved as /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
 # appjail image metadata info webapp
 Name            :    webapp (py)
-Timestamp       :    Thu Jun 15 04:30:56 2023
+Timestamp       :    Mon Jun 26 17:14:34 2023
 Build on        :
   - amd64
 Image           :    amd64
-  - SHA256 = d0c295468755b3989d983ef51351e73e949242591c0ff3aeb76329fab9f5cc91
-  - SIZE = 847895
-Source          :    amd64
+  - SHA256 = 7317ab3cb8bb03b48b1df7187b032dc7a99b5cb4b2a500eac88a0e1c4603ffc6
+  - SIZE = 847852
+Installed       :
+  - /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
 ```
 
 After exporting a jail as an image we will probably want to make it public. You need to put the ajspec in a safe place that ensures it is only handled by trusted people and you can put the image anywhere, but it is advisable to put it in a safe place if you can. Remember that AppJail when importing an image will check the checksum to see if they match, so the ajspec file must be in a safe place.
