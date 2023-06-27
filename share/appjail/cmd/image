@@ -1892,7 +1892,7 @@ image_usage()
 usage: image export [-f] [-c compress] [-n name] [-t tag] jail
        image get [-eHIpt] image
        image import [-f] [-a arch] [-N ajspec_name] [-n name] [-t tag] [method+]path
-       image jail [-a arch] [-i image] [-t tag] jail [options ...]
+       image jail [-a arch] [-t tag] -i image jail [options ...]
        image list [-eHIpt] [-i image] [keyword ...]
        image remove [-a arch] [-t tag] image
        image update [image]
