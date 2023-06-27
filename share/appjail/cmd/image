@@ -1836,6 +1836,9 @@ Options for export, import, jail, metadata del, metadata get, metadata set and r
 Options for import, jail, remove:
     -a arch                   -- Operate in this architecture. Default: ${IMAGE_ARCH}
 
+Options for jail:
+    -i image                  -- Use this image to create the jail.
+
 Options for export and import:
     -f                        -- Overwrites the image. When the -f is not used, on export AppJail will complain when the
                                  image has been previously saved successfully. On import AppJail will not complain but
