@@ -1234,7 +1234,8 @@ image_metadata_get()
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.timestamp.${arch}
 			;;
 		timestamp-human:*)
-			local timestamp=`image_metadata_get ${file_arg} -t "${tag}" -- "${target}" timestamp:${arch}` || exit $?
+			local timestamp
+			timestamp=`image_metadata_get ${ignore_arg} ${file_arg} -t "${tag}" -- "${target}" timestamp:${arch}` || exit $?
 
 			date -r${timestamp} +"%c"
 			;;
