@@ -4533,6 +4533,8 @@ Source          :    amd64
   - https://anonget.onrender.com/N9t6U0x1z5/gonic_minimal_amd64_image_appjail
 Installed       :
   - /usr/local/appjail/cache/images/gonic/minimal-amd64-image.appjail
+Entrypoint      :    gh+AppJail-makejails/gonic
+AJSPEC          :    .ajspec
 Name            :    hello (latest)
 Build on        :
   - amd64
