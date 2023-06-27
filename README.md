@@ -4349,7 +4349,7 @@ The following table shows detailed information about ajspec parameters. The `Opt
 | --- | --- | --- | --- |
 | `<tag>.name` | Yes | No | Image name. Although it is optional it is highly recommended to have it set as it is not, the user will have to specify one when importing. |
 | `<tag>.timestamp.<arch>` | No | No | Timestamp specifiying when the image was last updated. |
-| `<tag>.maintainer` | Yes | Yes | In charge of maintaing the image and everything related to it. |
+| `<tag>.maintainer` | Yes | Yes | In charge of maintaining the image and everything related to it. |
 | `<tag>.comment` | Yes | No | One-line description |
 | `<tag>.url` | Yes | No | Home page project or a website that provides more information about the image for the specific tag |
 | `<tag>.description` | Yes | Yes | Long description. |
