@@ -44,6 +44,7 @@ Contribute your Makejail: https://github.com/AppJail-makejails
 * Table interface - many commands have a table-like interface, which is very familiar to many sysadmin tools.
 * No databases - each configuration is separated in each entity (networks, jails, etc.) which makes maintenance much easier.
 * Healthcheckers - Monitor your jails and make sure they are healthy!
+* Images - Your jail in a single file!
 * ...
 
 ## Installation
