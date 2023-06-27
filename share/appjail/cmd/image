@@ -180,6 +180,7 @@ image_export()
 				ajspec_value="\"${name}\""
 				;;
 			timestamp)
+				ajspec_key="timestamp.${arch}"
 				ajspec_value=`date +"%s"`
 				;;
 			sum)
@@ -399,7 +400,7 @@ image_import()
 		lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
 	fi
 
-	if ! _image_chkarch "${arch}" "${ajspec_file}"; then
+	if ! _image_chkarch "${arch}" "${tag}" "${ajspec_file}"; then
 		lib_err ${EX_NOINPUT} "Cannot find architecture \`${arch}\`"
 	fi
 
@@ -446,18 +447,18 @@ image_import()
 
 	local current_timestamp=
 	if [ -f "${current_ajspec}" ]; then
-		current_timestamp=`image_metadata_get -fit "${tag}" -- "${current_ajspec}" timestamp`
+		current_timestamp=`image_metadata_get -fit "${tag}" -- "${current_ajspec}" timestamp:${arch}`
 	fi
 
 	local timestamp
-	timestamp=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" timestamp`
+	timestamp=`image_metadata_get -fit "${tag}" -- "${ajspec_file}" timestamp:${arch}`
 
 	local timestamp_mismatch
 	if lib_check_empty "${timestamp}" || ! lib_check_number "${timestamp}"; then
 		timestamp=`date +"%s"`
 
 		lib_warn "Timestamp is not defined. New timestamp: ${timestamp}"
-		image_metadata_set -ft "${tag}" -- "${ajspec_file}" timestamp="${timestamp}" || exit $?
+		image_metadata_set -ft "${tag}" -- "${ajspec_file}" timestamp:${arch}="${timestamp}" || exit $?
 
 		timestamp_mismatch=1
 	elif lib_check_empty "${current_timestamp}" || ! lib_check_number "${current_timestamp}"; then
@@ -570,13 +571,13 @@ _image_chktag()
 
 _image_chkarch()
 {
-	local arch2chk="$1" ajspec_file="$2"
-	if [ -z "${arch2chk}" -o -z "${ajspec_file}" ]; then
-		lib_err ${EX_USAGE} "usage: _image_chkarch arch2chk ajspec_file"
+	local arch2chk="$1" tag="$2" ajspec_file="$3"
+	if [ -z "${arch2chk}" -o -z "${tag}" -o -z "${ajspec_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _image_chkarch arch2chk tag ajspec_file"
 	fi
 
 	local arch
-	for arch in `image_metadata_get -fi -- "${ajspec_file}" arch`; do
+	for arch in `image_metadata_get -fit "${tag}" -- "${ajspec_file}" arch`; do
 		if [ "${arch}" = "${arch2chk}" ]; then
 			return 0
 		fi
@@ -1009,9 +1010,9 @@ image_metadata_del()
 	local arch=
 
 	case "${keyword}" in
-		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
+		name|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
 			;;
-		sum:*|source:*|size:*)
+		sum:*|source:*|size:*|timestamp:*)
 			local arch=`lib_jailparam_value "${keyword}" :`
 			if lib_check_empty "${arch}"; then
 				image_usage
@@ -1037,8 +1038,8 @@ image_metadata_del()
 		name)
 			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.name
 			;;
-		timestamp)
-			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.timestamp
+		timestamp:*)
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.timestamp.${arch}
 			;;
 		maintainer)
 			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.maintainer
@@ -1196,9 +1197,9 @@ image_metadata_get()
 	local arch=
 
 	case "${keyword}" in
-		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
+		name|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
 			;;
-		sum:*|source:*|size:*)
+		timestamp:*|timestamp-human:*|sum:*|source:*|size:*)
 			local arch=`lib_jailparam_value "${keyword}" :`
 			if lib_check_empty "${arch}"; then
 				image_usage
@@ -1229,11 +1230,11 @@ image_metadata_get()
 		name)
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.name
 			;;
-		timestamp)
-			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.timestamp
+		timestamp:*)
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.timestamp.${arch}
 			;;
-		timestamp:human)
-			local timestamp=`image_metadata_get ${file_arg} -t "${tag}" -- "${target}" timestamp` || exit $?
+		timestamp-human:*)
+			local timestamp=`image_metadata_get ${file_arg} -t "${tag}" -- "${target}" timestamp:${arch}` || exit $?
 
 			date -r${timestamp} +"%c"
 			;;
@@ -1306,12 +1307,6 @@ image_metadata_info()
 				echo "Name            :    ${name} (${tag})"
 			fi
 
-			timestamp_human=`image_metadata_get -it "${tag}" -- "${image_name}" timestamp:human`
-			if ! lib_check_empty "${timestamp_human}"; then
-
-				echo "Timestamp       :    ${timestamp_human}"
-			fi
-
 			maintainers=`image_metadata_get -it "${tag}" -- "${image_name}" maintainer`
 			if ! lib_check_empty "${maintainers}"; then
 				echo "Maintainer(s)   :"
@@ -1346,6 +1341,11 @@ image_metadata_info()
 					size=`image_metadata_get -it "${tag}" -- "${image_name}" size:${arch}`
 					if ! lib_check_empty "${size}"; then
 						echo "  - SIZE = ${size}"
+					fi
+
+					timestamp_human=`image_metadata_get -it "${tag}" -- "${image_name}" timestamp-human:${arch}`
+					if ! lib_check_empty "${timestamp_human}"; then
+						echo "  - TIMESTAMP = ${timestamp_human}"
 					fi
 
 					sources=`image_metadata_get -it "${tag}" -- "${image_name}" source:${arch}`
@@ -1487,9 +1487,9 @@ image_metadata_set()
 	local arch=
 
 	case "${keyword}" in
-		name|timestamp|timestamp:human|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
+		name|maintainer|comment|url|description|arch|tags|entrypoint|ajspec)
 			;;
-		sum:*|source:*|size:*)
+		sum:*|source:*|size:*|timestamp:*)
 			local arch=`lib_jailparam_value "${keyword}" :`
 			if lib_check_empty "${arch}"; then
 				image_usage
@@ -1540,10 +1540,6 @@ image_metadata_set()
 			fi
 			escape_value="\"${escape_value}\""
 			;;
-		maintainer|comment|url|source:*|entrypoint|ajspec)
-			escape_value=`lib_escape_string "${value}" "" '\"' "-"`
-			escape_value="\"${escape_value}\""
-			;;
 		sum:*)
 			if ! lib_check_sum "${value}"; then
 				lib_err ${EX_DATAERR} -- "${value}: invalid checksum."
@@ -1564,14 +1560,23 @@ image_metadata_set()
 				lib_err ${EX_DATAERR} "Invalid tag \"${value}\""
 			fi
 			;;
+		timestamp:*)
+			if ! lib_check_number "${value}"; then
+				lib_err ${EX_DATAERR} -- "${value}: invalid timestamp."
+			fi
+			;;
+		*)
+			escape_value=`lib_escape_string "${value}" "" '\"' "-"`
+			escape_value="\"${escape_value}\""
+			;;
 	esac
 
 	case "${keyword}" in
 		name)
 			lib_ajconf set -t "${ajspec}" -V ${tag}.name="${escape_value}"
 			;;
-		timestamp)
-			lib_ajconf set -t "${ajspec}" -V ${tag}.timestamp="${escape_value}"
+		timestamp:*)
+			lib_ajconf set -t "${ajspec}" -V ${tag}.timestamp.${arch}="${value}"
 			;;
 		maintainer)
 			lib_ajconf set -t "${ajspec}" ${append_arg} -V ${tag}.maintainer="${escape_value}"
@@ -1717,11 +1722,6 @@ image_update()
 			continue
 		fi
 
-		build_on=`image_metadata_get -- "${image_name}" arch`
-		if lib_check_empty "${build_on}"; then
-			continue
-		fi
-
 		rootdir="${IMAGESDIR}/${image_name}"
 
 		for tag in ${tags}; do
@@ -1736,6 +1736,7 @@ image_update()
 				ajspec="${IMAGE_DEFAULT_AJSPEC}"
 			fi
 
+			build_on=`image_metadata_get -it "${tag}" -- "${image_name}" arch`
 			for arch in ${build_on}; do
 				image_filename="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
 				image_file="${rootdir}/${image_filename}"
@@ -1868,7 +1869,7 @@ Keywords for metadata del, metadata get and metadata set:
     arch                      -- Image architectures.
     name                      -- Image name.
     tags                      -- Image tags.
-    timestamp                 -- Timestamp.
+    timestamp:<arch>          -- Timestamp.
     maintainer                -- Image's maintainer(s).
     comment                   -- One-line description.
     url                       -- Home page.
@@ -1880,7 +1881,7 @@ Keywords for metadata del, metadata get and metadata set:
     ajspec                    -- ajspec filename.
 
 Keywords for metadata get:
-    timestamp:human           -- Display \`timestamp\` in a human-readable form.
+    timestamp-human:<arch>           -- Display \`timestamp\` in a human-readable form.
 EOF
 }
 
