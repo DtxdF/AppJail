@@ -340,7 +340,7 @@ image_import()
 {
 	local _o
 	local opt_force=0
-	local arch="${IMAGE_ARCH}"
+	local arch="host"
 	local ajspec_name="${IMAGE_DEFAULT_AJSPEC}"
 	local name=
 	local tag="${IMAGE_TAG}"
@@ -394,6 +394,10 @@ image_import()
 
 	if ! _image_chktag "${tag}" "${ajspec_file}"; then
 		lib_err ${EX_NOINPUT} "Cannot find tag \`${tag}\`"
+	fi
+
+	if [ "${arch}" = "host" ]; then
+		arch="${IMAGE_ARCH}"
 	fi
 
 	if ! lib_check_arch "${arch}"; then
@@ -752,7 +756,7 @@ _image_getajspec_gitlab_ssh()
 image_jail()
 {
 	local _o
-	local arch="${IMAGE_ARCH}"
+	local arch="host"
 	local image=
 	local tag="${IMAGE_TAG}"
 
@@ -797,6 +801,10 @@ image_jail()
 
 	if ! lib_check_tagname "${tag}"; then
 		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+	fi
+
+	if [ "${arch}" = "host" ]; then
+		arch="${IMAGE_ARCH}"
 	fi
 
 	if ! lib_check_arch "${arch}"; then
@@ -1834,7 +1842,8 @@ Options for export, import, jail, metadata del, metadata get, metadata set and r
     -t tag                    -- Operate in this tag. Default: ${IMAGE_TAG}
 
 Options for import, jail:
-    -a arch                   -- Operate in this architecture. Default: ${IMAGE_ARCH}
+    -a arch                   -- Operate in this architecture. If \`arch\` is \`host\`, \`${IMAGE_ARCH}\` will be
+                                 used. Default: host
 
 Options for remove:
     -a arch                   -- Operate in this architecture.
