@@ -4494,6 +4494,8 @@ webapp
 ...
 ```
 
+**Note**: When retrieving an ajspec file on import, it will overwrite the current ajspec file.
+
 AppJail can update images for you. You just need to use `appjail image update`.
 
 ```
