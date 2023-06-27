@@ -1882,7 +1882,7 @@ Keywords for metadata del, metadata get and metadata set:
     ajspec                    -- ajspec filename.
 
 Keywords for metadata get:
-    timestamp-human:<arch>           -- Display \`timestamp\` in a human-readable form.
+    timestamp-human:<arch>    -- Display \`timestamp\` in a human-readable form.
 EOF
 }
 
