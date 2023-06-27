@@ -1833,8 +1833,11 @@ Methods for import:
 Options for export, import, jail, metadata del, metadata get, metadata set and remove:
     -t tag                    -- Operate in this tag. Default: ${IMAGE_TAG}
 
-Options for import, jail, remove:
+Options for import, jail:
     -a arch                   -- Operate in this architecture. Default: ${IMAGE_ARCH}
+
+Options for remove:
+    -a arch                   -- Operate in this architecture.
 
 Options for jail:
     -i image                  -- Use this image to create the jail.
