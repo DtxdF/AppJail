@@ -4341,25 +4341,27 @@ Suppose we are writing an application that depending on the installed dependenci
 
 ### AJSPEC
 
-An ajspec file provides information about the image, such as the checksum, the site where the image will be downloaded, etc. The syntax of the ajspec file is the same as used in templates, but internally there are some things that have a special meaning, such as `<tag>` and `<arch>`. `<tag>` is the tag and is used to identify the variant of the image. An image can have more than one tag. `<arch>` is the architecture of the image, since the image can be valid for a lot of platforms.
+An ajspec file provides information about the image, such as the checksum, the site where the image will be downloaded, etc. The syntax of the ajspec file is the same as used in templates.
 
-A valid ajspec file has the following parameters:
+The following table shows detailed information about ajspec parameters. The `Optional` column specifies whether a parameter is mandatory or not for some commands such as `appjail image update` and `appjail image import`. The `Multiple` column specifies whether a parameter can be specified multiple times or not.
 
-* `<tag>.name`
-* `<tag>.timestamp`
-* `<tag>.maintainer`
-* `<tag>.comment`
-* `<tag>.url`
-* `<tag>.description`
-* `<tag>.sum.<arch>`
-* `<tag>.source.<arch>`
-* `<tag>.size.<arch>`
-* `<tag>.entrypoint`
-* `<tag>.ajspec`
-* `<tag>.arch`
-* `tags`
+| Parameter | Optional | Multiple | Description  |
+| --- | --- | --- | --- |
+| `<tag>.name` | Yes | No | Image name. Although it is optional it is highly recommended to have it set as it is not, the user will have to specify one when importing. |
+| `<tag>.timestamp.<arch>` | No | No | Timestamp specifiying when the image was last updated. |
+| `<tag>.maintainer` | Yes | Yes | In charge of maintaing the image and everything related to it. |
+| `<tag>.comment` | Yes | No | One-line description |
+| `<tag>.url` | Yes | No | Home page project or a website that provides more information about the image for the specific tag |
+| `<tag>.description` | Yes | Yes | Long description. |
+| `<tag>.sum.<arch>` | No | No | Checksum. |
+| `<tag>.source.<arch>` | No | Yes | Sites where the image will be downloaded. If the first one fails, AppJail will try the second one and if it fails, AppJail will try the third one, and so on. |
+| `<tag>.size.<arch>` | Yes | No | Compressed image size. |
+| `<tag>.entrypoint` | No | No | It is used by `appjail image update` to retrieve the ajspec when `appjail image import` is called and set by the latter. |
+| `<tag>.ajspec` | Yes | No | Ajspec filename used by git-like methods. |
+| `<tag>.arch` | No | Yes | Architectures allowed by this image. |
+| `tags` | No | Yes | Image tags. |
 
-See `appjail image` for more details.
+As you can see there are some things to talk about, such as `<tag>` and `<arch>`. `<tag>` specifies the image tag and `<arch>` the image architecture. It is important to remember to add the image tag to `tags` and the image architecture to `<tag>.arch` for AppJail recognize them. See `appjail image` for more details.
 
 You probably won't need to manipulate an ajspec file many times, especially if you only want to use the image, but for when you need to edit it, `appjail image metadata` if your best friend.
 
@@ -4368,7 +4370,6 @@ Before editing, it is worth looking at what we need to edit.
 ```
 # appjail image metadata info nginx
 Name            :    nginx (132)
-Timestamp       :    Tue Jun 13 20:05:19 2023
 Maintainer(s)   :
   - Francis Ford Coppola <fcoppola@example.org>
   - Quentin Tarantino <qtarantino@example.org>
@@ -4377,13 +4378,12 @@ Build on        :
 Image           :    amd64
   - SHA256 = 481f09014b94433430efb2f0da52c7bdd2cc4e9b478ac9336b06710dab9d2ea5
   - SIZE = 27360
+  - TIMESTAMP = Tue Jun 13 20:05:19 2023
 Source          :    amd64
   - http://192.168.1.105:8080/AppJail-images/nginx/132-amd64-image.appjail
 Entrypoint      :    gh+DtxdF/nginx-image
 AJSPEC          :    .ajspec
 ```
-
-The `nginx` image has useful information. `appjail image metadata info` will show information for all tags, so since it only shows one, the `nginx` image only has one tag. In this case it is `132`. `Timestamp` specifies when the image was last updated. `Maintainer(s)` provides information on who is responsible for fixing problems and improving the image. This image was built in `amd64` and the checksum and size are also provided. `Source` are the sites where the image will be downloaded. You can specify many `Sources` and AppJail will try to download the image for the first site, if it fails, it tries the second and so on. `Entrypoint` is what we use in the `appjail image import` command to retrieve the ajspec file. `AJSPEC` is the name of the ajspec file but it is only used by git and git-like methods.
 
 This image is descriptive, but a description and perhaps other data are very important, such as the home page and a one-line description.
 
@@ -4400,7 +4400,6 @@ reuse, SSL offload and HTTP media streaming.
 EOF
 # appjail image metadata info nginx
 Name            :    nginx (132)
-Timestamp       :    Tue Jun 13 20:05:19 2023
 Maintainer(s)   :
   - Francis Ford Coppola <fcoppola@example.org>
   - Quentin Tarantino <qtarantino@example.org>
@@ -4410,6 +4409,7 @@ Build on        :
 Image           :    amd64
   - SHA256 = 481f09014b94433430efb2f0da52c7bdd2cc4e9b478ac9336b06710dab9d2ea5
   - SIZE = 27976978
+  - TIMESTAMP = Tue Jun 13 20:05:19 2023
 Source          :    amd64
   - http://localhost:8080/132-amd64-image.appjail
 WWW             :    https://nginx.org/
@@ -4426,7 +4426,7 @@ reuse, SSL offload and HTTP media streaming.
 
 ### Getting started with Images
 
-After understanding the ajspec file, we can proceed smoothly with the creation of the image. To create a jail we first need an existing jail, then we can make changes to custumize it, stop the jail and finally export it. A very important step that will probably be necessary after stopping the jail and before exporting it is to remove sensitive data such as private keys and/or non-portable files like `/etc/rc.conf`. Of course, removing `/etc/rc.conf` is unnecessary when we know the non-portable parameters that can affect the jail when it is installed on the target (e.g.: `defaultrouter`).
+After understanding the ajspec file, we can proceed smoothly with the creation of the image. To create an image we first need an existing jail, then we can make changes to custumize it, stop the jail and finally export it. A very important step that will probably be necessary after stopping the jail and before exporting it is to remove sensitive data such as private keys and/or non-portable files like `/etc/rc.conf`. Of course, removing `/etc/rc.conf` is unnecessary when we know the non-portable parameters that can affect the jail when it is installed on the target (e.g.: `defaultrouter`).
 
 ```
 # appjail quick webapp virtualnet=":webapp default" nat start overwrite
@@ -4448,12 +4448,12 @@ After understanding the ajspec file, we can proceed smoothly with the creation o
 [00:00:03] [ info  ] [webapp] Saved as /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
 # appjail image metadata info webapp
 Name            :    webapp (py)
-Timestamp       :    Mon Jun 26 17:14:34 2023
 Build on        :
   - amd64
 Image           :    amd64
   - SHA256 = 7317ab3cb8bb03b48b1df7187b032dc7a99b5cb4b2a500eac88a0e1c4603ffc6
   - SIZE = 847852
+  - Timestamp = Mon Jun 26 17:14:34 2023
 Installed       :
   - /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
 ```
@@ -4510,7 +4510,6 @@ As we have mentioned `appjail image metadata info` is the command to get informa
 ```
 appjail image metadata info
 Name            :    gonic (latest)
-Timestamp       :    Wed Jun 21 17:21:34 2023
 Build on        :
   - amd64
 Image           :    amd64
@@ -4526,6 +4525,7 @@ Build on        :
 Image           :    amd64
   - SHA256 = b3179c173ea9cf0170303ad0b3efc443038edc8f3b8a91b8ec6f2f80603abae3
   - SIZE = 12404300
+  - TIMESTAMP = Wed Jun 21 17:21:34 2023
 Source          :    amd64
   - https://dtxdf.duckdns.org/N9t6U0x1z5/gonic_minimal_amd64_image_appjail
   - https://anonget.onrender.com/N9t6U0x1z5/gonic_minimal_amd64_image_appjail
@@ -4534,12 +4534,12 @@ Installed       :
 Entrypoint      :    gh+AppJail-makejails/gonic
 AJSPEC          :    .ajspec
 Name            :    hello (latest)
-Timestamp       :    Thu Jun 15 16:06:25 2023
 Build on        :
   - amd64
 Image           :    amd64
   - SHA256 = c01698b9f15204ec243153fda2df4cff11c348349c550105b7b764b0f4a0130d
   - SIZE = 457976
+  - TIMESTAMP = Thu Jun 15 16:06:25 2023
 Source          :    amd64
   - https://dl.dropboxusercontent.com/s/fac2ujzw1idl8xg/latest-amd64-image.appjail?dl=0
 Installed       :
