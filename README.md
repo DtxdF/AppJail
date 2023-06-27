@@ -4356,8 +4356,8 @@ The following table shows detailed information about ajspec parameters. The `Opt
 | `<tag>.sum.<arch>` | No | No | Checksum. |
 | `<tag>.source.<arch>` | No | Yes | Sites where the image will be downloaded. If the first one fails, AppJail will try the second one and if it fails, AppJail will try the third one, and so on. |
 | `<tag>.size.<arch>` | Yes | No | Compressed image size. |
-| `<tag>.entrypoint` | No | No | It is used by `appjail image update` to retrieve the ajspec when `appjail image import` is called and set by the latter. |
-| `<tag>.ajspec` | Yes | No | Ajspec filename used by git-like methods. |
+| `entrypoint` | No | No | It is used by `appjail image update` to retrieve the ajspec when `appjail image import` is called and set by the latter. |
+| `ajspec` | Yes | No | Ajspec filename used by git-like methods. |
 | `<tag>.arch` | No | Yes | Architectures allowed by this image. |
 | `tags` | No | Yes | Image tags. |
 
@@ -4413,8 +4413,6 @@ Image           :    amd64
 Source          :    amd64
   - http://localhost:8080/132-amd64-image.appjail
 WWW             :    https://nginx.org/
-Entrypoint      :    gh+DtxdF/nginx-image
-AJSPEC          :    .ajspec
 Description     :
 NGINX is a high performance edge web server with the lowest memory footprint
 and the key features to build modern and efficient web infrastructure.
@@ -4422,6 +4420,8 @@ and the key features to build modern and efficient web infrastructure.
 NGINX functionality includes HTTP server, HTTP and mail reverse proxy, caching,
 load balancing, compression, request throttling, connection multiplexing and
 reuse, SSL offload and HTTP media streaming.
+Entrypoint      :    gh+DtxdF/nginx-image
+AJSPEC          :    .ajspec
 ```
 
 ### Getting started with Images
@@ -4531,8 +4531,6 @@ Source          :    amd64
   - https://anonget.onrender.com/N9t6U0x1z5/gonic_minimal_amd64_image_appjail
 Installed       :
   - /usr/local/appjail/cache/images/gonic/minimal-amd64-image.appjail
-Entrypoint      :    gh+AppJail-makejails/gonic
-AJSPEC          :    .ajspec
 Name            :    hello (latest)
 Build on        :
   - amd64

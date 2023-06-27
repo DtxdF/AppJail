@@ -444,7 +444,7 @@ image_import()
 		lib_err ${EX_IOERR} "Error creating ${rootdir}"
 	fi
 
-	image_metadata_set -ft "${tag}" -- "${ajspec_file}" entrypoint="${ajspec}" || exit $?
+	image_metadata_set -f -- "${ajspec_file}" entrypoint="${ajspec}" || exit $?
 
 	local current_ajspec
 	current_ajspec="${rootdir}/${IMAGE_DEFAULT_AJSPEC}"
@@ -545,7 +545,7 @@ image_import()
 	fi
 
 	# ajspec name.
-	image_metadata_set -ft "${tag}" -- "${ajspec_file}" ajspec="${ajspec_name}" || exit $?
+	image_metadata_set -f -- "${ajspec_file}" ajspec="${ajspec_name}" || exit $?
 
 	if ! cp "${ajspec_file}" "${current_ajspec}"; then
 		lib_err ${EX_IOERR} "Error copying ${ajspec_file}"
@@ -1077,10 +1077,10 @@ image_metadata_del()
 			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.size.${arch}
 			;;
 		entrypoint)
-			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.entrypoint
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP entrypoint
 			;;
 		ajspec)
-			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ${tag}.ajspec
+			lib_ajconf del ${ignore_arg} -t "${ajspec}" -VP ajspec
 			;;
 	esac
 }
@@ -1280,10 +1280,10 @@ image_metadata_get()
 			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.size.${arch}
 			;;
 		entrypoint)
-			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.entrypoint
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V entrypoint
 			;;
 		ajspec)
-			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ${tag}.ajspec
+			lib_ajconf getColumn ${ignore_arg} -t "${ajspec}" -V ajspec
 			;;
 	esac
 }
@@ -1385,22 +1385,22 @@ image_metadata_info()
 				echo "WWW             :    ${url}"
 			fi
 
-			entrypoint=`image_metadata_get -it "${tag}" -- "${image_name}" entrypoint`
-			if ! lib_check_empty "${entrypoint}"; then
-				echo "Entrypoint      :    ${entrypoint}"
-			fi
-
-			ajspec=`image_metadata_get -it "${tag}" -- "${image_name}" ajspec`
-			if ! lib_check_empty "${ajspec}"; then
-				echo "AJSPEC          :    ${ajspec}"
-			fi
-
 			description=`image_metadata_get -it "${tag}" -- "${image_name}" description`
 			if [ -n "${description}" ]; then
 				echo "Description     :"
 				printf "%s\n" "${description}"
 			fi
 		done > "${output}"
+
+		entrypoint=`image_metadata_get -i -- "${image_name}" entrypoint`
+		if ! lib_check_empty "${entrypoint}"; then
+			echo "Entrypoint      :    ${entrypoint}" >> "${output}"
+		fi
+
+		ajspec=`image_metadata_get -i -- "${image_name}" ajspec`
+		if ! lib_check_empty "${ajspec}"; then
+			echo "AJSPEC          :    ${ajspec}" >> "${output}"
+		fi
 
 		cat -- "${output}" && rm -f "${output}"
 	done
@@ -1641,10 +1641,10 @@ image_metadata_set()
 			lib_ajconf set -t "${ajspec}" -V ${tag}.size.${arch}="${value}"
 			;;
 		entrypoint)
-			lib_ajconf set -t "${ajspec}" -V ${tag}.entrypoint="${escape_value}"
+			lib_ajconf set -t "${ajspec}" -V entrypoint="${escape_value}"
 			;;
 		ajspec)
-			lib_ajconf set -t "${ajspec}" -V ${tag}.ajspec="${escape_value}"
+			lib_ajconf set -t "${ajspec}" -V ajspec="${escape_value}"
 			;;
 	esac
 }
@@ -1734,13 +1734,13 @@ image_update()
 		rootdir="${IMAGESDIR}/${image_name}"
 
 		for tag in ${tags}; do
-			entrypoint=`image_metadata_get -it "${tag}" -- "${image_name}" entrypoint`
+			entrypoint=`image_metadata_get -i -- "${image_name}" entrypoint`
 			if lib_check_empty "${entrypoint}"; then
 				lib_debug -- "${image_name}: no entrypoint has been set. Ignoring ..."
 				continue
 			fi
 
-			ajspec=`image_metadata_get -it "${tag}" -- "${image_name}" ajspec`
+			ajspec=`image_metadata_get -i -- "${image_name}" ajspec`
 			if lib_check_empty "${ajspec}"; then
 				ajspec="${IMAGE_DEFAULT_AJSPEC}"
 			fi
