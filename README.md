@@ -4454,7 +4454,7 @@ Build on        :
 Image           :    amd64
   - SHA256 = 7317ab3cb8bb03b48b1df7187b032dc7a99b5cb4b2a500eac88a0e1c4603ffc6
   - SIZE = 847852
-  - Timestamp = Mon Jun 26 17:14:34 2023
+  - TIMESTAMP = Mon Jun 26 17:14:34 2023
 Installed       :
   - /usr/local/appjail/cache/images/webapp/py-amd64-image.appjail
 ```
@@ -4518,11 +4518,11 @@ Build on        :
 Image           :    amd64
   - SHA256 = 342ffef8f02f792d1b98f56972bd6632dd71a21ee271bebb50d20cd788eb2bde
   - SIZE = 117669148
+  - TIMESTAMP = Wed Jun 21 16:37:31 2023
 Source          :    amd64
   - https://dtxdf.duckdns.org/j1ucU8x3z6/gonic_latest_amd64_image_appjail
   - https://anonget.onrender.com/j1ucU8x3z6/gonic_latest_amd64_image_appjail
 Name            :    gonic (minimal)
-Timestamp       :    Wed Jun 21 16:37:31 2023
 Build on        :
   - amd64
 Image           :    amd64
