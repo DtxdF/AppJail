@@ -43,6 +43,7 @@ main()
 		lib_err - "usage: PKG [[--chroot | --jexec [--jail] | --local]] package ..."
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --remove package ..."
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --autoremove"
+		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --clean"
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --update"
 		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --upgrade"
 		exit ${EX_USAGE}
@@ -51,6 +52,7 @@ main()
 	# Options
 	local use_autoremove=0
 	local use_pkgchroot=0
+	local use_clean=0
 	local use_pkgjail=0
 	local use_pkgjexec=1
 	local use_pkglocal=0
@@ -80,6 +82,9 @@ main()
 				;;
 			--chroot)
 				use_pkgchroot=1
+				;;
+			--clean)
+				use_clean=1
 				;;
 			--jail)
 				use_pkgjail=1
@@ -112,7 +117,7 @@ main()
 	done
 	current_index=$((current_index-1))
 
-	local mutually_exclusive=$((use_remove+use_autoremove+use_update+use_upgrade))
+	local mutually_exclusive=$((use_clean+use_remove+use_autoremove+use_update+use_upgrade))
 	if [ ${mutually_exclusive} -ge 2 ]; then
 		main # usage
 	fi
@@ -120,7 +125,9 @@ main()
 	local pkg_args=
 	local escape_chars='`"\'
 
-	if [ ${use_remove} -eq 1 ]; then
+	if [ ${use_clean} -eq 1 ]; then
+		pkg_cmd="clean -y"
+	elif [ ${use_remove} -eq 1 ]; then
 		pkg_cmd="remove -y --"
 	elif [ ${use_autoremove} -eq 1 ]; then
 		pkg_cmd="autoremove -y"
@@ -148,8 +155,8 @@ main()
 	# command
 	printf "%s" "${pkg_prefix}"
 
-	# autoremove does not require packages.
-	if [ ${use_autoremove} -eq 0 -a ${use_update} -eq 0 -a ${use_upgrade} -eq 0 ]; then
+	# autoremove, clean, update and upgrade does not require packages.
+	if [ ${use_autoremove} -eq 0 -a ${use_clean} -eq 0 -a ${use_update} -eq 0 -a ${use_upgrade} -eq 0 ]; then
 		while [ ${current_index} -lt ${total_items} ]; do 
 			current_index=$((current_index+1))
 			local pkg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`

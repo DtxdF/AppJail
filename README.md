@@ -2190,6 +2190,7 @@ MOUNT /tmp /tmp
 PKG [[--chroot | --jexec [--jail] | --local]] package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --remove package ...
 PKG [[--chroot | --jexec [--jail] | --local]] --autoremove
+PKG [[--chroot | --jexec [--jail] | --local]] --clean
 PKG [[--chroot | --jexec [--jail] | --local]] --update
 PKG [[--chroot | --jexec [--jail] | --local]] --upgrade
 ```
@@ -2217,6 +2218,10 @@ Remove one or more packages instead of installing them.
 ##### --autoremove
 
 Remove orphan or unused packages.
+
+##### --clean
+
+Clean the local cache of fetched remote packages.
 
 ##### --update
 
