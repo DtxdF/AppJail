@@ -300,7 +300,18 @@ quick_create_jail()
 			lib_debug "Trying to remove ${QUICK_JAILNAME} ..."
 
 			appjail stop -- "${QUICK_JAILNAME}" || exit $?
-			appjail jail destroy -- "${QUICK_JAILNAME}" || exit $?
+
+			local destroy_flags=
+			case "${QUICK_OPTION_OVERWRITE}" in
+				force) destroy_flags="-f" ;;
+				recursive) destroy_flags="-R" ;;
+				force+recursive) destroy_flags="-fR" ;;
+				*) QUICK_OPTION_OVERWRITE=; destroy_flags= ;;
+			esac
+
+			lib_debug "Destroy flags: <${QUICK_OPTION_OVERWRITE}>"
+
+			appjail jail destroy ${destroy_flags} -- "${QUICK_JAILNAME}" || exit $?
 		fi
 	fi
 
@@ -3222,7 +3233,18 @@ quick_set_osarch()
 
 quick_set_overwrite()
 {
-	QUICK_OPTION_OVERWRITE=1
+	local opts="$1"
+
+	if lib_check_empty "${opts}"; then
+		QUICK_OPTION_OVERWRITE=1
+	else
+		case "${opts}" in
+			force|recursive|force+recursive) ;;
+			*) lib_err ${EX_DATAERR} "overwrite syntax: [force|recursive|force+recursive]"
+		esac
+
+		QUICK_OPTION_OVERWRITE="${opts}"
+	fi
 }
 
 quick_set_nooverwrite()
@@ -3736,9 +3758,11 @@ Options:
                              Default: ${QUICK_OPTION_OSVERSION}
                              Descr: Operating system version used by the jail.
 
-    overwrite             -- Syntax: overwrite
-                             Type: bool
-                             Descr: If the jail exists, stop it and remove it.
+    overwrite             -- Syntax: overwrite="[force|recursive|force+recursive]"
+                             Type: str
+                             Descr: If the jail exists, stop it and remove it. Use \`force\` to force the destruction of the jail,
+			            \`recursive\` to remove the jail and all references to it, use \`force+recursive\` for both.
+				    Both are ignored when using a non-ZFS file system.
 
     priority              -- Syntax: priority=priority_number
                              Type: number
