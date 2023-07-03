@@ -1410,6 +1410,12 @@ Or to remove a bunch of logs in a single command:
 appjail logs remove jails/jpriv
 ```
 
+Using the `-g` flag we can use shell glob patterns.
+
+```sh
+appjail logs remove -g 'jails/otherjail/startup-start/2023-02-0[34].log'
+```
+
 **WARNING**: When using ZFS as the backend file system `appjail logs remove` will recursively remove all datasets including all references, such as clones. Be careful.
 
 `appjail logs tail` can be used to display the last part of a file.

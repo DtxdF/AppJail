@@ -169,6 +169,22 @@ logs_read()
 
 logs_remove()
 {
+	local _o
+	local use_glob=0
+
+	while getopts ":g" _o; do
+		case "${_o}" in
+			g)
+				use_glob=1
+				;;
+			*)
+				logs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
 	local file="$1"; shift
 	if lib_check_empty "${file}"; then
 		logs_usage
@@ -219,6 +235,27 @@ logs_remove()
 		else
 			rm -rf "${LOGDIR}/${file}"
 		fi
+	elif [ ${use_glob} -eq 1 ]; then
+		local bs_file
+		bs_file=`basename -- "${file}"` || exit $?
+
+		local bs_dir
+		bs_dir=`dirname -- "${file}"` || exit $?
+
+		if [ ! -d "${LOGDIR}/${bs_dir}" ]; then
+			lib_err ${EX_NOINPUT} -- "${bs_dir}: does not exist."
+		fi
+
+		local match
+		match=`find "${LOGDIR}/${bs_dir}" -name "${bs_file}" -mindepth 1 -maxdepth 1` || exit $?
+
+		if lib_check_empty "${match}"; then
+			lib_err ${EX_NOINPUT} -- "${file}: no matches found."
+		fi
+
+		printf "%s\n" "${match}" | while IFS= read -r logfile; do
+			rm -f "${logfile}"
+		done
 	else
 		if [ ! -f "${LOGDIR}/${file}" ]; then
 			lib_err ${EX_NOINPUT} -- "${file}: does not exist."
@@ -282,6 +319,9 @@ Parameters:
     remove        -- Remove a bunch of logs or a single one.
     tail          -- Use tail(1) to display the contents of a log.
 
+Options for remove:
+    -g            -- Enable shell glob patterns. Only used by \`log\`.
+
 Options for list:
     -e            -- Don't escape tabs.
     -H            -- Don't display the columns.
@@ -294,7 +334,8 @@ logs_usage()
 	cat << EOF
 usage: logs list [-eHp] type[/entity[/subtype[/log]]]
        logs read type/entity/subtype/log [pager_args ...]
-       logs remove [all | type[/entity[/subtype[/log]]]]
+       logs remove all
+       logs remove [-g] type[/entity[/subtype[/log]]]
        logs tail type/entity/subtype/log [tail_args ...]
 EOF
 }
