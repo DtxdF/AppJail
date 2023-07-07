@@ -1783,6 +1783,8 @@ See `-v` in `appjail makejail`.
 
 See `-a` in `appjail makejail`.
 
+Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
+
 #### --arg
 
 Sets the value of a parameter to the Makejail to be executed.
@@ -1790,6 +1792,8 @@ Sets the value of a parameter to the Makejail to be executed.
 #### --before-include
 
 See `-B` in `appjail makejail`.
+
+Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
 
 #### --build-arg
 
@@ -1802,6 +1806,8 @@ See `-o` in `appjail makejail`.
 #### --file
 
 See `-f` in `appjail makejail`.
+
+Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
 
 #### --name
 
@@ -1870,6 +1876,60 @@ Use an image as the jail.
 
 ```
 FROM --entrypoint gh+DtxdF/nginx-image nginx:132
+```
+
+### GLOBAL
+
+#### Syntax
+
+```
+GLOBAL :name: [instruction [args ...]]
+```
+
+##### name
+
+Global name.
+
+##### instruction
+
+Makejail instruction and, if required, with its arguments.
+
+#### Description
+
+Create a Makejail as a temporary file that can be used by `EXEC`. The intention is to deploy multiple jails using a single Makejail.
+
+Note that since the Makejail is a temporary file, any reference to a file is relative to that directory since `INCLUDE` works this way (see `INCLUDE` for details).
+
+```
+# Correct
+GLOBAL :darkhttpd: INCLUDE gh+AppJail-makejails/darkhttpd
+GLOBAL :darkhttpd: COPY --verbose "${APPJAIL_PWD}/usr/" usr
+
+# Wrong
+GLOBAL :darkhttpd: INCLUDE gh+AppJail-makejails/darkhttpd
+GLOBAL :darkhttpd: COPY --verbose usr
+```
+
+#### Examples
+
+```
+# Local options.
+OPTION start
+OPTION overwrite=force
+
+# Global options.
+GLOBAL :network: OPTION virtualnet=:${APPJAIL_JAILNAME} default
+GLOBAL :network: OPTION nat
+
+# Web servers.
+RAW for jail in nginx darkhttpd; do
+    EXEC --after-include :network: \
+         --file gh+AppJail-makejails/${jail} \
+         --name ${jail}
+RAW done
+
+# Command executed by this jail.
+CMD echo "Done."
 ```
 
 ### INCLUDE

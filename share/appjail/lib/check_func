@@ -165,6 +165,21 @@ lib_check_tagname()
 	fi
 }
 
+lib_check_globalname()
+{
+	local globalname="$1"
+
+	if [ -z "${globalname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_globalname globalname"
+	fi
+
+	if printf "%s" "${globalname}" | grep -qEe '^:[a-zA-Z0-9_][a-zA-Z0-9_-]*:$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 lib_check_imagename()
 {
 	local imagename="$1"

@@ -96,8 +96,8 @@ main()
 				opt_verbose=1
 				;;
 			--after-include)
-				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
+				local arg=`get_global_file "${optarg}"`
+				arg=`lib_escape_string "${arg}" "" "${escape_chars}"`
 
 				after_include="${after_include} -a \"${arg}\""
 				;;
@@ -125,26 +125,25 @@ main()
 				fi
 				;;
 			--before-include)
-				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
+				local arg=`get_global_file "${optarg}"`
+				arg=`lib_escape_string "${arg}" "" "${escape_chars}"`
 
 				before_include="${before_include} -B \"${arg}\""
 				;;
 			--build-arg)
-				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
+				local arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				build_args="${options} -b \"${arg}\""
 				;;
 			--file)
 				makejail_file="${optarg}"
+				makejail_file=`get_global_file "${makejail_file}"`
 				;;
 			--name)
 				jail_name="${optarg}"
 				;;
 			--option)
-				local arg="${OPTARG}"
-				arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
+				local arg=`lib_escape_string "${optarg}" "" "${escape_chars}"`
 
 				options="${options} -o \"${arg}\""
 				;;
@@ -177,6 +176,27 @@ main()
 	fi
 
 	printf "%s\n" "\"\${APPJAIL_SCRIPT}\" makejail -c ${mk_args} ${after_include} ${before_include} ${options} ${build_args} -j \"${jail_name}\" -f \"${makejail_file}\" -- ${parameters}"
+}
+
+get_global_file()
+{
+	local file="$1"
+	if [ -z "${file}" ]; then
+		lib_err ${EX_USAGE} "usage: get_global_file file"
+	fi
+
+	if ! lib_check_globalname "${file}"; then
+		printf "%s" "${file}"
+		return 0
+	fi
+
+	local globalfile="${MAKEJAIL_TEMPDIR}/global/${file}"
+	if [ ! -f "${globalfile}" ]; then
+		printf "%s" "${file}"
+		return 0
+	fi
+
+	printf "%s" "${globalfile}"
 }
 
 main "$@"
