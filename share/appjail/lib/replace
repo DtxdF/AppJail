@@ -342,10 +342,11 @@ lib_replace()
 	fi
 
 	# Replaces
-	str=`echo "${str}" | sed -Ee "s#(^%${old}|([^%])%${old})#\2${new}#g"`
+	new=`printf "%s" "${new}" | sed -Ee 's/([&#])/\\\\\\1/g'`
+	str=`printf "%s" "${str}" | sed -Ee "s#(^%${old}|([^%])%${old})#\2${new}#g"`
 
 	# Escape %%
-	echo "${str}" | sed -Ee "s#%%#%#g"
+	printf "%s\n" "${str}" | sed -Ee "s#%%#%#g"
 }
 
 lib_multi_replace()
