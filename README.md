@@ -3020,7 +3020,7 @@ PKG python${python_major}${python_minor}
 
 The Makejail uses `VAR` with `--noexpand` to escape the `$` character (see `VAR` for more details).
 
-The rest of the code shows that this Makejail uses `RAW` to perform some useful checks. When all the checks are correct, python installs using variables instead of build arguments. All checks for build arguments should be performed at build stage unless there is a good reason to perform them at another stage.
+The rest of the code shows what this Makejail uses. `RAW` to perform some useful checks. When all the checks are correct, python installs using variables instead of build arguments. All checks for build arguments should be performed at build stage unless there is a good reason to perform them at another stage.
 
 **Note**: The build arguments can also be named `Macro Variables`.
 
