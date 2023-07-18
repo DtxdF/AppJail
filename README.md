@@ -1845,7 +1845,7 @@ EXEC --before-include network.makejail \
 #### Syntax
 
 ```
-FROM [--ajspec ajspec_name] [--entrypoint entrypoint] [--platform platform] image[:tag]
+FROM [--ajspec ajspec_name] [--entrypoint entrypoint|none] [--platform platform] image[:tag]
 ```
 
 ##### --ajspec
@@ -1855,6 +1855,10 @@ See `-N` in `appjail image import`.
 ##### --entrypoint
 
 See `appjail image import`.
+
+When no entry point is set, `IMAGE_ENTRYPOINT` (default: `gh+AppJail-makejails`) is concatenated with `image`.
+
+`none` is special because it indicates that the image should not be downloaded, so it is assumed that it is already installed.
 
 ##### --platform
 
@@ -1875,7 +1879,9 @@ Use an image as the jail.
 #### Examples
 
 ```
-FROM --entrypoint gh+DtxdF/nginx-image nginx:132
+FROM --entrypoint gh+AppJail-makejails/nginx nginx:13.2
+# Equivalent:
+FROM nginx:13.2
 ```
 
 ### GLOBAL

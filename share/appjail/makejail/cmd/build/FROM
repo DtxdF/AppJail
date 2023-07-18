@@ -40,7 +40,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: FROM [--ajspec ajspec_name] [--entrypoint entrypoint] [--platform platform] image[:tag]"
+		lib_err ${EX_USAGE} "usage: FROM [--ajspec ajspec_name] [--entrypoint entrypoint|none] [--platform platform] image[:tag]"
 	fi
 
 	if [ -d "${MAKEJAIL_TEMPDIR}/images" ]; then
@@ -141,8 +141,8 @@ main()
 		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/platform"
 	fi
 
-	name=`lib_escape_string "${name}" "" "${escape_chars}"`
-	if ! printf "%s\n" "${name}" > "${imagesdir}/name"; then
+	local escape_name=`lib_escape_string "${name}" "" "${escape_chars}"`
+	if ! printf "%s\n" "${escape_name}" > "${imagesdir}/name"; then
 		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/name"
 	fi
 
@@ -151,11 +151,15 @@ main()
 		lib_err ${EX_IOERR} "Error writing in ${imagesdir}/tag"
 	fi
 
-	if [ -n "${entrypoint}" ]; then
+	if lib_check_empty "${entrypoint}"; then
+		entrypoint="${IMAGE_ENTRYPOINT}/${name}"
+	fi
+
+	if [ "${entrypoint}" != "none" ]; then
 		ajspec=`lib_escape_string "${ajspec}" "" "${escape_chars}"`
 		entrypoint=`lib_escape_string "${entrypoint}" "" "${escape_chars}"`
 
-		echo "\"\${APPJAIL_SCRIPT}\" image import -a \"${platform}\" -N "${ajspec}" -n \"${name}\" -t \"${tag}\" -- \"${entrypoint}\""
+		echo "\"\${APPJAIL_SCRIPT}\" image import -a \"${platform}\" -N "${ajspec}" -n \"${escape_name}\" -t \"${tag}\" -- \"${entrypoint}\""
 	fi
 }
 
