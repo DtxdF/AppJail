@@ -2960,8 +2960,6 @@ A good example is when using Python. The Python executable is named `pythonx.y`,
 
 Arguments can use other arguments as a value, but the `}` character must be escaped using `\`
 
-There is a Makejail for Python that we use to explain the above process: [AppJail-makejails/python](https://github.com/AppJail-makejails/python).
-
 ```
 %{PYTHON_EXECUTABLE:python%{PYTHON_MAJOR\}.%{PYTHON_MINOR\}}
 %{PYTHON_MAJOR:3}
@@ -2994,7 +2992,7 @@ CMD python3.9
 
 The process is the same for the rest of the arguments.
 
-The Makejail for Python uses the `VAR` command to check Python versions as you can see below:
+If we create a Makejail for Python that uses Build Arguments, we will probably need `VAR` and `RAW` instructions for some checks.
 
 ```
 VAR --noexpand python_major=%{PYTHON_MAJOR}
