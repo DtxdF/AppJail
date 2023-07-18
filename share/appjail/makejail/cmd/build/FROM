@@ -36,9 +36,6 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/replace"
 
-COPY_OPTION_SRC=1
-COPY_OPTION_DST=2
-
 main()
 {
 	local args="$1"
