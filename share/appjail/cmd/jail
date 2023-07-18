@@ -621,7 +621,7 @@ _jail_import()
 		tar)
 			jail_install_empty -j "${jail_name}"
 
-			lib_info "Importing ${jail_name} ..."
+			lib_info "Importing ${input} as ${jail_name} ..."
 
 			local escape_jail_path
 			escape_jail_path=`lib_escape_string "${jail_path}"`
@@ -641,7 +641,7 @@ _jail_import()
 			fi
 			;;
 		zfs)
-			lib_info "Importing ${jail_name} ..."
+			lib_info "Importing ${input} as ${jail_name} ..."
 
 			local decompress_cmd
 
