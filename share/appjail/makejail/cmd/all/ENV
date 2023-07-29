@@ -61,8 +61,20 @@ main()
 	escape_chars='`"\'
 
 	env=`lib_escape_string "${env}" 3 "${escape_chars}"`
+	env="\\\"${env}\\\""
 
-	if ! printf "%s " "\\\"${env}\\\"" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
+	local env_vars
+	# The user environment variables must override the environment variables defined by
+	# the Makejail to honor the intent.
+	local env_tmp="${envdir}/${MAKEJAIL_CURRENT_STAGE}.tmp"
+	if [ -f "${env_tmp}" ]; then
+		env_vars="${env} `head -1 "${env_tmp}"`"
+		rm -f "${env_tmp}"
+	else
+		env_vars="${env}"
+	fi
+
+	if ! printf "%s " "${env_vars}" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
 		lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
 	fi
 }

@@ -118,9 +118,9 @@ makejail_main()
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
 	local repoid=
 
-	while getopts ":cEelva:B:b:d:f:j:o:u:" _o; do
+	while getopts ":cEelva:B:b:d:f:j:o:u:V:" _o; do
 		case "${_o}" in
-			a|B|b|d|f|j|o|u)
+			a|B|b|d|f|j|o|u|V)
 				if lib_check_empty "${OPTARG}"; then
 					makejail_usage
 					exit ${EX_USAGE}
@@ -174,12 +174,7 @@ makejail_main()
 				;;
 			o)
 				if [ -z "${MAKEJAIL_OPTIONS}" ]; then
-					MAKEJAIL_OPTIONS="`lib_generate_tempfile`"
-
-					errlevel=$?
-					if [ ${errlevel} -ne 0 ]; then
-						exit ${errlevel}
-					fi
+					MAKEJAIL_OPTIONS="`lib_generate_tempfile`" || exit $?
 
 					local escape_mkoptions
 					escape_mkoptions=`lib_escape_string "${MAKEJAIL_OPTIONS}"`
@@ -195,6 +190,27 @@ makejail_main()
 			u)
 				opt_update=1
 				repoid="${OPTARG}"
+				;;
+			V)
+				local env="${OPTARG}"
+				if ! lib_check_var "${env}"; then
+					lib_err ${EX_DATAERR} -- "${env}: Invalid environment variable."
+				fi
+
+				_create_tempdir
+
+				local envdir="${MAKEJAIL_TEMPDIR}/env"
+				if ! mkdir -p "${envdir}"; then
+					lib_err ${EX_IOERR} "Error creating ${envdir}"
+				fi
+
+				local env_name=`lib_jailparam_name "${env}" "="`
+				local env_value=`lib_jailparam_value "${env}" "="`
+
+				env="${env_name}=${env_value}"
+				env=`lib_escape_string "${env}" 3`
+
+				printf "%s " "\\\"${env}\\\"" >> "${envdir}/${MAKEJAIL_STAGE_BUILD}.tmp"
 				;;
 			*)
 				makejail_usage
@@ -454,17 +470,7 @@ makejail_run()
 
 	lib_atexit_add "rm -f \"${escape_output}\""
 
-	MAKEJAIL_TEMPDIR=`lib_generate_tempdir`
-
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
-
-	local escape_mk_tempdir
-	escape_mk_tempdir=`lib_escape_string "${MAKEJAIL_TEMPDIR}"`
-
-	lib_atexit_add "rm -rf \"${escape_mk_tempdir}\" > /dev/null 2>&1"
+	_create_tempdir
 
 	makejail_write "${makejail_file}" > "${output}"
 	
@@ -513,6 +519,18 @@ makejail_run()
 		if ! mv -- "${initscript}" "${JAILDIR}/${MAKEJAIL_JAILNAME}/init"; then
 			lib_err ${EX_IOERR} "Error moving ${initscript} as ${JAILDIR}/${MAKEJAIL_JAILNAME}/jail"
 		fi
+	fi
+}
+
+_create_tempdir()
+{
+	if [ -z "${MAKEJAIL_TEMPDIR}" ]; then
+		MAKEJAIL_TEMPDIR=`lib_generate_tempdir` || exit $?
+
+		local escape_mk_tempdir
+		escape_mk_tempdir=`lib_escape_string "${MAKEJAIL_TEMPDIR}"`
+
+		lib_atexit_add "rm -rf \"${escape_mk_tempdir}\" > /dev/null 2>&1"
 	fi
 }
 
@@ -580,12 +598,7 @@ makejail_write()
 		local parameters=`lib_jailparam_value "${line}" " "`
 
 		local _cmd
-		_cmd=`makejail_check_cmd "${cmd}"`
-
-		errlevel=$?
-		if [ ${errlevel} -ne 0 ]; then
-			exit ${errlevel}
-		fi
+		_cmd=`makejail_check_cmd "${cmd}"` || exit $?
 
 		local stagedir
 		stagedir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_CURRENT_STAGE}"
@@ -623,7 +636,6 @@ makejail_write()
 		local option
 		while IFS= read -r option; do
 			echo "${option}" > "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}/${priority}.${MAKEJAIL_CMD_OPTION}"
-
 			priority=$((priority+1))
 		done < "${MAKEJAIL_OPTIONS}"
 	else
@@ -1546,6 +1558,7 @@ Options for -c:
     -f makejail            -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
     -j jail_name           -- Jail name. If not defined, a random string is used.
     -o option              -- Additional options to be used by the \`appjail quick\` command.
+    -V env                 -- Additional environment variables to be used by the Makejail in the \`build\` stage.
 
 Options for -d, -u:
     -E                     -- Exact match.
@@ -1556,7 +1569,7 @@ makejail_usage()
 {
 	cat << EOF
 usage: makejail [-c] [-ev] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
-		[-f makejail] [-j jail_name] [[-o option] ...] -- [runtime_args ...]
+		[-f makejail] [-j jail_name] [[-o option] ...] [[-V env=value] ...] -- [runtime_args ...]
        makejail [-E] -d id
        makejail -l
        makejail [-E] -u [id|*]

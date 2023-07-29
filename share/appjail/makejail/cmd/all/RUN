@@ -221,6 +221,8 @@ get_environment()
 	local env_vars_file="${MAKEJAIL_TEMPDIR}/env/${MAKEJAIL_CURRENT_STAGE}"
 	if [ -f "${env_vars_file}" ]; then
 		ENV_VARS=`head -1 -- "${env_vars_file}"`
+	elif [ -f "${env_vars_file}.tmp" ]; then
+		ENV_VARS=`head -1 -- "${env_vars_file}.tmp"`
 	fi
 }
 
