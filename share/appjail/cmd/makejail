@@ -103,6 +103,10 @@ MAKEJAIL_CMD_INCLUDE="INCLUDE"
 MAKEJAIL_CMD_OPTION="OPTION"
 MAKEJAIL_CMD_STAGE="STAGE"
 
+# Files
+MAKEJAIL_OPTIONS=
+MAKEJAIL_TEMPDIR=
+
 makejail_desc="Build a jail using a Makejail file."
 
 makejail_main()
