@@ -3498,10 +3498,10 @@ Options:
 				     Describes the type of the file system.
 				 - options (str, optional, default:rw):
 				     Describes the mount options associated with the file system
-				 - dump (str, optional, default:0):
+				 - dump (int, optional, default:0):
 				      This field is used for these file systems by the dump(8) command to determine
 				      which file systems need to be dumped.
-				 - pass (str, optional, default:0):
+				 - pass (int, optional, default:0):
 				      This field is used by the fsck(8) and quotacheck(8) programs to determine the
 				      order in which file system and quota checks are done at reboot time.
                              Examples:
