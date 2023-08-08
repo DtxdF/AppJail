@@ -33,6 +33,7 @@ lib_load "${LIBDIR}/copy"
 lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/keys"
 lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/tempfile"
 
@@ -1312,6 +1313,8 @@ quick_set_virtualnet()
 
 	if [ "${interface}" = "<name>" ]; then
 		interface="${QUICK_JAILNAME}"
+	elif [ "${interface}" = "<random>" ]; then
+		interface=`random_hexstring 11 0 15 | tr -d '\n'`
 	fi
 
 	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4" "${address}"
@@ -3856,7 +3859,8 @@ Options:
 				     Network name. If not defined \`${AUTO_NETWORK_NAME}\` is used.
 				 - interface (str, required):
 				     \`if_epair(4)\` interface to create. If \`interface\` is \`<name>\`, the jail name will be used
-				     as the interface name.
+				     as the interface name. If \`interface\` is \`<random>\`, a random hexadecimal string will be
+				     used as the interface name.
 				 - default (bool, optional):
 				     Mark this network as the default router and use it in other options such as \`expose\`, \`nat\`
 				     or \`nonat\`.
