@@ -1310,6 +1310,10 @@ quick_set_virtualnet()
 		QUICK_OPTION_DEFNET="${virtualnet}"
 	fi
 
+	if [ "${interface}" = "<name>" ]; then
+		interface="${QUICK_JAILNAME}"
+	fi
+
 	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "ip4" "${address}"
 	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface" "${interface}"
 	lib_keys_set "${QUICK_KEY_VIRTUALNET}" "${virtualnet}" "interface_desc" "${interface_desc}"
@@ -3851,7 +3855,8 @@ Options:
 			         - virtualnet (str, optional):
 				     Network name. If not defined \`${AUTO_NETWORK_NAME}\` is used.
 				 - interface (str, required):
-				     \`if_epair(4)\` interface to create.
+				     \`if_epair(4)\` interface to create. If \`interface\` is \`<name>\`, the jail name will be used
+				     as the interface name.
 				 - default (bool, optional):
 				     Mark this network as the default router and use it in other options such as \`expose\`, \`nat\`
 				     or \`nonat\`.
