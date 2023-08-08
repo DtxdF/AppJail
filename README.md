@@ -3983,7 +3983,7 @@ NRO  ENABLED  NAME  DEVICE          MOUNTPOINT      TYPE       OPTIONS          
 5    1        -     /tmp/.X11-unix  /tmp/.X11-unix  nullfs     rw                    0     0
 ```
 
-We have created the target directory before mounting our device, this is because `appjail fstab jail ... set` checks if the target exists and if the device is not outside the jail directory. You can disable this check using the `-p` parameter.
+We have created the target directory before mounting our device, this is because `appjail fstab jail ... set` checks if the target exists and if the device is not outside the jail directory. You can disable this check using the `-p` parameter. Using the `-p` parameter is useful because it automatically creates the mount point.
 
 If you want to change a field of an existing entry, just specify the NRO and the corresponding parameter. `-d` and `-m` are not required when defined. For example, to change the `mount(8)` options in NRO `0`:
 

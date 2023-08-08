@@ -704,6 +704,10 @@ fstab_set()
 		if lib_check_path_traversal_file "${jail_path}/jail" "${fs_file}"; then
 			lib_err ${EX_NOPERM} "Path traversal or invalid path detected: (${jail_path}/jail :: ${jail_path}/jail/${fs_file})"
 		fi
+	else
+		if ! mkdir -p "${jail_path}/jail/${fs_file}"; then
+			lib_err ${EX_IOERR} "Error creating ${jail_path}/jail/${fs_file}"
+		fi
 	fi
 
 	if [ -z "${fs_vfstype}" ]; then
@@ -913,7 +917,8 @@ Options for set:
     -p                   -- By default the mountpoint is checked against a path traversal check.
                             This is not a security measure, it is just for convenience so as not
 			    to mount in a non-existent directory or mount outside the jail
-			    directory. This option disable it.
+			    directory. This option disable this check and also creates the
+			    mountpoint.
     -D dump              -- Default: ${FSTAB_DEFAULT_FSFREQ}. The fifth field, (fs_freq). See fstab(5).
     -d device            -- The first field, (fs_spec). See fstab(5). This option and mountpoint are not
                             required unless the NRO (\`-n\`) has no such values.
