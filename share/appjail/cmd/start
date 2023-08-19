@@ -403,6 +403,8 @@ start_main()
 
 		stop_safe -- "${jail_name}"
 	fi
+
+	return ${errlevel}
 }
 
 stop_safe()
