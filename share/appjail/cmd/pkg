@@ -75,7 +75,7 @@ pkg_all()
 	done
 	shift $((OPTIND-1))
 
-	local cmd="$1"
+	local cmd="$1"; shift
 	if lib_check_empty "${cmd}"; then
 		pkg_usage
 		exit ${EX_USAGE}
