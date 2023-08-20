@@ -4,6 +4,8 @@ EX_USAGE=64
 EX_DATAERR=65
 EX_NOINPUT=66
 
+SLEEP_PID=
+
 main()
 {
 	local algo="/sbin/sha256"
@@ -56,6 +58,8 @@ main()
 		exit ${EX_NOINPUT}
 	fi
 
+	trap "_ERRLEVEL=\$?; atexit; exit \${_ERRLEVEL}" SIGINT SIGQUIT SIGTERM EXIT
+
 	local current_hosts current_hosts_sum
 
 	while true; do
@@ -67,13 +71,24 @@ main()
 			"${hook}" "${hosts}" || exit $?
 		fi
 
-		sleep "${interval}" || exit $?
+		sleep "${interval}" &
+
+		SLEEP_PID=$!
+
+		wait ${SLEEP_PID} || exit $?
 	done
 }
 
 usage()
 {
 	echo "usage: ajdns.sh [-a algo] [-i interval] -h hosts -H hook" >&2
+}
+
+atexit()
+{
+	if [ -n "${SLEEP_PID}" ]; then
+		kill ${SLEEP_PID}
+	fi
 }
 
 main "$@"
