@@ -18,6 +18,8 @@ rcvar=${name}_enable
 
 start_precmd="appjail_health_precmd"
 
+load_rc_config ${name}
+
 : ${appjail_health_enable:=NO}
 : ${appjail_health_logfile=/var/log/appjail.log}
 : ${appjail_health_path=${PATH}:%%PREFIX%%/bin}
@@ -38,5 +40,4 @@ appjail_health_precmd()
 	echo "AppJail log file (Health): ${appjail_health_logfile}"
 }
 
-load_rc_config ${name}
 run_rc_command "$1"

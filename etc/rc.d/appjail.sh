@@ -16,6 +16,8 @@
 name=appjail
 rcvar=${name}_enable
 
+load_rc_config ${name}
+
 : ${appjail_enable:=NO}
 : ${appjail_logfile=/var/log/appjail.log}
 : ${appjail_path=${PATH}:%%PREFIX%%/bin}
@@ -62,5 +64,4 @@ appjail_status()
 	env PATH="${appjail_path}" "${command}" jail list | grep -e '^UP' -e '^STATUS'
 }
 
-load_rc_config ${name}
 run_rc_command "$1"

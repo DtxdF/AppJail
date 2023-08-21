@@ -21,6 +21,8 @@ rcvar=${name}_enable
 
 start_precmd="appjail_dns_precmd"
 
+load_rc_config ${name}
+
 : ${appjail_dns_enable:=NO}
 : ${appjail_dns_logfile=/var/log/appjail.log}
 : ${appjail_dns_path=${PATH}:%%PREFIX%%/bin}
@@ -44,5 +46,4 @@ appjail_dns_precmd()
 	echo "AppJail log file (DNS): ${appjail_dns_logfile}"
 }
 
-load_rc_config ${name}
 run_rc_command "$1"

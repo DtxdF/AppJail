@@ -16,6 +16,8 @@
 name=appjail_natnet
 rcvar=${name}_enable
 
+load_rc_config ${name}
+
 : ${appjail_natnet_enable:=NO}
 : ${appjail_natnet_logfile=/var/log/appjail.log}
 
@@ -84,5 +86,4 @@ appjail_natnet_status()
 	rm -f "${nat_info}"
 }
 
-load_rc_config ${name}
 run_rc_command "$1"
