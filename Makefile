@@ -62,7 +62,7 @@ install: utils-strip
 	${FIND} share/appjail/scripts -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# Prefix.
-.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh
+.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh share/appjail/scripts/ajuser.sh
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 

@@ -34,6 +34,11 @@ CONFIG="%%PREFIX%%/share/appjail/files/config.conf"
 main()
 {
 	. "${CONFIG}"
+
+	if [ `id -u` -ne 0 ]; then
+		exec "${SCRIPTSDIR}/ajuser.sh" "$@"
+	fi
+
 	. "${LIBDIR}/load"
 
 	# For convenience, these will be loaded.
@@ -49,10 +54,6 @@ main()
 	fi
 
 	lib_init_logtime
-
-	if [ `id -u` -ne 0 ]; then
-		lib_err ${EX_NOPERM} "AppJail is intended to be run as root. Use a tool such as doas(1), sudo(8) or su(1)."
-	fi
 
 	local cmd=$1; shift
 	if [ -z "${cmd}" ]; then

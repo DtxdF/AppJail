@@ -4048,6 +4048,8 @@ NRO  ENABLED  NAME  DEVICE      MOUNTPOINT  TYPE    OPTIONS  DUMP  PASS
 
 ## Unprivileged users
 
+**Note**: Now an unprivileged user can run `appjail` without running `appjail-user` and this is the recommended way. Much of the following explanation actually applies.
+
 When you share a server with co-workers or when you are the only person using a laptop, it is probably worth using AppJail without accessing the `root` account. AppJail has a simple but useful wrapper for such users named `appjail-user`.
 
 The `appjail-user` uses `RUNAS` (default: `doas`) to execute AppJail commands as root. You can set it in the AppJail configuration file to whatever you prefer, such as `sudo` or `doas`. Of course, you need to install one of them first. I recommend using `security/doas` because it is simple and secure.
