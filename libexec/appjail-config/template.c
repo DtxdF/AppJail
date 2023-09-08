@@ -374,7 +374,8 @@ template_setparam(const char *s, param p, traceback *trbck)
 
                 st = WRITE;
                 b = p->k;
-                set_option(TEMPLATE_OPARAM, p, NULL);
+                if (!get_option(TEMPLATE_OVAR, p, NULL))
+                    set_option(TEMPLATE_OPARAM, p, NULL);
             }
         } else {
             st = WRITE;
