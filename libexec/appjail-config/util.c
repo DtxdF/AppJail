@@ -277,7 +277,8 @@ test_param(int c)
         return true;
         break;
     default:
-        return isalnum(c) != 0;
+        return isalnum(c) != 0 \
+               || isspace(c) != 0;
     }
 }
 
