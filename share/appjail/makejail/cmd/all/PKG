@@ -132,7 +132,7 @@ main()
 	elif [ ${use_autoremove} -eq 1 ]; then
 		pkg_cmd="autoremove -y"
 	elif [ ${use_update} -eq 1 ]; then
-		pkg_cmd="update -y"
+		pkg_cmd="update"
 	elif [ ${use_upgrade} -eq 1 ]; then
 		pkg_cmd="upgrade -y"
 	else
