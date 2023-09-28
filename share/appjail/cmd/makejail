@@ -823,19 +823,19 @@ makejail_write_cmd()
 
 		lib_atexit_add "rm -f \"${escape_args_file}\""
 
-        # Order by priority.
-        ls "${stagedir}" | sort -n | while IFS= read -r cmd_file
-        do
-            cmd_name=`echo "${cmd_file}" | cut -d. -f2`
+		# Order by priority.
+		ls "${stagedir}" | sort -n | while IFS= read -r cmd_file
+		do
+			cmd_name=`echo "${cmd_file}" | cut -d. -f2`
 
-            if [ "${cmd_name}" != "${cmd}" ]; then
-                continue
-            fi
+			if [ "${cmd_name}" != "${cmd}" ]; then
+				continue
+			fi
 
-            cat -- "${stagedir}/${cmd_file}"
-        done >> "${args_file}"
+			cat -- "${stagedir}/${cmd_file}"
+		done >> "${args_file}"
 
-        # Priority is not necessary in this case.
+		# Priority is not necessary in this case.
 		makejail_write_cmd -1 "${stage}" "${cmd}" "${args_file}"
 
 		rm -f -- "${stagedir}/"*.${cmd}
