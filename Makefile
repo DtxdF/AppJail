@@ -102,6 +102,7 @@ uninstall:
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-config-user"
 	${RM} -f "${DESTDIR}${PREFIX}/bin/appjail-user"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail"
+	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-dns"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-health"
 	${RM} -f "${DESTDIR}${PREFIX}/etc/rc.d/appjail-natnet"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
