@@ -3983,8 +3983,6 @@ NRO  ENABLED  NAME  DEVICE          MOUNTPOINT      TYPE       OPTIONS          
 5    1        -     /tmp/.X11-unix  /tmp/.X11-unix  nullfs     rw                    0     0
 ```
 
-We have created the target directory before mounting our device, this is because `appjail fstab jail ... set` checks if the target exists and if the device is not outside the jail directory. You can disable this check using the `-p` parameter. Using the `-p` parameter is useful because it automatically creates the mount point.
-
 If you want to change a field of an existing entry, just specify the NRO and the corresponding parameter. `-d` and `-m` are not required when defined. For example, to change the `mount(8)` options in NRO `0`:
 
 ```
@@ -4045,6 +4043,43 @@ The jail can now be stopped without any problems.
 NRO  ENABLED  NAME  DEVICE      MOUNTPOINT  TYPE    OPTIONS  DUMP  PASS
 0    1        -     /usr/ports  /usr/ports  nullfs  rw       0     0
 ```
+
+### PseudoFS
+
+An interesting and useful feature of `appjail fstab` is when you set `type` to `<pseudofs>`. It is actually a pseudo-filesystem as the name implies, in other words, this does not exist on your system.
+
+The purpose of this handy feature is to allow you to easily separate the data that should persist when removing the jail. For example, imagine you import an image and it comes with `/usr/local/www/apache24/data/wp-content` indicating a WordPress installation. Such files and subdirectories will be removed with the jail data and other things it contains. For this data to persist, you must move them to the host and mount them using `mount_nullfs(5)`. You will probably need to stop the jail before moving the files as some applications may not be able to run correctly.
+
+This pseudo-filesystem does this. It moves the data from the jail to the host when you run `appjail fstab jail ... compile` and mounts that file or directory using `mount_nullfs(5)`, so that when you remove the jail, your data is safe.
+
+As a side note, `PASS` and `DUMP` will be ignored.
+
+Using `<pseudofs>` is no different than using another file system.
+
+```
+# mkdir -p /tmp/var_tmp
+# ls /tmp/var_tmp
+# appjail fstab jail jtest set -d /tmp/var_tmp -m /var/tmp -t '<pseudofs>'
+# appjail fstab jail jtest
+NRO  ENABLED  NAME  DEVICE        MOUNTPOINT  TYPE        OPTIONS  DUMP  PASS
+0    1        -     /tmp/var_tmp  /var/tmp    <pseudofs>  rw       0     0
+# appjail restart jtest
+...
+[00:00:10] [ debug ] [jtest] Moving /usr/local/appjail/jails/jtest/jail//var/tmp/vi.recover -> /tmp/var_tmp/vi.recover ...
+...
+# appjail fstab jail jtest mounted
+/usr/local/appjail/releases/amd64/13.2-RELEASE/default/release -> /usr/local/appjail/jails/jtest/jail/.appjail
+/tmp/var_tmp -> /usr/local/appjail/jails/jtest/jail/var/tmp
+devfs -> /usr/local/appjail/jails/jtest/jail/dev
+# ls /tmp/var_tmp
+vi.recover/
+```
+
+It is preferable and advisable to reboot, since as mentioned above, an application may have problems when moving files and directories here and there while running.
+
+### Notes
+
+`appjail fstab jail ... compile` will do some things for you. If the file system type is `nullfs` it will create the file or directory inside the jail specified by `MOUNTPOINT` depending on whether `DEVICE` is a file or directory, or an error is displayed the file type is not a file or directory. If the file system type is `<pseudofs>` it will perform the same things as `nullfs` plus other things described in `PseudoFS`. If none of these file system types match and `MOUNTPOINT` does not exist inside the jail, a directory pointing to that path will be created.
 
 ## Unprivileged users
 

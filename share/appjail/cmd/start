@@ -267,7 +267,14 @@ start_main()
 				jail_value="${LOGDIR}/jails/${jail_name}/console/${logname}"
 				;;
 			mount.fstab)
+				lib_debug "Compiling fstab file ..."
+
 				"${APPJAIL_PROGRAM}" fstab jail "${jail_name}" compile
+
+				errlevel=$?
+				if [ ${errlevel} -ne 0 ]; then
+					lib_err ${errlevel} "Error compiling fstab file."
+				fi
 
 				jail_value="${jail_path}/conf/fstab"
 				;;

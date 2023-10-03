@@ -184,8 +184,28 @@ fstab_compile()
 		fs_freq=`fstab_get "${jail_name}" -In "${nro}" dump`
 		fs_passno=`fstab_get "${jail_name}" -In "${nro}" pass`
 
-		fs_spec=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_spec}"`
+		lib_debug "Compiling fstab #${nro}: ${fs_spec} ${fs_file} ${fs_vfstype} ${fs_mntops} ${fs_freq} ${fs_passno}"
+
+		# Actual fs_file.
 		fs_file="${jail_path}/jail/${fs_file}"
+
+		case "${fs_vfstype}" in
+			\<pseudofs\>)
+				fs_vfstype="nullfs"
+				fs_freq=0
+				fs_passno=0
+
+				_fstab_pre_mount_pseudofs "${fs_spec}" "${fs_file}"
+				;;
+			nullfs)
+				_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}"
+				;;
+			*)
+				_fstab_pre_mount "${fs_file}"
+				;;
+		esac
+
+		fs_spec=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_spec}"`
 		fs_file=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_file}"`
 
 		if ! printf "%s\t%s\t%s\t%s\t%s\t%s\n" "${fs_spec}" "${fs_file}" "${fs_vfstype}" "${fs_mntops}" "${fs_freq}" "${fs_passno}" >> "${fstab_temp}"; then
@@ -200,6 +220,62 @@ fstab_compile()
 
 	if ! cat "${fstab_temp}" > "${fstab}"; then
 		lib_err ${EX_IOERR} "Error writing ${fstab_temp} to ${fstab}"
+	fi
+}
+
+_fstab_pre_mount_pseudofs()
+{
+	local fs_spec="$1"
+	local fs_file="$2"
+
+	local type
+	type=`_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}"` || exit $?
+
+	case "${type}" in
+		dir) "${SCRIPTSDIR}/super-mv.sh" -f "${CONFIG}" -s "${fs_file}" -d "${fs_spec}" ;;
+	esac
+}
+
+_fstab_pre_mount_nullfs()
+{
+	local fs_spec="$1"
+	local fs_file="$2"
+
+	if [ ! -e "${fs_spec}" ]; then
+		lib_err ${EX_NOINPUT} -- "${fs_spec}: No such file or directory."
+	fi
+
+	local type
+
+	if [ -f "${fs_spec}" ]; then
+		if [ ! -e "${fs_file}" ]; then
+			touch -- "${fs_file}" || exit $?
+		elif [ ! -f "${fs_file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${fs_file}: Must be same type as ${fs_spec}"
+		fi
+
+		type="file"
+	elif [ -d "${fs_spec}" ]; then
+		if [ ! -e "${fs_file}" ]; then
+			mkdir -p -- "${fs_file}" || exit $?
+		elif [ ! -d "${fs_file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${fs_file}: Must be same type as ${fs_spec}"
+		fi
+
+		type="dir"
+	else
+		lib_err ${EX_NOINPUT} "This file system only accepts the \`file\` and \`directory\` types."
+	fi
+
+	echo "${type}"
+}
+
+_fstab_pre_mount()
+{
+	local fs_file="$1"
+
+	if [ ! -e "${fs_file}" ]; then
+		mkdir -p -- "${fs_file}"
 	fi
 }
 
@@ -696,20 +772,6 @@ fstab_set()
 		lib_err ${EX_CONFIG} "The mountpoint is not set in this NRO. Use \`-m\` to fix it."
 	fi
 
-	if [ ${opt_path_traversal} -eq 1 ]; then
-		if [ ! -d "${jail_path}/jail/${fs_file}" ]; then
-			lib_err ${EX_NOINPUT} -- "${jail_path}/jail/${fs_file}: Not a directory or does not exist."
-		fi
-
-		if lib_check_path_traversal_file "${jail_path}/jail" "${fs_file}"; then
-			lib_err ${EX_NOPERM} "Path traversal or invalid path detected: (${jail_path}/jail :: ${jail_path}/jail/${fs_file})"
-		fi
-	else
-		if ! mkdir -p "${jail_path}/jail/${fs_file}"; then
-			lib_err ${EX_IOERR} "Error creating ${jail_path}/jail/${fs_file}"
-		fi
-	fi
-
 	if [ -z "${fs_vfstype}" ]; then
 		fs_vfstype=`fstab_get "${jail_name}" -Iin "${nro}" type`
 		fs_vfstype="${fs_vfstype:-${FSTAB_DEFAULT_FSVFSTYPE}}"
@@ -918,7 +980,7 @@ Options for set:
                             This is not a security measure, it is just for convenience so as not
 			    to mount in a non-existent directory or mount outside the jail
 			    directory. This option disable this check and also creates the
-			    mountpoint.
+			    mountpoint. Deprecated. Currently this is a no-op flag.
     -D dump              -- Default: ${FSTAB_DEFAULT_FSFREQ}. The fifth field, (fs_freq). See fstab(5).
     -d device            -- The first field, (fs_spec). See fstab(5). This option and mountpoint are not
                             required unless the NRO (\`-n\`) has no such values.
