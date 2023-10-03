@@ -4048,9 +4048,9 @@ NRO  ENABLED  NAME  DEVICE      MOUNTPOINT  TYPE    OPTIONS  DUMP  PASS
 
 An interesting and useful feature of `appjail fstab` is when you set `type` to `<pseudofs>`. It is actually a pseudo-filesystem as the name implies, in other words, this does not exist on your system.
 
-The purpose of this handy feature is to allow you to easily separate the data that should persist when removing the jail. For example, imagine you import an image and it comes with `/usr/local/www/apache24/data/wp-content` indicating a WordPress installation. Such files and subdirectories will be removed with the jail data and other things it contains. For this data to persist, you must move them to the host and mount them using `mount_nullfs(5)`. You will probably need to stop the jail before moving the files as some applications may not be able to run correctly.
+The purpose of this handy feature is to allow you to easily separate the data that should persist when removing the jail. For example, imagine you import an image and it comes with `/usr/local/www/apache24/data/wp-content` indicating a WordPress installation. Such files and subdirectories will be removed with the jail data and other things it contains. For this data to persist, you must move them to the host and mount them using `mount_nullfs(8)`. You will probably need to stop the jail before moving the files as some applications may not be able to run correctly.
 
-This pseudo-filesystem does this. It moves the data from the jail to the host when you run `appjail fstab jail ... compile` and mounts that file or directory using `mount_nullfs(5)`, so that when you remove the jail, your data is safe.
+This pseudo-filesystem does this. It moves the data from the jail to the host when you run `appjail fstab jail ... compile` and mounts that file or directory using `mount_nullfs(8)`, so that when you remove the jail, your data is safe.
 
 As a side note, `PASS` and `DUMP` will be ignored.
 
