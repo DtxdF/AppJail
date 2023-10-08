@@ -673,10 +673,10 @@ EOF
 fetch_usage()
 {
 cat << EOF
-usage: fetch list arch[/version]
-       fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
-       fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r release_name] [-S script] suite_name
+usage: fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r release_name] [-S script] suite_name
        fetch destroy [-f] [-a osarch] [-v osversion] release_name
+       fetch list arch[/version]
+       fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
        fetch www [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
 EOF
 }
