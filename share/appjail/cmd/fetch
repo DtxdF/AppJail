@@ -110,11 +110,11 @@ fetch_list()
 	fi
 
 	if [ -n "${osversion}" ]; then
-		(cd "${RELEASEDIR}/${osarch}/${osversion}"; find . -depth 1)
+		(cd "${RELEASEDIR}/${osarch}/${osversion}"; find . -depth 1 -maxdepth 3)
 	elif [ -n "${osarch}" ]; then
-		(cd "${RELEASEDIR}/${osarch}"; find . -depth 2)
+		(cd "${RELEASEDIR}/${osarch}"; find . -depth 2 -maxdepth 3)
 	else
-		(cd "${RELEASEDIR}"; find . -depth 3)
+		(cd "${RELEASEDIR}"; find . -depth 3 -maxdepth 3)
 	fi |\
 		sed -Ee 's#\./##' |\
 		{

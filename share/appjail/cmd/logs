@@ -119,13 +119,13 @@ logs_list()
 	if [ -n "${log}" ]; then
 		basename "${LOGDIR}/${type}/${entity}/${subtype}/${log}"
 	elif [ -n "${subtype}" ]; then
-		(cd "${LOGDIR}/${type}/${entity}/${subtype}"; find . -depth 1)
+		(cd "${LOGDIR}/${type}/${entity}/${subtype}"; find . -depth 1 -maxdepth 4)
 	elif [ -n "${entity}" ]; then
-		(cd "${LOGDIR}/${type}/${entity}"; find . -depth 2)
+		(cd "${LOGDIR}/${type}/${entity}"; find . -depth 2 -maxdepth 4)
 	elif [ -n "${type}" ]; then
-		(cd "${LOGDIR}/${type}"; find . -depth 3)
+		(cd "${LOGDIR}/${type}"; find . -depth 3 -maxdepth 4)
 	else
-		(cd "${LOGDIR}"; find . -depth 4)
+		(cd "${LOGDIR}"; find . -depth 4 -maxdepth 4)
 	fi |\
 		sed -Ee 's#\./##' |\
 		{
