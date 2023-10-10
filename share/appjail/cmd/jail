@@ -1133,6 +1133,11 @@ jail_install_standard_thinjail()
 			mkdir -p "${rootdir}"
 		fi
 
+		if [ ! -e "${source}/${file}" ]; then
+			lib_warn -- "${file}: No such file or directory. Ignoring..."
+			continue
+		fi
+
 		lib_debug "Copying: cp -a \"${source}/${file}\" \"${rootdir}\""
 
 		if ! cp -a "${source}/${file}" "${rootdir}"; then
