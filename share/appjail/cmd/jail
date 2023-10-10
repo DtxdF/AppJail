@@ -1992,16 +1992,45 @@ jail_list()
 		return
 	fi
 
-	ls -A "${JAILDIR}" | while IFS= read -r jail_name; do
-		jail_get ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${jail_name}" "$@"
+	local output
+	output=`lib_generate_tempfile` || exit $?
 
-		# To not print the columns again
-		Hflag=
-	done | \
+	local escape_output
+	escape_output=`lib_escape_string "${output}"`
+
+	lib_atexit_add "rm -f \"${escape_output}\""
+
+	local first=1
+	local jobs=0
+
+	for jail_name in "${JAILDIR}/"*; do
+		jail_name="${jail_name##*/}"
+
+		if [ ${first} -eq 1 ]; then
+			jail_get ${eflag} ${Hflag} ${Iflag} ${tflag} -- "${jail_name}" "$@"
+
+			first=0
+		else
+			jail_get ${eflag} ${Iflag} ${tflag} -- "${jail_name}" "$@" &
+
+			jobs=$((jobs+1))
+
+			# Limit the number of jobs per CPU.
+			if [ ${jobs} -ge `sysctl -n hw.ncpu` ]; then
+				# Reset.
+				jobs=0
+
+				wait || exit $?
+			fi
+		fi
+	done > "${output}"
+
+	wait || exit $?
+
 	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
+		column -ts $'\t' -- "${output}"
 	else
-		cat
+		cat -- "${output}"
 	fi
 }
 
