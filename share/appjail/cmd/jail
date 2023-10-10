@@ -1130,7 +1130,10 @@ jail_install_standard_thinjail()
 			rootdir="${dest}"
 		else
 			rootdir="${dest}/${dir}"
-			mkdir -p "${rootdir}"
+			
+			if ! mkdir -p -- "${rootdir}"; then
+				lib_err ${EX_IOERR} "Error creating ${rootdir}"
+			fi
 		fi
 
 		if [ ! -e "${source}/${file}" ]; then
@@ -1154,7 +1157,9 @@ jail_install_standard_thinjail()
 		fi
 	done < "${FILESDIR}/exclude-thinjail.files"
 
-	mkdir -p "${dest}/.appjail"
+	if ! mkdir -p -- "${dest}/.appjail"; then
+		lib_err ${EX_IOERR} "Error creating ${dest}/.appjail"
+	fi
 }
 
 jail_install_standard_linux_debootstrap()
