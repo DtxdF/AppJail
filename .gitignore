@@ -4,3 +4,4 @@
 /libexec/appjail-config/appjail-config
 /libexec/appjail-config/tok
 *.o
+/*.vim
