@@ -49,7 +49,7 @@ fetch_main()
 	fi
 
 	case "${entity}" in
-		debootstrap|destroy|list|local|www) ;;
+		debootstrap|destroy|empty|list|local|www) ;;
 		*) fetch_usage; exit ${EX_USAGE} ;;
 	esac
 
@@ -351,6 +351,68 @@ fetch_local()
 fetch_www()
 {
 	_fetch_cmd -m www "$@"
+}
+
+fetch_empty()
+{
+	local osarch="any"
+	local osversion="any"
+	local _o
+
+	while getopts ":a:v:" _o; do
+		case "${_o}" in
+			a|v)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				osarch="${OPTARG}"
+				;;
+			v)
+				osversion="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local release_name="$1"
+
+	if lib_check_empty "${release_name}"; then
+		release_name="${DEFAULT_RELEASE}"
+	fi
+
+	if ! lib_zfs_mkdir "${RELEASEDIR}" "${ZFS_RELEASE_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}"
+	fi
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
+	fi
+
+	_fetch_atomic_init -a "${osarch}" -r "${release_name}" -v "${osversion}"
+
+	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	_fetch_atomic_mid "${releasedir}"
+
+	touch -- "${releasedir}/.empty"
+
+	_fetch_atomic_end "${releasedir}"
+
+	printf "%s\n" "${releasedir}"
 }
 
 _fetch_cmd()
@@ -661,6 +723,10 @@ Options for destroy:
     -a osarch                 -- Release architecture. Default: ${FREEBSD_ARCH}
     -v osversion              -- OS version of the release to be destroyed. ${FREEBSD_VERSION}
 
+Options for empty:
+    -a osarch                 -- Release architecture. Default: any
+    -v osversion              -- OS version of the release. Default: any
+
 Options for local and www:
     -C                        -- By default, appjail tries to download the MANIFEST file and use it to verify the
                                  downloaded components. This option disables it.
@@ -675,6 +741,7 @@ fetch_usage()
 cat << EOF
 usage: fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r release_name] [-S script] suite_name
        fetch destroy [-f] [-a osarch] [-v osversion] release_name
+       fetch empty [-a osarch] [-v osversion] [release_name]
        fetch list arch[/version]
        fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
        fetch www [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]

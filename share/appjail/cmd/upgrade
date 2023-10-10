@@ -123,6 +123,33 @@ upgrade_jail()
 		lib_err ${EX_NOPERM} "${jail_name} is not a thickjail."
 	fi
 
+	local osarch
+	osarch=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" osarch` || return $?
+
+	if lib_check_empty "${osarch}"; then
+		lib_err ${EX_CONFIG} -- "osarch is empty or not defined in the configuration file!"
+	fi
+
+	local osversion
+	osversion=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" osversion` || return $?
+
+	if lib_check_empty "${osversion}"; then
+		lib_err ${EX_CONFIG} -- "osversion is empty or not defined in the configuration file!"
+	fi
+
+	local release_name
+	release_name=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" release_name` || return $?
+
+	if lib_check_empty "${release_name}"; then
+		lib_err ${EX_CONFIG} -- "release_name is empty or not defined in the configuration file!"
+	fi
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if [ -f "${releasedir}/.empty" ]; then
+		lib_err ${EX_NOPERM} "This jail uses an empty release, so you cannot upgrade it."
+	fi
+
 	local currently_running
 	currently_running=`chroot "${basedir}" freebsd-version` || return $?
 
@@ -242,6 +269,10 @@ upgrade_release()
 	local new_basedir="${RELEASEDIR}/${freebsd_arch}/${new_version}/${release_name}"
 
 	if [ ${opt_install} -eq 1 ]; then
+		if [ -f "${new_basedir}/.empty" ]; then
+			lib_err ${EX_NOPERM} "This is an empty release, so you will have to upgrade it manually."
+		fi
+
 		if [ ! -d "${new_basedir}/release" ]; then
 			lib_err ${EX_NOINPUT} "Cannot find the \`${new_basedir}/release\` directory."
 		fi
@@ -261,7 +292,13 @@ upgrade_release()
 			fi
 		fi
 
-		local basedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}/release"
+		local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
+
+		if [ -f "${releasedir}/.empty" ]; then
+			lib_err ${EX_NOPERM} "This is an empty release, so you will have to upgrade it manually."
+		fi
+
+		local basedir="${releasedir}/release"
 
 		if [ ! -d "${basedir}" ]; then
 			lib_err ${EX_NOINPUT} "Cannot find the release directory (${basedir})."
