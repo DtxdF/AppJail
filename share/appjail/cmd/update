@@ -138,13 +138,11 @@ update_release()
 {
 	local _o
 	local opt_force=0
-	local opt_jail=0
-	local opt_release=0
 	local freebsd_arch="${FREEBSD_ARCH}"
 	local release_name="${DEFAULT_RELEASE}"
 	local freebsd_version="${FREEBSD_VERSION}"
 
-	while getopts ":fjra:v:" _o; do
+	while getopts ":fa:v:" _o; do
 		case "${_o}" in
 			a|v)
 				if lib_check_empty "${OPTARG}"; then
@@ -157,12 +155,6 @@ update_release()
 		case "${_o}" in
 			f)
 				opt_force=1
-				;;
-			j)
-				opt_jail=1
-				;;
-			r)
-				opt_release=1
 				;;
 			a)
 				freebsd_arch="${OPTARG}"
