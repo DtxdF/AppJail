@@ -1,0 +1,244 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+etcupdate_desc="Manage updates to system files not updated by installworld."
+
+ETCUPDATE_DEFAULT_MODE="update"
+
+etcupdate_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		etcupdate_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|release) ;;
+		*) etcupdate_usage; exit ${EX_USAGE} ;;
+	esac
+
+	etcupdate_${entity} "$@"
+}
+
+etcupdate_jail()
+{
+	local _o
+	local mode="${ETCUPDATE_DEFAULT_MODE}"
+
+	while getopts ":m:" _o; do
+		case "${_o}" in
+			m)
+				if lib_check_empty "${OPTARG}"; then
+					etcupdate_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			m)
+				mode="${OPTARG}"
+				;;
+			*)
+				etcupdate_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+
+	if lib_check_empty "${jail_name}"; then
+		etcupdate_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/jail"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`."
+	fi
+
+	local logname
+	logname=`_get_etcupdatelog` || exit $?
+
+	lib_zfs_mklogdir "jails" "${jail_name}" "etcupdate"
+
+	local etcupdate_name="jails/${jail_name}/etcupdate/${logname}"
+	local logfile="${LOGDIR}/${etcupdate_name}"
+
+	lib_info "etcupdate(8) log will be ${etcupdate_name}"
+
+	_etcupdate "${mode}" "${basedir}" "${logfile}" "$@"
+}
+
+etcupdate_release()
+{
+	local _o
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local mode="${ETCUPDATE_DEFAULT_MODE}"
+	local freebsd_version="${FREEBSD_VERSION}"
+
+	while getopts ":a:m:v:" _o; do
+		case "${_o}" in
+			a|m|v)
+				if lib_check_empty "${OPTARG}"; then
+					etcupdate_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			m)
+				mode="${OPTARG}"
+				;;
+			v)
+				freebsd_version="${OPTARG}"
+				;;
+			*)
+				etcupdate_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local release_name="$1"; shift
+	
+	if [ "${release_name}" = "-" ] || lib_check_empty "${release_name}"; then
+		release_name="${DEFAULT_RELEASE}"
+	fi
+
+	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
+
+	local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
+
+	if [ ! -d "${releasedir}/release" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the release directory (${releasedir}/release)."
+	fi
+
+	local logname
+	logname=`_get_etcupdatelog` || exit $?
+
+	lib_zfs_mklogdir "releases" "${release_name}" "etcupdate"
+
+	local etcupdate_name="releases/${release_name}/etcupdate/${logname}"
+	local logfile="${LOGDIR}/${etcupdate_name}"
+
+	lib_info "etcupdate(8) log will be ${etcupdate_name}"
+
+	_etcupdate "${mode}" "${releasedir}/release" "${logfile}" "$@"
+}
+
+_get_etcupdatelog()
+{
+	local logname
+	logname=`sh -c "${ETCUPDATELOG_NAME}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "{ETCUPDATELOG_NAME} exits with a non-zero exit status."
+	fi
+
+	if lib_check_ispath "${logname}"; then
+		lib_err ${EX_DATAERR} -- "${logname}: invalid log name."
+	fi
+
+	printf "%s" "${logname}"
+}
+
+_etcupdate()
+{
+	local mode="$1"
+	local destdir="$2"
+	local logfile="$3"
+
+	shift 3
+
+	if [ -z "${mode}" -o -z "${destdir}" -o -z "${logfile}" ]; then
+		lib_err ${EX_USAGE} "usage: _etcupdate mode destdir logfile [args ...]"
+	fi
+
+	case "${mode}" in
+		update) mode= ;;
+		diff|extract|resolve|revert|status) ;;
+		*) etcupdate_usage; exit ${EX_USAGE} ;;
+	esac
+
+	local errlevel
+
+	etcupdate ${mode} -D "${destdir}" -L "${logfile}" "$@"
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "etcupdate(8) exits with a non-zero exit status."
+	fi
+}
+
+etcupdate_help()
+{
+	cat << EOF
+`etcupdate_usage`
+
+${etcupdate_desc}
+
+Parameters:
+    jail                      -- Run etcupdate(8) in a given jail.
+    release                   -- Run etcupdate(8) in a given release.
+
+Options:
+    -m mode                   -- etcupdate(8) mode. Valid: update, diff, extract, resolve, revert and status.
+
+Options for release:
+    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
+    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+EOF
+}
+
+etcupdate_usage()
+{
+	cat << EOF
+usage: etcupdate jail [-m mode] jail_name [etcupdate_args ...]
+       etcupdate release [-a freebsd_arch] [-m mode] [-v freebsd_version] [- | release_name] [etcupdate_args ...]
+EOF
+}

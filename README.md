@@ -1276,6 +1276,7 @@ The entities can be a network, a jail or something similar. They are dynamic.
 * `{jails|nat}/{ENTITY}/{startup-start|startup-stop}`: Logs created by the `appjail startup` command.
 * `releases/{ENTITY}/build`: Output of a compilation when executing `fetch src`.
 * `commands/{ENTITY}/output`: When `ENABLE_LOGGING_OUTPUT` is set to 1, AppJail will log all output of a command.
+* `{jails|releases}/${ENTITY}/etcupdate`: Output of `etcupdate(8)` when executing `etcupdate`.
 
 **log**:
 
