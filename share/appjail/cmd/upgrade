@@ -148,6 +148,8 @@ upgrade_jail()
 
 	if [ -f "${releasedir}/.empty" ]; then
 		lib_err ${EX_NOPERM} "This jail uses an empty release, so you cannot upgrade it."
+	elif [ -f "${releasedir}/.from_src" ]; then
+		lib_err ${EX_NOPERM} "This jail uses a release installed from a source tree, so you cannot upgrade it."
 	fi
 
 	local currently_running
@@ -271,6 +273,8 @@ upgrade_release()
 	if [ ${opt_install} -eq 1 ]; then
 		if [ -f "${new_basedir}/.empty" ]; then
 			lib_err ${EX_NOPERM} "This is an empty release, so you will have to upgrade it manually."
+		elif [ -f "${new_basedir}/.from_src" ]; then
+			lib_err ${EX_NOPERM} "This release is installed from a source tree, so you cannot upgrade it."
 		fi
 
 		if [ ! -d "${new_basedir}/release" ]; then
@@ -296,6 +300,8 @@ upgrade_release()
 
 		if [ -f "${releasedir}/.empty" ]; then
 			lib_err ${EX_NOPERM} "This is an empty release, so you will have to upgrade it manually."
+		elif [ -f "${releasedir}/.from_src" ]; then
+			lib_err ${EX_NOPERM} "This release is installed from a source tree, so you cannot upgrade it."
 		fi
 
 		local basedir="${releasedir}/release"

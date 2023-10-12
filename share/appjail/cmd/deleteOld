@@ -1,0 +1,213 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+deleteOld_desc="Run \`make delete-old delete-old-libs\` on a given release or thickjail."
+
+deleteOld_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		deleteOld_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		jail|release) ;;
+		*) deleteOld_usage; exit ${EX_USAGE} ;;
+	esac
+
+	deleteOld_${entity} "$@"
+}
+
+deleteOld_jail()
+{
+	local jail_name="$1"
+
+	if lib_check_empty "${jail_name}"; then
+		deleteOld_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	lib_set_logprefix " [`random_color`${jail_name}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/jail"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`."
+	fi
+
+	local jail_type
+	jail_type=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" jail_type` || return $?
+
+	if [ "${jail_type}" != "${JAIL_TYPE_THICK}" ]; then
+		lib_err ${EX_NOPERM} "${jail_name} is not a thickjail."
+	fi
+
+	local osarch
+	osarch=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" osarch` || return $?
+
+	if lib_check_empty "${osarch}"; then
+		lib_err ${EX_CONFIG} -- "osarch is empty or not defined in the configuration file!"
+	fi
+
+	local osversion
+	osversion=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" osversion` || return $?
+
+	if lib_check_empty "${osversion}"; then
+		lib_err ${EX_CONFIG} -- "osversion is empty or not defined in the configuration file!"
+	fi
+
+	local release_name
+	release_name=`lib_ajconf get -Vnt "${jail_path}/conf/config.conf" release_name` || return $?
+
+	if lib_check_empty "${release_name}"; then
+		lib_err ${EX_CONFIG} -- "release_name is empty or not defined in the configuration file!"
+	fi
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if [ ! -f "${releasedir}/.from_src" ]; then
+		lib_err ${EX_NOPERM} -- "The origin of this jail does not come from a source tree."
+	fi
+
+	if [ ! -f "${releasedir}/.srcdir" ]; then
+		lib_err ${EX_NOINPUT} -- "${releasedir}/.srcdir: File does not exist."
+	fi
+
+	local source_tree
+	source_tree=`head -1 -- "${releasedir}/.srcdir"` || return $?
+
+	_deleteOld "${source_tree}" "${basedir}"
+}
+
+deleteOld_release()
+{
+	local _o
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local freebsd_version="${FREEBSD_VERSION}"
+	local release_name="${DEFAULT_RELEASE}"
+
+	while getopts ":a:v:" _o; do
+		case "${_o}" in
+			a|v)
+				if lib_check_empty "${OPTARG}"; then
+					deleteOld_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			v)
+				freebsd_version="${OPTARG}"
+				;;
+			*)
+				deleteOld_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -gt 0 ]; then
+		release_name="$1"
+
+		if lib_check_empty "${release_name}"; then
+			deleteOld_usage
+			exit ${EX_USAGE}
+		fi
+	fi
+
+	lib_set_logprefix " [`random_color`${release_name}${COLOR_DEFAULT}]"
+
+	local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
+
+	if [ ! -d "${releasedir}/release" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the release directory (${releasedir}/release)."
+	fi
+
+	if [ ! -f "${releasedir}/.from_src" ]; then
+		lib_err ${EX_NOPERM} -- "The origin of this release does not come from a source tree."
+	fi
+
+	if [ ! -f "${releasedir}/.srcdir" ]; then
+		lib_err ${EX_NOINPUT} -- "${releasedir}/.srcdir: File does not exist."
+	fi
+
+	local source_tree
+	source_tree=`head -1 -- "${releasedir}/.srcdir"` || return $?
+
+	_deleteOld "${source_tree}" "${releasedir}/release"
+}
+
+_deleteOld()
+{
+	local source_tree="$1"
+	local destdir="$2"
+
+	if [ -z "${source_tree}" -o -z "${destdir}" ]; then
+		lib_err ${EX_USAGE} "usage: _deleteOld source_tree destdir"
+	fi
+
+	make -C "${source_tree}" delete-old delete-old-libs \
+		DESTDIR="${destdir}" BATCH_DELETE_OLD_FILES=yes
+}
+
+deleteOld_help()
+{
+	cat << EOF
+`deleteOld_usage`
+
+${deleteOld_usage}
+
+Parameters:
+    jail                      -- Run delete-old and delete-old-libs in a given thickjail.
+    release                   -- Run delete-old and delete-old-libs in a given release.
+
+Options for release:
+    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
+    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+EOF
+}
+
+deleteOld_usage()
+{
+	cat << EOF
+usage: deleteOld jail jail_name
+       deleteOld release [-a freebsd_arch] [-v freebsd_version] [release_name]
+EOF
+}

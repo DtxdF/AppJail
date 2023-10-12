@@ -49,7 +49,7 @@ fetch_main()
 	fi
 
 	case "${entity}" in
-		debootstrap|destroy|empty|list|local|www) ;;
+		debootstrap|destroy|empty|list|local|src|www) ;;
 		*) fetch_usage; exit ${EX_USAGE} ;;
 	esac
 
@@ -415,6 +415,325 @@ fetch_empty()
 	printf "%s\n" "${releasedir}"
 }
 
+fetch_src()
+{
+	local _o
+	local opt_build=0
+	local opt_delete_old=1
+	local opt_world=1
+	local opt_kernel=0
+	local opt_distribution=1
+	local opt_distrib_dirs=1
+	local arch="${TARGET_ARCH}"
+	local jobs="${JOBS}"
+	local kernel="${KERNEL}"
+	local source_tree="${SRCDIR}"
+	local errlevel
+
+	while getopts ":bDIkNRa:j:K:s:" _o; do
+		case "${_o}" in
+			a|j|K|s)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			b)
+				opt_build=1
+				;;
+			D)
+				opt_delete_old=0
+				;;
+			I)
+				opt_world=0
+				;;
+			k)
+				opt_kernel=1
+				;;
+			N)
+				opt_distribution=0
+				;;
+			R)
+				opt_distrib_dirs=0
+				;;
+			a)
+				arch="${OPTARG}"
+				;;
+			j)
+				jobs="${OPTARG}"
+				;;
+			K)
+				kernel="${OPTARG}"
+				;;
+			s)
+				source_tree="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local release_name="$1"; shift
+	
+	if [ "${release_name}" = "-" ] || lib_check_empty "${release_name}"; then
+		release_name="${DEFAULT_RELEASE}"
+	fi
+
+	# Some checks.
+
+	if [ ! -d "${source_tree}" ]; then
+		lib_err ${EX_NOINPUT} -- "${source_tree}: Source tree cannot be found."
+	fi
+
+	if ! lib_check_number "${jobs}"; then
+		lib_err ${EX_DATAERR} -- "${jobs}: Jobs must be a number."
+	fi
+
+	# TARGET/TARGET_ARCH.
+
+	local target target_arch
+
+	target=`lib_jailparam_name "${arch}" /`
+	
+	if ! lib_check_target "${source_tree}" "${target}"; then
+		lib_err ${EX_NOINPUT} -- "${target}: Invalid TARGET."
+	fi
+
+	target_arch=`lib_jailparam_value "${arch}" /`
+
+	if ! lib_check_empty "${target_arch}"; then
+		if lib_check_ispath "${target_arch}" || ! lib_check_target_arch "${source_tree}" "${target_arch}"; then
+			lib_err ${EX_DATAERR} -- "${target_arch}: Invalid TARGET_ARCH."
+		fi
+	fi
+
+	if [ ${opt_kernel} -eq 1 ]; then
+		if ! lib_check_kernelconf "${source_tree}" "${target}" "${kernel}"; then
+			lib_err ${EX_NOINPUT} -- "${kernel}: Kernel configuration cannot be found."
+		fi
+	fi
+
+	local newvers_file="${source_tree}/sys/conf/newvers.sh"
+
+	if [ ! -f "${newvers_file}" ]; then
+		lib_err ${EX_OSFILE} -- "${newvers_file}: File required but does not exist."
+	fi
+
+	local revision branch
+
+	revision=`grep -Ee '^REVISION=' "${newvers_file}" | sed -Ee 's/.+="([^"]+)"/\1/'`
+	branch=`grep -Ee '^BRANCH=' "${newvers_file}" | sed -Ee 's/.+="([^"]+)"/\1/'`
+	
+	if lib_check_empty "${revision}" || lib_check_empty "${branch}"; then
+		lib_err ${EX_OSFILE} -- "${newvers_file}: REVISION or BRANCH cannot be obtained."
+	fi
+
+	local release="${revision}-${branch}"
+	# Remove -pXX.
+	release=`printf "%s" "${release}" | sed -Ee 's/\-p[0-9]+$//'`
+
+	local releasedir="${RELEASEDIR}/${target}/${release}/${release_name}"
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${target}/${release}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
+	fi
+
+	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${target}/${release}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	if ! touch -- "${releasedir}/.from_src"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/.from_src"
+	fi
+
+	# Write options used by update jail.
+	
+	printf "%s" "${arch}" > "${releasedir}/.arch" || exit $?
+	printf "%s" "${target}" > "${releasedir}/.target" || exit $?
+	if ! lib_check_empty "${target_arch}"; then
+		printf "%s" "${target_arch}" > "${releasedir}/.target_arch" || exit $?
+	fi
+	printf "%s" "${kernel}" > "${releasedir}/.kernconf" || exit $?
+	printf "%s" "${source_tree}" > "${releasedir}/.srcdir" || exit $?
+
+	# TARGET_ARCH variable.
+
+	local _target_arch_arg=
+
+	if ! lib_check_empty "${target_arch}"; then
+		_target_arch_arg="TARGET_ARCH=${target_arch}"
+	fi
+
+	# Log.
+
+	local logname
+	logname=`sh -c "${BUILDLOG_NAME}"`
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "{BUILDLOG_NAME} exits with a non-zero exit status."
+	fi
+
+	if lib_check_ispath "${logname}"; then
+		lib_err ${EX_DATAERR} -- "${logname}: invalid log name."
+	fi
+
+	lib_zfs_mklogdir "releases" "${release_name}" "build"
+
+	local build_name="releases/${release_name}/build/${logname}"
+	local buildlog="${LOGDIR}/${build_name}"
+
+	lib_info "Build log will be ${build_name}"
+
+	if [ ${opt_build} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_buildworld" || exit $?
+
+		lib_info "Starting buildworld with ${jobs} jobs ..."
+
+		make -C "${source_tree}" -j${jobs} buildworld \
+			TARGET="${target}" ${_target_arch_arg} ${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "buildworld finished!"
+
+			touch -- "${releasedir}/.done_buildworld" || exit $?
+		else
+			lib_err ${errlevel} "buildworld failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+
+		if [ ${opt_kernel} -eq 1 ]; then
+			rm -f -- "${releasedir}/.buildkernel"
+
+			lib_info "Starting buildkernel with ${jobs} jobs ..."
+
+			make -C "${source_tree}" -j${jobs} buildkernel \
+				TARGET="${target}" ${_target_arch_arg} \
+				KERNCONF="${kernel}" ${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+			errlevel=$?
+
+			if [ ${errlevel} -eq 0 ]; then
+				lib_info "buildkernel finished!"
+
+				touch -- "${releasedir}/.buildkernel"
+			else
+				lib_err ${errlevel} "buildkernel failed. Run \`appjail logs read ${build_name}\` for details."
+			fi
+		fi
+	fi
+
+	if [ ${opt_world} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_installworld" || exit $?
+
+		lib_info "Starting installworld with ${jobs} jobs ..."
+
+		make -C "${source_tree}" -j${jobs} installworld \
+			DESTDIR="${releasedir}/release" DB_FROM_SRC=1 \
+			TARGET="${target}" ${_target_arch_arg} \
+			${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "installworld finished!"
+
+			touch -- "${releasedir}/.done_installworld" || exit $?
+		else
+			lib_err ${errlevel} "installworld failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+	fi
+
+	if [ ${opt_distrib_dirs} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_distrib-dirs" || exit $?
+
+		lib_info "Starting distrib-dirs ..."
+
+		make -C "${source_tree}" -j${jobs} distrib-dirs \
+			DESTDIR="${releasedir}/release" DB_FROM_SRC=1 \
+			TARGET="${target}" ${_target_arch_arg} \
+			${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "distrib-dirs finished!"
+
+			touch -- "${releasedir}/.done_distrib-dirs" || exit $?
+		else
+			lib_err ${errlevel} "distrib-dirs failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+	fi
+
+	if [ ${opt_distribution} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_distribution" || exit $?
+
+		lib_info "Starting distribution ..."
+
+		make -C "${source_tree}" -j${jobs} distribution \
+			DESTDIR="${releasedir}/release" DB_FROM_SRC=1 \
+			TARGET="${target}" ${_target_arch_arg} \
+			${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "distribution finished!"
+
+			touch -- "${releasedir}/.done_distribution" || exit $?
+		else
+			lib_err ${errlevel} "distribution failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+	fi
+
+	if [ ${opt_kernel} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_installkernel" || exit $?
+
+		lib_info "Starting installkernel with ${jobs} jobs ..."
+
+		make -C "${source_tree}" -j${jobs} installkernel \
+			DESTDIR="${releasedir}/release" KERNCONF="${kernel}" \
+			TARGET="${target}" ${_target_arch_arg} \
+			${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+		
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "installkernel finished!"
+
+			touch -- "${releasedir}/.done_installkernel" || exit $?
+		else
+			lib_err ${errlevel} "installkernel failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+	fi
+
+	if [ ${opt_delete_old} -eq 1 ]; then
+		rm -f -- "${releasedir}/.done_delete-old" || exit $?
+
+		lib_info "Starting delete-old delete-old-libs ..."
+
+		"${APPJAIL_PROGRAM}" deleteOld release \
+			-a "${target}" -v "${release}" -- "${release_name}" >> "${buildlog}" 2>&1
+	
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "delete-old delete-old-libs finished!"
+
+			touch -- "${releasedir}/.done_delete-old" || exit $?
+		else
+			lib_err ${errlevel} "delete-old delete-old-libs failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+	fi
+}
+
 _fetch_cmd()
 {
 	local _o
@@ -733,6 +1052,19 @@ Options for local and www:
     -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
     -u downloadurl            -- Website where the components will be downloaded. Default: ${DOWNLOADURL}
     -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
+
+Options for src:
+    -b                        -- Build the world and, if -k is specified, the kernel.
+    -D                        -- Don't run delete-old and delete-old-libs targets.
+    -I                        -- Don't run installworld target.
+    -k                        -- Build and/or install the kernel. If -b is not specified, only installkernel will
+                                 be executed.
+    -N                        -- Don't run distribution target.
+    -R                        -- Don't run distrib-dirs target.
+    -a target[/target_arch]   -- Equivalent to TARGET/TARGET_ARCH in build(7). Default: ${TARGET_ARCH}
+    -j jobs                   -- Number of jobs to use. Default: ${JOBS}
+    -K kernel                 -- Kernel configuration file to be used. Default: ${KERNEL}
+    -s source_tree            -- Source tree. Default: ${SRCDIR}
 EOF
 }
 
@@ -744,6 +1076,7 @@ usage: fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r rel
        fetch empty [-a osarch] [-v osversion] [release_name]
        fetch list arch[/version]
        fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
+       fetch src [-bDIkNR] [-a target[/target_arch]] [-j jobs] [-K kernel] [-s source_tree] [- | release_name] [make_args ...]
        fetch www [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
 EOF
 }

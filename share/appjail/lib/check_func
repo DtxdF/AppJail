@@ -965,3 +965,81 @@ lib_check_sum()
 
 	return 0
 }
+
+lib_check_target()
+{
+	local srcdir="$1"
+	local target="$2"
+
+	if [ -z "${srcdir}" -o -z "${target}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_target srcdir target"
+	fi
+
+	local targets
+	targets=`_lib_get_targets "${srcdir}"` || exit $?
+
+	for _target in `echo "${targets}" | cut -d/ -f1`; do
+		if [ "${_target}" = "${target}" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+lib_check_target_arch()
+{
+	local srcdir="$1"
+	local target_arch="$2"
+
+	if [ -z "${srcdir}" -o -z "${target_arch}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_target srcdir target_arch"
+	fi
+
+	local targets_arch
+	targets_arch=`_lib_get_targets "${srcdir}"` || exit $?
+
+	for _target_arch in `echo "${targets_arch}" | cut -d/ -f2`; do
+		if [ "${_target_arch}" = "${target_arch}" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+_lib_get_targets()
+{
+	local output
+	local errlevel
+	local srcdir="$1"
+
+	output=`make -C "${srcdir}" targets`
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error in obtaining the targets."
+	fi
+
+	printf "%s\n" "${output}" | tail +2 | sed -Ee 's/^ //'
+}
+
+lib_check_kernelconf()
+{
+	local srcdir="$1"
+	local arch="$2"
+	local kernel="$3"
+
+	if [ -z "${srcdir}" -o -z "${arch}" -o -z "${kernel}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_kernelconf srcdir arch kernel"
+	fi
+
+	local kernelconf="${srcdir}/sys/${arch}/conf/${kernel}"
+
+	if [ -f "${kernelconf}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}

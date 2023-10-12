@@ -55,17 +55,47 @@ update_main()
 update_jail()
 {
 	local _o
+	local opt_build=0
 	local opt_force=0
+	local opt_cond_kernel=1
+	local opt_kernel=0
+	local jobs="${JOBS}"
 
-	while getopts ":f" _o; do
+	while getopts ":bfKkj:" _o; do
 		case "${_o}" in
+			j)
+				if lib_check_empty "${OPTARG}"; then
+					update_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			b)
+				opt_build=1
+				;;
 			f)
 				opt_force=1
 				;;
+			K)
+				opt_cond_kernel=0
+				;;
+			k)
+				opt_kernel=1
+				;;
+			j)
+				jobs="${OPTARG}"
+				;;
+			*)
+				update_usage
+				exit ${EX_USAGE}
+				;;
 		esac
 	done
+	shift $((OPTIND-1))
 
-	local jail_name="$1"
+	local jail_name="$1"; shift
 	if lib_check_empty "${jail_name}"; then
 		update_usage
 		exit ${EX_USAGE}
@@ -115,23 +145,134 @@ update_jail()
 
 	if [ -f "${releasedir}/.empty" ]; then
 		lib_err ${EX_NOPERM} "This jail uses an empty release, so you cannot update it."
+	elif [ -f "${releasedir}/.from_src" ]; then
+		if [ ${opt_cond_kernel} -eq 1 -a -f "${releasedir}/.done_installkernel" ]; then
+			opt_kernel=1
+		fi
+
+		local logname
+		logname=`sh -c "${BUILDLOG_NAME}"`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "{BUILDLOG_NAME} exits with a non-zero exit status."
+		fi
+
+		if lib_check_ispath "${logname}"; then
+			lib_err ${EX_DATAERR} -- "${logname}: invalid log name."
+		fi
+
+		lib_zfs_mklogdir "jails" "${jail_name}" "build"
+
+		local build_name="jails/${jail_name}/build/${logname}"
+		local buildlog="${LOGDIR}/${build_name}"
+
+		lib_info "Build log will be ${build_name}"
+
+		if [ ! -f "${releasedir}/.target" ]; then
+			lib_err ${EX_NOINPUT} -- "${releasedir}/.target: File does not exist."
+		fi
+
+		if [ ! -f "${releasedir}/.kernconf" ]; then
+			lib_err ${EX_NOINPUT} -- "${releasedir}/.kernconf: File does not exist."
+		fi
+
+		if [ ! -f "${releasedir}/.srcdir" ]; then
+			lib_err ${EX_NOINPUT} -- "${releasedir}/.srcdir: File does not exist."
+		fi
+
+		local target target_arch kernel source_tree
+		local _target_arch_arg=
+
+		target=`head -1 -- "${releasedir}/.target"` || exit $?
+		if [ -f "${releasedir}/.target_arch" ]; then
+			target_arch=`head -1 -- "${releasedir}/.target_arch"` || exit $?
+			_target_arch_arg="TARGET_ARCH=${target_arch}"
+		fi
+		kernel=`head -1 -- "${releasedir}/.kernconf"` || exit $?
+		source_tree=`head -1 -- "${releasedir}/.srcdir"` || exit $?
+
+		if [ ${opt_build} -eq 1 ]; then
+			lib_info "Starting buildworld with ${jobs} jobs ..."
+
+			make -C "${source_tree}" -j${jobs} buildworld \
+				TARGET="${target}" ${_target_arch_arg} ${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+			errlevel=$?
+
+			if [ ${errlevel} -eq 0 ]; then
+				lib_info "buildworld finished!"
+			else
+				lib_err ${errlevel} "buildworld failed. Run \`appjail logs read ${build_name}\` for details."
+			fi
+
+			if [ ${opt_kernel} -eq 1 ]; then
+				lib_info "Starting buildkernel with ${jobs} jobs ..."
+
+				make -C "${source_tree}" -j${jobs} buildkernel \
+					TARGET="${target}" ${_target_arch_arg} \
+					KERNCONF="${kernel}" ${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+				errlevel=$?
+
+				if [ ${errlevel} -eq 0 ]; then
+					lib_info "buildkernel finished!"
+				else
+					lib_err ${errlevel} "buildkernel failed. Run \`appjail logs read ${build_name}\` for details."
+				fi
+			fi
+		fi
+
+		lib_info "Starting installworld with ${jobs} jobs ..."
+
+		make -C "${source_tree}" -j${jobs} installworld \
+			DESTDIR="${basedir}" DB_FROM_SRC=1 \
+			TARGET="${target}" ${_target_arch_arg} \
+			${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+
+		errlevel=$?
+
+		if [ ${errlevel} -eq 0 ]; then
+			lib_info "installworld finished!"
+		else
+			lib_err ${errlevel} "installworld failed. Run \`appjail logs read ${build_name}\` for details."
+		fi
+
+		if [ ${opt_kernel} -eq 1 ]; then
+			lib_info "Starting installkernel with ${jobs} jobs ..."
+
+			make -C "${source_tree}" -j${jobs} installkernel \
+				DESTDIR="${basedir}" KERNCONF="${kernel}" \
+				TARGET="${target}" ${_target_arch_arg} \
+				${MAKEARGS} "$@" >> "${buildlog}" 2>&1
+			
+			errlevel=$?
+
+			if [ ${errlevel} -eq 0 ]; then
+				lib_info "installkernel finished!"
+			else
+				lib_err ${errlevel} "installkernel failed. Run \`appjail logs read ${build_name}\` for details."
+			fi
+		fi
+
+		lib_info "Done."
+	else
+		local freebsd_update_args
+		if [ ${opt_force} -eq 1 ]; then
+			freebsd_update_args="-F"
+		fi
+
+		local currently_running
+		currently_running=`chroot "${basedir}" freebsd-version`
+
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${basedir}" \
+			--currently-running "${currently_running}" \
+			fetch install
 	fi
-
-	local freebsd_update_args
-	if [ ${opt_force} -eq 1 ]; then
-		freebsd_update_args="-F"
-	fi
-
-	local currently_running
-	currently_running=`chroot "${basedir}" freebsd-version`
-
-	freebsd-update \
-		${freebsd_update_args} \
-		-f "${FREEBSD_UPDATE_CONF}" \
-		--not-running-from-cron \
-		-b "${basedir}" \
-		--currently-running "${currently_running}" \
-		fetch install
 }
 
 update_release()
@@ -185,6 +326,8 @@ update_release()
 
 	if [ -f "${releasedir}/.empty" ]; then
 		lib_err ${EX_NOPERM} "This is an empty release, so you will have to update it manually."
+	elif [ -f "${releasedir}/.from_src" ]; then
+		lib_err ${EX_NOPERM} "This is a release installed from a source tree, so you will have to run \`appjail fetch src\` by yourself."
 	fi
 
 	local basedir="${releasedir}/release"
@@ -224,6 +367,15 @@ Parameters:
 Options:
     -f                        -- See \`-F\` in freebsd-update(8).
 
+Options for jail:
+    Note: -b, -k, -K and -j are valid only by thickjails that use a release compiled from a source tree.
+
+    -b                        -- Build the world and the kernel (see below).
+    -k                        -- Unconditionally build the kernel.
+    -K                        -- If a successful kernel compilation is detected from the release,
+                                 the kernel will be compiled. This option disables this feature.
+    -j jobs                   -- Number of jobs to use. Default: ${JOBS}
+
 Options for release:
     -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
     -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
@@ -233,7 +385,7 @@ EOF
 update_usage()
 {
 	cat << EOF
-usage: update jail [-f] jail_name
+usage: update jail [-bfKk] [-j jobs] jail_name
        update release [-f] [-a freebsd_arch] [-v freebsd_version] [release_name]
 EOF
 }
