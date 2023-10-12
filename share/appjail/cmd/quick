@@ -132,6 +132,7 @@ QUICK_OPTION_OSARCH="${FREEBSD_ARCH}"
 QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
 QUICK_OPTION_OVERWRITE="${DEFAULT_OVERWRITE}"
 QUICK_OPTION_PRIORITY="${DEFAULT_PRIORITY}"
+QUICK_OPTION_RELEASE="${DEFAULT_RELEASE}"
 QUICK_OPTION_RESTART="${DEFAULT_RESTART}"
 QUICK_OPTION_RUN="${DEFAULT_RUN}"
 QUICK_OPTION_RUN_ARGS=
@@ -189,7 +190,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -318,6 +319,7 @@ quick_create_jail()
 
 	local escape_osarch=`lib_escape_string "${QUICK_OPTION_OSARCH}"`
 	local escape_install_method=`lib_escape_string "${QUICK_OPTION_INSTALL_METHOD}"`
+	local escape_release=`lib_escape_string "${QUICK_OPTION_RELEASE}"`
 	local escape_jail_type=`lib_escape_string "${QUICK_OPTION_JAILTYPE}"`
 	local escape_osversion=`lib_escape_string "${QUICK_OPTION_OSVERSION}"`
 	# This is not necessary after running `appjail jail create` because
@@ -325,7 +327,7 @@ quick_create_jail()
 	local escape_jail_name=`lib_escape_string "${QUICK_JAILNAME}"`
 
 	local appjail_cmd="appjail jail create"
-	appjail_cmd="${appjail_cmd} -a \"${escape_osarch}\" -I \"${escape_install_method}\" -T \"${escape_jail_type}\" -v \"${escape_osversion}\""
+	appjail_cmd="${appjail_cmd} -a \"${escape_osarch}\" -I \"${escape_install_method}\" -r \"${escape_release}\" -T \"${escape_jail_type}\" -v \"${escape_osversion}\""
 
 	if [ -n "${QUICK_OPTION_INITSCRIPT}" ]; then
 		local escape_initscript=`lib_escape_string "${QUICK_OPTION_INITSCRIPT}"`
@@ -2815,6 +2817,15 @@ quick_set_notzdata()
 	QUICK_OPTION_USE_TZDATA=0
 }
 
+quick_set_release()
+{
+	local release
+
+	release="$1"; quick_reqoption "release" "${release}"
+
+	QUICK_OPTION_RELEASE="${release}"
+}
+
 quick_run_resolv_conf()
 {
 	local errlevel
@@ -3776,6 +3787,11 @@ Options:
                              Default: ${QUICK_OPTION_PRIORITY}
                              Descr: The priority number that affects the order in which this jail is started and stopped. If 0, the
 			            priority is not set because 0 is the default number when the jail is created.
+
+    release               -- Syntax: release="release_name"
+                             Type: str
+			     Default: ${QUICK_OPTION_RELEASE}
+			     Descr: Release used by the jail.
 
     resolv_conf           -- Syntax: resolv_conf
                                      resolv_conf="path/to/resolv.conf"
