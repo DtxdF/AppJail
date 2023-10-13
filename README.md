@@ -4933,7 +4933,7 @@ There are three files. `.done` is to indicate to `fetch empty` that this release
 
 ```sh
 # release
-D=/usr/local/appjail/releases/any/any/default
+D=/usr/local/appjail/releases/any/any/default/release
 # or jail
 D=/usr/local/appjail/jails/jtest/jail
 
