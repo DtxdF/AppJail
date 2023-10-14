@@ -57,8 +57,8 @@ main()
 			if printf "%s" "${file}" | grep -qEe '/'; then
 				subdir="${file%/*}"
 				
-				mode=`stat -f "%OLp" -- "${src}/${subdir}"`
-				owner_and_group=`stat -f "%u:%g" -- "${src}/${subdir}"`
+				mode=`stat -f "%OLp" -- "${src}/${subdir}"` || exit $?
+				owner_and_group=`stat -f "%u:%g" -- "${src}/${subdir}"` || exit $?
 
 				rootdir="${dst}/${subdir}"
 
