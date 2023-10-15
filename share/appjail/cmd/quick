@@ -1893,7 +1893,7 @@ quick_run_fstab()
 
 		lib_debug "fstab#${nro}: \"${device}\" \"${mountpoint}\" \"${type}\" \"${options}\" \"${dump}\" \"${pass}\""
 
-		appjail fstab jail "${QUICK_JAILNAME}" set -d "${device}" -m "${mountpoint}" -t "${type}" -o "${options}" -D "${dump}" -P "${pass}" -p
+		appjail fstab jail "${QUICK_JAILNAME}" set -d "${device}" -m "${mountpoint}" -t "${type}" -o "${options}" -D "${dump}" -P "${pass}"
 	done
 }
 
@@ -2103,7 +2103,7 @@ quick_run_x11()
 	fi
 	
 	mkdir -pm 1777 "${JAILDIR}/${QUICK_JAILNAME}/jail/tmp/.X11-unix" || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp/.X11-unix -m /tmp/.X11-unix -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp/.X11-unix -m /tmp/.X11-unix || exit $?
 }
 
 quick_set_x11()
@@ -2128,7 +2128,7 @@ quick_run_tmpdir()
 	fi
 	
 	mkdir -pm 1777 "${JAILDIR}/${QUICK_JAILNAME}/jail/tmp" || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp -m /tmp -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp -m /tmp || exit $?
 }
 
 quick_set_tmpdir()
@@ -2148,11 +2148,11 @@ quick_run_linuxfs()
 	
 	lib_debug "Using linuxfs option ..."
 
-	appjail fstab jail "${QUICK_JAILNAME}" set -d devfs -m /dev -t devfs -o rw,ruleset="${QUICK_OPTION_DEVFS_RULESET}" -p || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d tmpfs -m /dev/shm -t tmpfs -o rw,size=1g,mode=1777 -p || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d fdescfs -m /dev/fd -t fdescfs -o rw,linrdlnk -p || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d linprocfs -m /proc -t linprocfs -p || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d linsysfs -m /sys -t linsysfs -p || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d devfs -m /dev -t devfs -o rw,ruleset="${QUICK_OPTION_DEVFS_RULESET}" || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d tmpfs -m /dev/shm -t tmpfs -o rw,size=1g,mode=1777 || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d fdescfs -m /dev/fd -t fdescfs -o rw,linrdlnk || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d linprocfs -m /proc -t linprocfs || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d linsysfs -m /sys -t linsysfs || exit $?
 }
 
 quick_set_linuxfs()

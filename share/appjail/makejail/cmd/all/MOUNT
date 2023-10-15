@@ -172,7 +172,7 @@ main()
 		dump=`lib_escape_string "${dump}" "" "${escape_chars}"`
 		pass=`lib_escape_string "${pass}" "" "${escape_chars}"`
 
-		echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" set -n \"${nro}\" -d \"${device}\" -m \"${mountpoint}\" -t \"${type}\" -o \"${options}\" -D \"${dump}\" -P \"${pass}\" -p"
+		echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" set -n \"${nro}\" -d \"${device}\" -m \"${mountpoint}\" -t \"${type}\" -o \"${options}\" -D \"${dump}\" -P \"${pass}\""
 		if [ ${automount} -eq 1 ]; then
 			echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" compile"
 			echo "\"\${APPJAIL_SCRIPT}\" fstab jail \"\${APPJAIL_JAILNAME}\" mount -a"
