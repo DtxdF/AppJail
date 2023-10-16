@@ -1024,6 +1024,7 @@ Parameters:
     destroy                   -- Destroy a release.
     list                      -- List installed releases.
     local                     -- Copy components from local filesystem.
+    src                       -- Compile a source tree.
     www                       -- Default. Use {WWW_CMD} to get FreeBSD components.
 
 Options:
