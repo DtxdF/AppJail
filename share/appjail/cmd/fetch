@@ -1020,9 +1020,9 @@ fetch_help()
 ${fetch_desc}
 
 Parameters:
-    list                      -- List installed releases.
     debootstrap               -- Use debootstrap(8) to bootstrap a basic Debian system.
     destroy                   -- Destroy a release.
+    list                      -- List installed releases.
     local                     -- Copy components from local filesystem.
     www                       -- Default. Use {WWW_CMD} to get FreeBSD components.
 
