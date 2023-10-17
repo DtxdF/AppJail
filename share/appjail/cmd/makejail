@@ -635,9 +635,9 @@ makejail_write()
 	# FROM
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_FROM}"
 
-    local builddir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}"
+	local builddir="${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}"
 
-    mkdir -p -- "${builddir}" || exit $?
+	mkdir -p -- "${builddir}" || exit $?
 
 	# Additional options provided by the user.
 	if [ -n "${MAKEJAIL_OPTIONS}" ]; then
@@ -903,10 +903,10 @@ makejail_run_cmd()
 				MAKEJAIL_STAGESDIR="${MAKEJAIL_STAGESDIR}" \
 					"${cmd}" "${parameters}"
 
-				errlevel=$?
-				if [ ${errlevel} -ne 0 ]; then
-					exit ${errlevel}
-				fi
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				exit ${errlevel}
+			fi
 			;;
 	esac
 }
