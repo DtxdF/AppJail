@@ -2026,7 +2026,7 @@ jail_list()
 			jobs=$((jobs+1))
 
 			# Limit the number of jobs per CPU.
-			if [ ${jobs} -ge `sysctl -n hw.ncpu` ]; then
+			if [ ${jobs} -ge ${JOBS} ]; then
 				# Reset.
 				jobs=0
 
