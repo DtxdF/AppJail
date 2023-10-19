@@ -4206,6 +4206,25 @@ PING python.development.appjail (10.42.0.4): 56 data bytes
 round-trip min/avg/max/stddev = 0.207/0.228/0.275/0.028 ms
 ```
 
+If you prefer a much shorter name than the one used above, you can set `{SHORTEN_DOMAIN_NAMES}` to `1` in your `appjail.conf`.
+
+```
+# ping -c4 redis
+PING redis (10.42.0.16): 56 data bytes
+64 bytes from 10.42.0.16: icmp_seq=0 ttl=64 time=0.244 ms
+64 bytes from 10.42.0.16: icmp_seq=1 ttl=64 time=0.154 ms
+64 bytes from 10.42.0.16: icmp_seq=2 ttl=64 time=0.216 ms
+64 bytes from 10.42.0.16: icmp_seq=3 ttl=64 time=0.189 ms
+
+--- redis ping statistics ---
+4 packets transmitted, 4 packets received, 0.0% packet loss
+round-trip min/avg/max/stddev = 0.154/0.201/0.244/0.033 ms
+```
+
+**Note**: Use `{NETWORK_TO_SHORTEN}` (default: `${AUTO_NETWORK_NAME}` which defaults to `ajnet`) to choose which network name to shorten.
+
+When the above feature is enabled, you can use either the short or the long name.
+
 ## Healthcheckers
 
 Simply starting the jail is fine for almost all users, but what happens when the jail contains a service that should not be stopped? Software has bugs and at any time your favorite web server or the DBMS can crash.
