@@ -108,7 +108,6 @@ main()
 	fi
 
 	"${SCRIPTSDIR}/run_init.sh" -f "${config}" ${cmd} -F "${custom_stage}" "${initscript}" "$@"
-
 }
 
 usage()
