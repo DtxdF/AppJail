@@ -896,7 +896,7 @@ _fetch_gethash_manifest()
 		lib_err ${EX_USAGE} "usage: _fetch_gethash_manifest file manifest_file"
 	fi
 
-	grep -F "${file}" "${manifest_file}" | awk '{print $2}'
+	grep -F -- "${file}" "${manifest_file}" | awk '{print $2}'
 }
 
 _fetch()

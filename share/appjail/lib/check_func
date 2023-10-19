@@ -333,7 +333,7 @@ lib_check_path_traversal()
 		lib_err ${errlevel} "realpath(1) error (${_dst_dir})."
 	fi
 
-	cmp=`printf "%s" "${dst_dir}" | grep -Fwo "${src_dir}"`
+	cmp=`printf "%s" "${dst_dir}" | grep -Fwo -- "${src_dir}"`
 
 	if [ "${cmp}" != "${src_dir}" ]; then
 		# Path traversal!
@@ -372,7 +372,7 @@ lib_check_path_traversal_file()
 		lib_err ${errlevel} "realpath(1) error (${_file})."
 	fi
 
-	local rootdir_file=`printf "%s" "${file}" | grep -Fwo "${rootdir}"`
+	local rootdir_file=`printf "%s" "${file}" | grep -Fwo -- "${rootdir}"`
 
 	if [ "${rootdir}" != "${rootdir_file}" ]; then
 		return 0
@@ -611,7 +611,7 @@ lib_check_signal()
 
 	local signals=`kill -l | tr '\n' ' ' | tr '[:upper:]' '[:lower:]' | sed -Ee 's/([a-z]+)/sig\1/g' | tr ' ' '\n'`
 
-	if echo "${signals}" | grep -qFw "${signal}"; then
+	if echo "${signals}" | grep -qFw -- "${signal}"; then
 		return 0
 	else
 		return 1
@@ -641,7 +641,7 @@ lib_check_rctl_resource()
 		lib_err ${EX_USAGE} "lib_check_rctl_resource resource"
 	fi
 
-	if grep -qFw "${resource}" "${FILESDIR}/rctl-resources"; then
+	if grep -qFw -- "${resource}" "${FILESDIR}/rctl-resources"; then
 		return 0
 	else
 		return 1
@@ -656,7 +656,7 @@ lib_check_rctl_action()
 		lib_err ${EX_USAGE} "lib_check_rctl_action action"
 	fi
 
-	if grep -qFw "${action}" "${FILESDIR}/rctl-actions"; then
+	if grep -qFw -- "${action}" "${FILESDIR}/rctl-actions"; then
 		return 0
 	else
 		return 1
@@ -671,7 +671,7 @@ lib_check_rctl_subject()
 		lib_err ${EX_USAGE} "lib_check_rctl_subject subject"
 	fi
 
-	if grep -qFw "${subject}" "${FILESDIR}/rctl-subjects"; then
+	if grep -qFw -- "${subject}" "${FILESDIR}/rctl-subjects"; then
 		return 0
 	else
 		return 1
