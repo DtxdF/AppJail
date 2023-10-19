@@ -118,9 +118,7 @@ run_cmd()
 
 	(
 	__appjail_errlevel__=0
-	__appjail_scriptdir__=`dirname "${__appjail_script__}"`
 
-	cd "${__appjail_scriptdir__}"
 	. "${__appjail_script__}"
 
 	if lib_check_func "pre${__appjail_function__}"; then
