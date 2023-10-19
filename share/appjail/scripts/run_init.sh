@@ -38,8 +38,11 @@ main()
 		exit 64 # EX_USAGE
 	fi
 
-	while getopts ":CcSsF:f:" _o; do
+	while getopts ":ACcSsF:f:" _o; do
 		case "${_o}" in
+			A)
+				function="apply"
+				;;
 			C)
 				function="cmd"
 				;;
@@ -96,7 +99,7 @@ main()
 
 usage()
 {
-	echo "usage: run_init.sh [[-C | -c | -S | -s] | -F custom_stage] -f config init_script [args ...]"
+	echo "usage: run_init.sh [[-A | -C | -c | -S | -s] | -F custom_stage] -f config init_script [args ...]"
 }
 
 run_cmd()

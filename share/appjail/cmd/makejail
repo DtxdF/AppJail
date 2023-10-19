@@ -51,6 +51,9 @@ MAKEJAIL_BUILD_ARGS=
 # Default makejail filename
 DEFAULT_MAKEJAIL_FILE="Makejail"
 
+# Apply
+MAKEJAIL_APPLY=0
+
 # Errors
 MAKEJAIL_ERRORS=1
 
@@ -64,6 +67,7 @@ MAKEJAIL_STAGESDIR="stages"
 MAKEJAIL_CURRENT_STAGE="build"
 
 # Stages
+MAKEJAIL_STAGE_APPLY="apply"
 MAKEJAIL_STAGE_BUILD="build"
 MAKEJAIL_STAGE_PRECREATE="precreate"
 MAKEJAIL_STAGE_CREATE="create"
@@ -80,6 +84,7 @@ MAKEJAIL_STAGE_POSTSTOP="poststop"
 
 # Init stages
 MAKEJAIL_INIT_STAGES="\
+		${MAKEJAIL_STAGE_APPLY} \
 		${MAKEJAIL_STAGE_PRECREATE} \
 		${MAKEJAIL_STAGE_CREATE} \
 		${MAKEJAIL_STAGE_POSTCREATE} \
@@ -121,8 +126,10 @@ makejail_main()
 	local opt_exact_match=0
 	local makejail_file="${DEFAULT_MAKEJAIL_FILE}"
 	local repoid=
+	# environment
+	local environment=
 
-	while getopts ":cEelva:B:b:d:f:j:o:u:V:" _o; do
+	while getopts ":AcEelva:B:b:d:f:j:o:u:V:" _o; do
 		case "${_o}" in
 			a|B|b|d|f|j|o|u|V)
 				if lib_check_empty "${OPTARG}"; then
@@ -133,6 +140,9 @@ makejail_main()
 		esac
 
 		case "${_o}" in
+			A)
+				MAKEJAIL_APPLY=1
+				;;
 			c)
 				opt_create=1
 				;;
@@ -201,20 +211,17 @@ makejail_main()
 					lib_err ${EX_DATAERR} -- "${env}: Invalid environment variable."
 				fi
 
-				_create_tempdir
-
-				local envdir="${MAKEJAIL_TEMPDIR}/env"
-				if ! mkdir -p "${envdir}"; then
-					lib_err ${EX_IOERR} "Error creating ${envdir}"
-				fi
-
 				local env_name=`lib_jailparam_name "${env}" "="`
 				local env_value=`lib_jailparam_value "${env}" "="`
 
 				env="${env_name}=${env_value}"
 				env=`lib_escape_string "${env}" 3`
 
-				printf "%s " "\\\"${env}\\\"" >> "${envdir}/${MAKEJAIL_STAGE_BUILD}.tmp"
+				if [ -z "${environment}" ]; then
+					environment="\\\"${env}\\\""
+				else
+					environment="${environment} \\\"${env}\\\""
+				fi
 				;;
 			*)
 				makejail_usage
@@ -241,11 +248,23 @@ makejail_main()
 
 		makejail_update ${Eflag} "${repoid}"
 	else
-		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
-			MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
-		fi
+		if [ -n "${environment}" ]; then
+			_create_tempdir
 
-		lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
+			local envdir="${MAKEJAIL_TEMPDIR}/env"
+			if ! mkdir -p "${envdir}"; then
+				lib_err ${EX_IOERR} "Error creating ${envdir}"
+			fi
+
+			local stage
+			if [ ${MAKEJAIL_APPLY} -eq 1 ]; then
+				stage="${MAKEJAIL_STAGE_APPLY}"
+			else
+				stage="${MAKEJAIL_STAGE_BUILD}"
+			fi
+
+			printf "%s" "${environment}" >> "${envdir}/${stage}.tmp"
+		fi
 
 		makejail_run "${makejail_file}" "$@"
 	fi
@@ -457,53 +476,91 @@ makejail_run()
 		lib_err ${EX_USAGE} "usage: makejail_run makejail_file"
 	fi
 
-	lib_info "Building ${MAKEJAIL_JAILNAME} ..."
+	if [ ${MAKEJAIL_APPLY} -eq 1 ]; then
+		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
+			makejail_usage
+			exit ${EX_USAGE}
+		fi
 
-	lib_debug "Main Makejail: ${makejail_file}"
+		if ! lib_check_jailname "${MAKEJAIL_JAILNAME}"; then
+			lib_err ${EX_DATAERR} "Invalid jail name \"${MAKEJAIL_JAILNAME}\""
+		fi
 
-	local output
-	output="`lib_generate_tempfile`"
+		local jail_path
+		jail_path="${JAILDIR}/${MAKEJAIL_JAILNAME}"
+		if [ ! -d "${jail_path}/jail" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the jail \`${MAKEJAIL_JAILNAME}\`"
+		fi
 
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
+		if lib_jail_exists "${MAKEJAIL_JAILNAME}"; then
+			if ! lib_jail_created_by_appjail "${MAKEJAIL_JAILNAME}"; then
+				lib_warn -- "${MAKEJAIL_JAILNAME} was not been created by appjail."
+				exit 0
+			fi
+		fi
 
-	local escape_output
-	escape_output=`lib_escape_string "${output}"`
+		lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
 
-	lib_atexit_add "rm -f \"${escape_output}\""
+		lib_info "Applying ${makejail_file} ..."
 
-	_create_tempdir
+		_create_tempdir
 
-	makejail_write "${makejail_file}" > "${output}"
-	
-	# Print the result
-	lib_debug "Buildscript generated:"
-	lib_debug_read "${output}"
+		makejail_write "${makejail_file}"
+	else
+		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
+			MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+		fi
 
-	local current_pwd
-	current_pwd=`pwd -P`
+		lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
 
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
-	fi
+		lib_info "Building ..."
 
-	local makejail_rootdir
-	makejail_rootdir=`head -1 -- "${MAKEJAIL_ROOTDIR}"`
+		lib_debug "Main Makejail: ${makejail_file}"
 
-	(cd -- "${makejail_rootdir}"; env \
-		APPJAIL_CONFIG="${CONFIG}" \
-		APPJAIL_JAILNAME="${MAKEJAIL_JAILNAME}" \
-		APPJAIL_JAILDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}/jail" \
-		APPJAIL_PWD="${current_pwd}" \
-		APPJAIL_ROOTDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}" \
-		APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
-			sh -- "${output}" "$@")
-	errlevel=$?
-	if [ ${errlevel} -ne 0 ]; then
-		exit ${errlevel}
+		local output
+		output="`lib_generate_tempfile`"
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		local escape_output
+		escape_output=`lib_escape_string "${output}"`
+
+		lib_atexit_add "rm -f \"${escape_output}\""
+
+		_create_tempdir
+
+		makejail_write "${makejail_file}" > "${output}"
+		
+		# Print the result
+		lib_debug "Buildscript generated:"
+		lib_debug_read "${output}"
+
+		local current_pwd
+		current_pwd=`pwd -P`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
+
+		local makejail_rootdir
+		makejail_rootdir=`head -1 -- "${MAKEJAIL_ROOTDIR}"`
+
+		(cd -- "${makejail_rootdir}"; env \
+			APPJAIL_CONFIG="${CONFIG}" \
+			APPJAIL_JAILNAME="${MAKEJAIL_JAILNAME}" \
+			APPJAIL_JAILDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}/jail" \
+			APPJAIL_PWD="${current_pwd}" \
+			APPJAIL_ROOTDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}" \
+			APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+				sh -- "${output}" "$@")
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			exit ${errlevel}
+		fi
 	fi
 
 	if [ -d "${JAILDIR}/${MAKEJAIL_JAILNAME}" ]; then
@@ -520,8 +577,29 @@ makejail_run()
 		lib_debug "initscript generated:"
 		lib_debug_read "${initscript}"
 
-		if ! mv -- "${initscript}" "${JAILDIR}/${MAKEJAIL_JAILNAME}/init"; then
-			lib_err ${EX_IOERR} "Error moving ${initscript} as ${JAILDIR}/${MAKEJAIL_JAILNAME}/jail"
+		if [ ${MAKEJAIL_APPLY} -eq 1 ]; then
+			local makejail_rootdir
+			makejail_rootdir=`head -1 -- "${MAKEJAIL_ROOTDIR}"`
+
+			# To be (run), or not to be (run), that is the question...
+			(cd -- "${makejail_rootdir}"; env \
+				APPJAIL_CONFIG="${CONFIG}" \
+				APPJAIL_JAILDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}/jail" \
+				APPJAIL_JAILNAME="${MAKEJAIL_JAILNAME}" \
+				APPJAIL_ROOTDIR="${JAILDIR}/${MAKEJAIL_JAILNAME}" \
+				APPJAIL_SCRIPT="${APPJAIL_PROGRAM}" \
+					"${SCRIPTSDIR}/run_init.sh" -A -f "${CONFIG}" "${initscript}" "$@")
+
+			errlevel=$?
+			if [ ${errlevel} -ne 0 ]; then
+				exit ${errlevel}
+			fi
+		else
+			local outname="${JAILDIR}/${MAKEJAIL_JAILNAME}/init"
+
+			if ! mv -- "${initscript}" "${outname}"; then
+				lib_err ${EX_IOERR} "Error moving ${initscript} as ${outname}"
+			fi
 		fi
 	fi
 }
@@ -601,6 +679,24 @@ makejail_write()
 		local cmd=`lib_jailparam_name "${line}" " "`
 		local parameters=`lib_jailparam_value "${line}" " "`
 
+		if [ "${cmd}" = "${MAKEJAIL_CMD_STAGE}" ]; then
+			makejail_change_stage "${parameters}"
+			continue
+		fi
+		
+		# Machinery depending on whether this Makejail is to be applied or not.
+		if [ ${MAKEJAIL_APPLY} -eq 1 ]; then
+			# Ignore if we aren't in the apply stage.
+			if [ "${MAKEJAIL_CURRENT_STAGE}" != "${MAKEJAIL_STAGE_APPLY}" ]; then
+				continue
+			fi
+		else
+			# Ignore if we are in the apply stage.
+			if [ "${MAKEJAIL_CURRENT_STAGE}" = "${MAKEJAIL_STAGE_APPLY}" ]; then
+				continue
+			fi
+		fi
+
 		local _cmd
 		_cmd=`makejail_check_cmd "${cmd}"` || exit $?
 
@@ -615,6 +711,11 @@ makejail_write()
 
 		priority=$((priority+1))
 	done < "${temp_makejail}"
+
+	# Build stage should be ignored.
+	if [ ${MAKEJAIL_APPLY} -eq 1 ]; then
+		return 0
+	fi
 	
 	# Configuration and functions
 	_makejail_config
@@ -891,24 +992,17 @@ makejail_run_cmd()
 
 	lib_debug "Running makejail command (cmd): ${cmd} (args:${parameters})"
 
-	case "${cmd}" in
-		${MAKEJAIL_CMD_STAGE})
-			makejail_change_stage "${parameters}"
-			;;
-		*)
-			env \
-				AJ_CONFIG="${CONFIG}" \
-				MAKEJAIL_CURRENT_STAGE="${MAKEJAIL_CURRENT_STAGE}" \
-				MAKEJAIL_TEMPDIR="${MAKEJAIL_TEMPDIR}" \
-				MAKEJAIL_STAGESDIR="${MAKEJAIL_STAGESDIR}" \
-					"${cmd}" "${parameters}"
+	env \
+		AJ_CONFIG="${CONFIG}" \
+		MAKEJAIL_CURRENT_STAGE="${MAKEJAIL_CURRENT_STAGE}" \
+		MAKEJAIL_TEMPDIR="${MAKEJAIL_TEMPDIR}" \
+		MAKEJAIL_STAGESDIR="${MAKEJAIL_STAGESDIR}" \
+			"${cmd}" "${parameters}"
 
-			errlevel=$?
-			if [ ${errlevel} -ne 0 ]; then
-				exit ${errlevel}
-			fi
-			;;
-	esac
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
 }
 
 makejail_check_cmd()
@@ -918,28 +1012,21 @@ makejail_check_cmd()
 		lib_err ${EX_DATAERR} "Makejail needs a command to run!"
 	fi
 
-	case "${cmd}" in
-		${MAKEJAIL_CMD_STAGE})
-			echo "${MAKEJAIL_CMD_STAGE}"
-			;;
-		*)
-			local script
+	local script
 
-			if lib_check_ispath "${cmd}"; then
-				lib_err ${EX_DATAERR} "Invalid command: ${cmd}"
-			fi
+	if lib_check_ispath "${cmd}"; then
+		lib_err ${EX_DATAERR} "Invalid command: ${cmd}"
+	fi
 
-			if [ -x "${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}" ]; then
-				script="${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}"
-			elif [ -x "${MAKEJAIL_COMMANDS}/all/${cmd}" ]; then
-				script="${MAKEJAIL_COMMANDS}/all/${cmd}"
-			else
-				lib_err ${EX_NOINPUT} -- "${cmd}: command not found."
-			fi
+	if [ -x "${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}" ]; then
+		script="${MAKEJAIL_COMMANDS}/${MAKEJAIL_CURRENT_STAGE}/${cmd}"
+	elif [ -x "${MAKEJAIL_COMMANDS}/all/${cmd}" ]; then
+		script="${MAKEJAIL_COMMANDS}/all/${cmd}"
+	else
+		lib_err ${EX_NOINPUT} -- "${cmd}: command not found."
+	fi
 
-			echo "${script}"
-			;;
-	esac
+	echo "${script}"
 }
 
 makejail_include()
@@ -1567,6 +1654,7 @@ Parameters:
                               but updates all matching repositories. Use \`*\` to update all cloned repositories.
 
 Options for -c:
+    -A                     -- Apply a Makejail to an existing jail. -e, -v and -o are ignored.
     -e                     -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
     -v                     -- Use \`set -vx\` to display the commands in the buildscript.
     -a include_file        -- Include a Makejail before all instructions.
@@ -1587,6 +1675,8 @@ makejail_usage()
 	cat << EOF
 usage: makejail [-c] [-ev] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
 		[-f makejail] [-j jail_name] [[-o option] ...] [[-V env=value] ...] -- [runtime_args ...]
+       makejail -A -j jail_name [-c] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
+		[-f makejail] [[-V env=value] ...] -- [runtime_args ...]
        makejail [-E] -d id
        makejail -l
        makejail [-E] -u [id|*]

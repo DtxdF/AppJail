@@ -923,6 +923,7 @@ Initscripts are another useful feature of AppJail that are the core of Makejail.
 * `stop`: `appjail stop` will run this `stage` after the jail is stopped.
 * `cmd`: `appjail run` will run this `stage` only when the jail is running.
 * `custom:<custom stage>`: `appjail run` will run this `stage` only when the jail is running. This stage is special because you can use any name you want (of course, not all characters are allowed).
+* `apply`: `appjail apply` will run this `stage` only when the jail exists.
 
 Each `stage` has `pre-` and `post-` functions. `pre-` is executed before `stage` is executed and if it fails, `stage` will not be executed. `post-` will be executed after `pre-` and `stage` even if they fail. `pre-` and `stage` affect the exit status, but `post-` does not. `stage` and functions in a initscript are all optional, AppJail will execute them if they exist.
 
@@ -3250,6 +3251,33 @@ To update all Makejails we can use `*`.
 [00:00:05] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Already up to date.
 [00:00:05] [ info  ] [1e973093ef8e324c857c3ddd57f18d1d6367866b47e913139439c67e571a516c] Done.
 ```
+
+### Applying Makejails
+
+Maybe you have a jail already created to which you want to make some changes, but simply running a Makejail is not useful for your case since it will be recreated, so you create a script in the language of your choice, but you realize that you need to write more things than simply creating a Makejail. The solution to this problem is to apply a Makejail to an existing jail to take advantage of the Makejail instructions.
+
+Suppose we create a jail that has `xrdp` and some DE like `lxde` and we forget to install some applications that we use daily, so to solve it we create a Makejail that by convention we name `Makejail.apply`.
+
+**Makejail.apply**:
+
+```
+STAGE apply
+
+PKG telegram-desktop \
+    xpdf \
+    librewolf
+    mesa-dri
+```
+
+As you can see, we need to put `STAGE apply` before the instructions are executed.
+
+To apply this Makejail just execute `appjail apply`.
+
+```sh
+appjail apply xrdp Makejail.apply
+```
+
+`appjail apply` does not require the jail to be started, it only needs an existing jail. This implies that some instructions that are intended to be executed in a started jail should not work.
 
 ### Empty jails
 
