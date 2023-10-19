@@ -44,7 +44,10 @@ lib_check_func()
 		lib_err ${EX_USAGE} "usage: lib_check_func function"
 	fi
 
-	if type "${function}" > /dev/null 2>&1; then
+	local out
+	out=`type "${function}" 2>&1`
+
+	if [ "${out}" = "${function} is a shell function" ]; then
 		return 0
 	else
 		return 1
