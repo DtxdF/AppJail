@@ -801,7 +801,7 @@ limits_stats()
 
 		local value
 		for keyword in ${keywords}; do
-			value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -F "${keyword}=" | cut -d= -f2-`
+			value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -Ee "^${keyword}=" | cut -d= -f2-`
 
 			if lib_check_empty "${value}"; then
 				if [ ${opt_empty} -eq 1 ]; then
