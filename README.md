@@ -4223,7 +4223,7 @@ round-trip min/avg/max/stddev = 0.154/0.201/0.244/0.033 ms
 
 **Note**: Use `{NETWORK_TO_SHORTEN}` (default: `${AUTO_NETWORK_NAME}` which defaults to `ajnet`) to choose which network name to shorten.
 
-When the above feature is enabled, you can use either the short or the long name.
+When the above feature is enabled, you can use either the short or the long name. The network domain names are kept intact, so if you need to get the IP of the network you must use its long name, e.g. `ajnet.appjail`, so you cannot just use `ajnet`.
 
 ## Healthcheckers
 
