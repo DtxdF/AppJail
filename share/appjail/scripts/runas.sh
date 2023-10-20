@@ -47,4 +47,4 @@ if [ -z "${CMD}" ]; then
 	exit 1
 fi
 
-"${RUNAS}" "${CMD}" "$@"
+exec "${RUNAS}" "${CMD}" "$@"
