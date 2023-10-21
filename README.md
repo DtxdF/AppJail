@@ -3279,6 +3279,91 @@ appjail apply xrdp Makejail.apply
 
 `appjail apply` does not require the jail to be started, it only needs an existing jail. This implies that some instructions that are intended to be executed in a started jail should not work.
 
+#### Notes
+
+Note that applying a Makejail is not executed in the same way as executing instructions in the `build` stage. The `build` stage uses a buildscript (simply a script that is executed in this stage) and the `apply` stage uses an initscript that is temporarily generated to execute the instructions you defined in your Makejail. The problem is the actual directory as you can see below:
+
+```
+# cat Makejail
+OPTION start
+OPTION overwrite=force
+
+INCLUDE a/Makejail
+
+CMD --local echo "main:"
+CMD --local pwd
+# cat a/Makejail
+INCLUDE b/Makejail
+
+CMD --local echo "a:"
+CMD --local pwd
+# cat a/b/Makejail
+INCLUDE c/Makejail
+
+CMD --local echo "b:"
+CMD --local pwd
+# cat a/b/c/Makejail
+CMD --local echo "c:"
+CMD --local pwd
+# appjail makejail -j jtest
+...
+c:
+/tmp/a/a/b/c
+b:
+/tmp/a/a/b
+a:
+/tmp/a/a
+main:
+/tmp/a
+...
+```
+
+As you can see above, by not defining any stage the `build` stage is used in those Makejails, so the current directory is implicitly defined. But if we use the `apply` stage:
+
+```
+# cat Makejail
+cat Makejail
+OPTION start
+OPTION overwrite=force
+
+INCLUDE a/Makejail
+
+STAGE apply
+
+CMD --local echo "main:"
+CMD --local pwd
+# cat a/Makejail
+INCLUDE b/Makejail
+
+STAGE apply
+
+CMD --local echo "a:"
+CMD --local pwd
+# cat a/b/Makejail
+INCLUDE c/Makejail
+
+STAGE apply
+
+CMD --local echo "b:"
+CMD --local pwd
+# cat a/b/c/Makejail
+STAGE apply
+
+CMD --local echo "c:"
+CMD --local pwd
+# appjail apply jtest
+...
+c:
+/tmp/a
+b:
+/tmp/a
+a:
+/tmp/a
+main:
+/tmp/a
+...
+```
+
 ### Empty jails
 
 Empty jails are useful for experimenting with jails. Especially with linux distros.
