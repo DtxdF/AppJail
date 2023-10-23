@@ -494,7 +494,7 @@ image_import()
 		lib_err ${EX_CONFIG} "Sources are not defined."
 	fi
 
-	printf "%s\n" "${sources}" | while IFS= read -r source; do
+	printf "%s\n" "${sources}" | _rearrange_sources | while IFS= read -r source; do
 		escape_url=`lib_escape_string "${source}"`
 		escape_output=`lib_escape_string "${image_file}"`
 		fetch_cmd=`lib_multi_replace "${IMAGE_FETCH_CMD}" o "\"${escape_output}\"" u "\"${escape_url}\""`
@@ -554,6 +554,15 @@ image_import()
 	touch -- "${done_file}"
 
 	lib_info "Saved as ${image_file}"
+}
+
+_rearrange_sources()
+{
+	case "${IMAGE_DOWNLOAD_METHOD}" in
+		seq) cat ;;
+		random) sort -R ;;
+		*) lib_err ${EX_CONFIG} "IMAGE_DOWNLOAD_METHOD: valid values are 'seq' and 'random'."
+	esac
 }
 
 _image_chktag()
