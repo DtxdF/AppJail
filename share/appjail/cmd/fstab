@@ -198,7 +198,7 @@ fstab_compile()
 				_fstab_pre_mount_pseudofs "${fs_spec}" "${fs_file}"
 				;;
 			nullfs)
-				_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}"
+				_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}" > /dev/null
 				;;
 			*)
 				_fstab_pre_mount "${fs_file}"
