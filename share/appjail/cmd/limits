@@ -479,7 +479,6 @@ limits_remove_keyword()
 	local nro=
 	local keyword
 	local basedir
-	local keyword_file=
 
 	while getopts ":n:" _o; do
 		case "${_o}" in
@@ -521,18 +520,17 @@ limits_remove_keyword()
 		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
 	fi
 
-	local keyword_file
 	for keyword in "$@"; do
 		case "${keyword}" in
 			action|enabled|name|per|resource|rule) ;;
 			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
 		esac
 
-		if [ ! -f "${basedir}/${keyword_file}" ]; then
+		if [ ! -f "${basedir}/${keyword}" ]; then
 			lib_warn -- "${keyword}: keyword does not exist."
 		fi
 
-		if ! rm -f "${basedir}/${keyword_file}"; then
+		if ! rm -f "${basedir}/${keyword}"; then
 			lib_warn -- "${keyword}: failed to remove."
 		fi
 	done
