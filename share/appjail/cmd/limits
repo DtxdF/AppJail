@@ -935,7 +935,8 @@ usage: limits get [-eHIipt] -n nro jail_name [keyword ...]
        limits list [eHIipt] [-n nro] jail_name [keyword ...]
        limits off jail_name
        limits on jail_name
-       limits remove [all | keyword -n nro keyword ... | nro nro] jail_name
+       limits remove [all | nro nro] jail_name
+       limits remove keyword -n nro jtest keyword ...
        limits set [-Ee] [-N name] [-n auto | nro] jail_name resource:action[=amount[/per]]
        limits stats [-eHIpt] jail_name [keyword ...]
 EOF
