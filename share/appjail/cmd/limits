@@ -79,7 +79,7 @@ limits_get()
 		case "${_o}" in
 			n)
 				if lib_check_empty "${OPTARG}"; then
-					limits
+					limits_usage
 					exit ${EX_USAGE}
 				fi
 				;;
@@ -708,7 +708,7 @@ limits_stats()
 		case "${_o}" in
 			n)
 				if lib_check_empty "${OPTARG}"; then
-					limits
+					limits_usage
 					exit ${EX_USAGE}
 				fi
 				;;
