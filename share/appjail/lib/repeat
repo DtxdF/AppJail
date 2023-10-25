@@ -104,11 +104,11 @@ lib_repeat_run()
 		tries=$((tries+1))
 	done
 
-	if ! lib_check_number "${cmd_output}"; then
+	if ! lib_check_empty "${cmd_output}"; then
 		printf "%s\n" "${cmd_output}" | while IFS= read -r line; do
 			lib_err - "${cmd}: ${line}"
 		done
 	fi
 
-	return ${errlevel}
+	return ${cmd_errlevel}
 }
