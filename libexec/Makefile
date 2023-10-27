@@ -1,5 +1,10 @@
 MAKE?=make
-TARGETS=appjail-config getservbyname ipcheck network
+TARGETS=appjail-config \
+		find-smallest-missing-number \
+		find-number-from-start \
+		getservbyname \
+		ipcheck \
+		network
 
 all:
 .for target in ${TARGETS}

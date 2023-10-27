@@ -1,0 +1,979 @@
+#!/bin/sh
+#
+# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/devfs"
+lib_load "${LIBDIR}/repeat"
+lib_load "${LIBDIR}/strlen"
+
+devfs_desc="Dynamic DEVFS ruleset management."
+
+devfs_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		append|apply|applyset|del|delset|get|list|load|remove|ruleset|set|show|showsets|status) ;;
+		*) devfs_usage; exit ${EX_USAGE} ;;
+	esac
+
+	devfs_${entity} "$@"
+}
+
+devfs_append()
+{
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local devfs_rules="$2"
+
+	if lib_check_empty "${devfs_rules}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	if [ ! -f "${devfs_rules}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the devfs rules \`${devfs_rules}\`"
+	fi
+
+	while IFS= read -r devfs_rule; do
+		devfs_set -- "${jail_name}" "${devfs_rule}" || exit $?
+	done < "${devfs_rules}"
+}
+
+devfs_apply()
+{
+	local _o
+	local ruleset="auto"
+
+	while getopts ":r:" _o; do
+		case "${_o}" in
+			r)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			r)
+				ruleset="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_devfs_chk_jail "${jail_name}"
+
+	if [ $# -eq 0 ]; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	local ruleset
+	ruleset=`devfs_ruleset_assign -r "${ruleset}" -- "${jail_name}"` || exit $?
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local devfsdir="${jail_path}/jail/dev"
+
+	if [ ! -d "${devfsdir}" ]; then
+		lib_err ${EX_NOINPUT} "The DEVFS directory (${devfsdir}) does not exist."
+	fi
+
+	# Reference ruleset to this devfs directory.
+	if ! devfs -m "${devfsdir}" ruleset "${ruleset}"; then
+		lib_err ${EX_SOFTWARE} "Error while referencing ruleset \`${ruleset}\` in \`${devfsdir}\`."
+	fi
+
+	if ! devfs -m "${devfsdir}" rule -s "${ruleset}" apply "$@"; then
+		lib_err ${EX_SOFTWARE} "Error applying \`$@\`."
+	fi
+}
+
+devfs_applyset()
+{
+	local _o
+	local ruleset="auto"
+
+	while getopts ":r:" _o; do
+		case "${_o}" in
+			r)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			r)
+				ruleset="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local devfsdir="${jail_path}/jail/dev"
+
+	if [ ! -d "${devfsdir}" ]; then
+		lib_err ${EX_NOINPUT} "The DEVFS directory (${devfsdir}) does not exist."
+	fi
+
+	devfs_load -r "${ruleset}" -- "${jail_name}" || exit $?
+
+	ruleset=`devfs_ruleset_get "${jail_name}"` || exit $?
+
+	if ! devfs -m "${devfsdir}" rule -s "${ruleset}" applyset; then
+		lib_err ${EX_SOFTWARE} "Error applying ruleset \`${ruleset}\`."
+	fi
+}
+
+devfs_del()
+{
+	local jail_name="$1"
+
+	local ruleset
+	ruleset=`devfs_ruleset_get "${jail_name}"` || exit $?
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local devfsdir="${jail_path}/jail/dev"
+
+	if [ ! -d "${devfsdir}" ]; then
+		lib_err ${EX_NOINPUT} "The DEVFS directory (${devfsdir}) does not exist."
+	fi
+
+	if ! lib_check_devfs_ruleset "${ruleset}"; then
+		lib_err ${EX_NOINPUT} -- "${ruleset}: This ruleset is not currently loaded."
+	fi
+
+	local rulenum="$2"
+
+	if lib_check_empty "${rulenum}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${rulenum}"; then
+		lib_err ${EX_DATAERR} -- "${rulenum}: Invalid rulenum."
+	fi
+
+	if ! devfs -m "${devfsdir}" rule -s "${ruleset}" del "${rulenum}"; then
+		lib_err ${EX_SOFTWARE} "Error removing rulenum \`${rulenum}\` from ruleset \`${ruleset}\`."
+	fi
+
+	if ! devfs -m "${devfsdir}" rule -s "${ruleset}" applyset; then
+		lib_err ${EX_SOFTWARE} "Error applying ruleset \`${ruleset}\`."
+	fi
+}
+
+devfs_delset()
+{
+	local jail_name="$1"
+
+	local ruleset
+	ruleset=`devfs_ruleset_get "${jail_name}"` || exit $?
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local devfsdir="${jail_path}/jail/dev"
+
+	if [ ! -d "${devfsdir}" ]; then
+		lib_err ${EX_NOINPUT} "The DEVFS directory (${devfsdir}) does not exist."
+	fi
+
+	if ! lib_check_devfs_ruleset "${ruleset}"; then
+		lib_err ${EX_NOINPUT} -- "${ruleset}: This ruleset is not currently loaded."
+	fi
+
+	if ! devfs -m "${devfsdir}" rule -s "${ruleset}" delset; then
+		lib_err ${EX_SOFTWARE} "Error removing ruleset \`${ruleset}\`."
+	fi
+}
+
+devfs_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_ignore_unknro=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local nro=
+
+	local flag_enabled=0
+        local flag_name=0
+        local flag_nro=0
+        local flag_rule=0
+	
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "${nro}" ]; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail_name="$1"; shift
+	_devfs_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/devfs/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		if [ ${opt_ignore_unknro} -eq 1 ]; then
+			return 0
+		fi
+
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "nro" "enabled" "name" "rule"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			enabled|name|nro|rule) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				nro)
+					value="${nro}"
+					;;
+				*)
+					if [ ! -f "${basedir}/${keyword}" ]; then
+						value=
+					else
+						value=`head -1 "${basedir}/${keyword}"`
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+devfs_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_ignore_unknro=0 iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local nro=
+
+	while getopts ":eHIiptn:" _o; do
+		case "${_o}" in
+			n)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			i)
+				opt_ignore_unknro=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_devfs_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_ignore_unknro} -eq 1 ]; then
+		iflag="-i"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${nro}" ]; then
+		devfs_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${pflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	mkdir -p "${JAILDIR}/${jail_name}/conf/boot/devfs"
+
+	ls -A "${JAILDIR}/${jail_name}/conf/boot/devfs" | sort -n | while IFS= read -r nro; do
+		devfs_get ${eflag} ${Hflag} ${Iflag} ${iflag} ${tflag} -n "${nro}" -- "${jail_name}" "$@"
+
+		# To not print the columns again
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+devfs_load()
+{
+	local _o
+	local ruleset="auto"
+
+	while getopts ":r:" _o; do
+		case "${_o}" in
+			r)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+		esac
+
+		case "${_o}" in
+			r)
+				ruleset="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local devfs_rules
+	devfs_rules=`lib_generate_tempfile` || exit $?
+
+	local escape_devfs_rules
+	escape_devfs_rules=`lib_escape_string "${devfs_rules}"`
+
+	lib_atexit_add "rm -f \"${escape_devfs_rules}\""
+
+	devfs_show -r "${ruleset}" -- "${jail_name}" > "${devfs_rules}" || exit $?
+
+	if ! lib_repeat_run -s random "${SCRIPTSDIR}/load-devfs-rules.sh" "${devfs_rules}"; then
+		lib_err ${EX_SOFTWARE} "Error loading DEVFS rules."
+	fi
+}
+
+devfs_remove()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		all|nro) ;;
+		*) devfs_usage; exit ${EX_USAGE} ;;
+	esac
+
+	devfs_remove_${command} "$@"
+}
+
+devfs_remove_all()
+{
+	local basedir
+	local jail_name
+
+	jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/devfs"
+
+	rm -rf "${basedir}"
+}
+
+devfs_remove_nro()
+{
+	local nro="$1"; shift
+	if lib_check_empty "${nro}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_number "${nro}"; then
+		lib_err ${EX_DATAERR} "NRO must be a number!"
+	fi
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	basedir="${JAILDIR}/${jail_name}/conf/boot/devfs/${nro}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the nro \`${nro}\`"
+	fi
+
+	rm -rf "${basedir}"
+}
+
+devfs_ruleset()
+{
+	local command="$1"; shift
+	if lib_check_empty "${command}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${command}" in
+		assign|get|remove) ;;
+		*) devfs_usage; exit ${EX_USAGE} ;;
+	esac
+
+	devfs_ruleset_${command} "$@"
+}
+
+devfs_ruleset_assign()
+{
+	local _o
+	local opt_reassign=0
+	local ruleset="auto"
+
+	while getopts ":Rr:" _o; do
+		case "${_o}" in
+			r)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			R)
+				opt_reassign=1
+				;;
+			r)
+				ruleset="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local ruleset_file="${jail_path}/conf/boot/devfs_ruleset"
+	local current_ruleset=0
+
+	if [ -f "${ruleset_file}" ]; then
+		current_ruleset=`head -1 -- "${ruleset_file}"` || exit $?
+	fi
+
+	local opt_write=0
+
+	if [ "${ruleset}" = "auto" ]; then
+		local _current_ruleset="${current_ruleset}"
+
+		if [ ${current_ruleset} -eq 0 ] || [ ${opt_reassign} -eq 1 ]; then
+			current_ruleset=`lib_devfs_get_available_ruleset` || exit $?
+
+			if [ ${_current_ruleset} -ne ${current_ruleset} ]; then
+				opt_write=1
+			fi
+		fi
+	else
+		if ! lib_check_number "${ruleset}" || \
+				[ ${ruleset} -eq 0 ]; then
+			lib_err ${EX_DATAERR} -- "${ruleset}: Invalid ruleset number."
+		fi
+
+		if [ ${ruleset} -ne ${current_ruleset} ]; then
+			opt_write=1
+		fi
+
+		current_ruleset="${ruleset}"
+	fi
+
+	if [ ${opt_write} -eq 1 ]; then
+		echo "${current_ruleset}" > "${ruleset_file}" || exit $?
+	fi
+
+	echo "${current_ruleset}"
+}
+
+devfs_ruleset_get()
+{
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local ruleset_file="${jail_path}/conf/boot/devfs_ruleset"
+
+	if [ ! -f "${ruleset_file}" ]; then
+		lib_err ${EX_NOINPUT} "There is no currently ruleset assigned."
+	fi
+
+	head -1 -- "${ruleset_file}"
+}
+
+devfs_ruleset_remove()
+{
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local ruleset_file="${jail_path}/conf/boot/devfs_ruleset"
+
+	if [ ! -f "${ruleset_file}" ]; then
+		lib_err ${EX_NOINPUT} "There is no currently ruleset assigned."
+	fi
+
+	rm -f "${ruleset_file}"
+}
+
+devfs_set()
+{
+	local _o
+	local opt_enabled=
+	local opt_name=0 name=
+	local nro="auto"
+
+	while getopts ":EeN:n:" _o; do
+		case "${_o}" in
+			N|n)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			E)
+				opt_enabled=1
+				;;
+			e)
+				opt_enabled=0
+				;;
+			N)
+				opt_name=1
+				name="${OPTARG}"
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	local devfs_rule="$2"
+	if lib_check_empty "${devfs_rule}"; then
+		devfs_rule=`devfs_get -Iin "${nro}" "${jail_name}" rule`
+
+		if [ -z "${devfs_rule}" ]; then
+			lib_err ${EX_CONFIG} "The devfs rule is not set in this NRO."
+		fi
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/boot/devfs"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ "${nro}" = "auto" ]; then
+		nro=`lib_getnro "${basedir}"`
+	else
+		if ! lib_check_number "${nro}"; then
+			lib_err ${EX_DATAERR} "NRO must be a number!"
+		fi
+	fi
+
+	basedir="${basedir}/${nro}"
+	if ! mkdir -p "${basedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${basedir}"
+	fi
+
+	if [ -z "${opt_enabled}" ]; then
+		opt_enabled=`devfs_get -In "${nro}" "${jail_name}" enabled`
+		opt_enabled="${opt_enabled:-1}"
+	fi
+
+	if [ ${opt_name} -eq 0 -a -z "${name}" ]; then
+		name=`devfs_get -In "${nro}" "${jail_name}" name`
+	fi
+
+	printf "%s\n" "${name}" > "${basedir}/name" || exit ${EX_IOERR}
+	printf "%s\n" "${opt_enabled}" > "${basedir}/enabled" || exit ${EX_IOERR} 
+	printf "%s\n" "${devfs_rule}" > "${basedir}/rule" || exit ${EX_IOERR}
+}
+
+devfs_show()
+{
+	local _o
+	local name=
+	local ruleset="auto"
+
+	while getopts ":n:r:" _o; do
+		case "${_o}" in
+			n|r)
+				if lib_check_empty "${OPTARG}"; then
+					devfs_usage
+					exit ${EX_USAGe}
+				fi
+		esac
+
+		case "${_o}" in
+			n)
+				name="${OPTARG}"
+				;;
+			r)
+				ruleset="${OPTARG}"
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_devfs_chk_jail "${jail_name}"
+
+	ruleset=`devfs_ruleset_assign -r "${ruleset}" -- "${jail_name}"` || exit $?
+
+	if [ -n "${name}" ]; then
+		if ! lib_check_varname "${name}"; then
+			lib_err ${EX_DATAERR} -- "${name}: Invalid ruleset name."
+		fi
+	else
+		name="devfsrules_`random_hexstring 11 0 15 | tr -d '\n'`"
+	fi
+
+	printf "[%s=%d]\n" "${name}" "${ruleset}"
+
+	devfs_list -HIpt -- "${jail_name}" nro enabled | while read -r nro enabled; do
+		if [ "${enabled}" != "1" ]; then
+			continue
+		fi
+
+		devfs_rule=`devfs_get -In "${nro}" -- "${jail_name}" rule` || exit $?
+
+		printf "add %s\n" "${devfs_rule}"
+	done || exit $?
+}
+
+devfs_showsets()
+{
+	lib_devfs_showallsets
+}
+
+_devfs_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		devfs_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+devfs_status()
+{
+	local ruleset
+	ruleset=`devfs_ruleset_get "$1"` || exit $?
+
+	if ! lib_check_devfs_ruleset "${ruleset}"; then
+		lib_err ${EX_NOINPUT} -- "${ruleset}: This ruleset is not currently loaded."
+	fi
+
+	devfs rule -s "${ruleset}" show
+}
+
+devfs_help()
+{
+    cat << EOF
+`devfs_usage`
+
+${devfs_desc}
+
+Parameters:
+    append                 -- Set rules by reading a file line by line. This command assumes that this file
+                              does not have a devfsrules name like \`[devfsrules_XXX=XX]\` or a \`devfs rule\`
+			      subcommand like \`path\`.
+    apply                  -- Apply a rule. This command uses \`devfs ruleset\` before applying this rule to
+                              reference it.
+    applyset               -- Load rules and apply them.
+    del                    -- Remove a rulenum.
+    delset                 -- Remove a ruleset.
+    get                    -- Get information about the current devfs rule for a given target.
+    list                   -- Like \`get\` but for all NROes.
+    load                   -- Load rules.
+    remove                 -- Remove all NROes or just a single NRO.
+    ruleset                -- Manipulate the ruleset number for this jail.
+    set                    -- Set parameters to an existing NRO or create it if it does not exist.
+    show                   -- Show current rules in a format described in \`devfs.rules(5)\`.
+    showsets               -- Show loaded and assigned rulesets. Assigned rulesets does not imply that they are
+                              loaded.
+    status                 -- Show loaded devfs rules.
+
+Options for apply, applyset, ruleset assign and show:
+    -r auto|ruleset        -- Operate in this ruleset. If not set, \`auto\` is used, which implies that
+                              \`{DEVFS_ASSIGN_ALGO}\` is used to obtain an unused ruleset number.
+
+Options for get:
+    -e                     -- This option is not required when using -p. The \\t character is used to delimit columns,
+                              in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                     -- Display the name of the columns.
+    -I                     -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                     -- Columnate the list.
+    -t                     -- Tabulate columns and values.
+    -n nro                 -- Operate in this NRO.
+
+Options for list:
+    -e                     -- This option is the opposite in \`Options for get\`.
+    -H                     -- This option is the opposite in \`Options for get\`.
+    -I                     -- This option is the same as in \`Options for get\`.
+    -p                     -- This option is the opposite in \`Options for get\`.
+    -t                     -- This option is the opposite in \`Options for get\`.
+    -n nro                 -- Operate in this NRO. If not set, operate in all NROes.
+
+Parameters for ruleset:
+    assign                 -- Assign a ruleset. It also display the current ruleset number.
+    get                    -- Get the current ruleset.
+    remove                 -- Remove the current ruleset.
+
+Options for ruleset assign:
+    -R                     -- Reassign a ruleset.
+
+Options for set:
+    -E                     -- Enable this NRO.
+    -e                     -- Disable this NRO.
+    -N name                -- The name of this NRO. It is not relevant, it is only for your
+                              convenience.
+    -n auto|nro            -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
+                              {JAILDIR}/{jail_name}/conf/boot/devfs.
+
+Options for show:
+    -n name                -- The name of this ruleset. If not set, a random name is chosen.
+EOF
+}
+
+devfs_usage()
+{
+    cat << EOF
+usage: devfs append jail_name devfs_rules
+       devfs apply [-r auto | ruleset] jail_name rulespec ...
+       devfs applyset [-r auto | ruleset] jail_name
+       devfs del jail_name rulenum
+       devfs delset jail_name
+       devfs get [-eHIipt] -n nro jail_name [keyword ...]
+       devfs list [eHIipt] [-n nro] jail_name [keyword ...]
+       devfs load [-r auto | ruleset] jail_name
+       devfs remove [all | nro nro] jail_name
+       devfs ruleset assign [-R] [-r auto | ruleset] jail_name
+       devfs ruleset get jail_name
+       devfs ruleset remove jail_name
+       devfs set [-Ee] [-N name] [-n auto | nro] jail_name rulespec
+       devfs show [-n name] [-r auto | ruleset] jail_name
+       devfs showsets
+       devfs status jail_name
+EOF
+}

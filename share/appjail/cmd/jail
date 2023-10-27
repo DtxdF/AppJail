@@ -1669,6 +1669,7 @@ jail_get()
 	local flag_boot=0
 	local flag_created=0
 	local flag_dirty=0
+	local flag_devfs_ruleset=0
 	local flag_hostname=0
 	local flag_ip4=0
 	local flag_ip6=0
@@ -1749,7 +1750,7 @@ jail_get()
 		fi
 
 		case "${keyword}" in
-			appjail_version|arch|boot|created|dirty|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version) ;;
+			appjail_version|arch|boot|created|dirty|devfs_ruleset|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version) ;;
 			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
 		esac
 
@@ -1819,6 +1820,11 @@ jail_get()
 						value="0"
 					else
 						value="1"
+					fi
+					;;
+				devfs_ruleset)
+					if [ -f "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset" ]; then
+						value=`head -1 -- "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset"`
 					fi
 					;;
 				ip4)
@@ -2560,6 +2566,7 @@ Keywords for get and list:
     arch                      -- OS architecture
     boot                      -- If 1, the jail will be started using the \`appjail startup\` command.
     created                   -- Jail creation date. See \`{CREATED_FORMAT}\` in the AppJail configuration file.
+    devfs_ruleset             -- Shows the ruleset assigned using \`devfs ruleset assign\`.
     dirty                     -- If 1, AppJail will remove the jail using the \`appjail jail clean\` command or by
                                  creating a new jail with the same name. See \`appjail jail mark\`.
     hostname                  -- Jail host name.

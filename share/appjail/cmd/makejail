@@ -753,7 +753,7 @@ makejail_write()
 	fi
 	# OPTION
 	makejail_write_cmd - "${MAKEJAIL_STAGE_BUILD}" "${MAKEJAIL_CMD_OPTION}"
-
+	
 	# build commands
 	ls -A -- "${MAKEJAIL_TEMPDIR}/${MAKEJAIL_STAGESDIR}/${MAKEJAIL_STAGE_BUILD}" | sort -n | while IFS= read -r cmd
 	do

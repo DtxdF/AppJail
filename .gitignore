@@ -3,5 +3,7 @@
 /libexec/ipcheck/ipcheck
 /libexec/appjail-config/appjail-config
 /libexec/appjail-config/tok
+/libexec/find-number-from-start/find-number-from-start
+/libexec/find-smallest-missing-number/find-smallest-missing-number
 *.o
 /*.vim

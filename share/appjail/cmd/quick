@@ -59,6 +59,7 @@ QUICK_USE_AJNET=0
 
 # Directories
 QUICK_KEY_BRIDGE="bridge"
+QUICK_KEY_DEVICE="device"
 QUICK_KEY_DHCP="dhcp"
 QUICK_KEY_ETHER="ether"
 QUICK_KEY_EXPOSE="expose"
@@ -101,6 +102,7 @@ QUICK_OPTION_CPUSET=
 QUICK_OPTION_CREATE_ARGS=
 QUICK_OPTION_DEFNET=
 QUICK_OPTION_DEVFS_RULESET="${DEFAULT_DEVFS_RULESET}"
+QUICK_OPTION_DEVICE=0
 QUICK_OPTION_DHCP=0
 QUICK_OPTION_EMPTY=0
 QUICK_OPTION_EXPOSE=0
@@ -190,7 +192,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -238,7 +240,7 @@ quick_main()
 	limits_options="cpuset limits"
 
 	local device_options
-	device_options="devfs fstab tmpdir linuxfs x11"
+	device_options="devfs device fstab tmpdir linuxfs x11"
 
 	local startup_options
 	startup_options="boot priority"
@@ -2400,6 +2402,38 @@ quick_set_devfs_ruleset()
 	QUICK_OPTION_DEVFS_RULESET="${devfs_ruleset}"
 }
 
+quick_run_device()
+{
+	if [ ${QUICK_OPTION_DEVICE} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring DEVFS ..."
+
+	lib_keys_list "${QUICK_KEY_DEVICE}" | sort -n | while IFS= read -r nro
+	do
+		rulespec=`lib_keys_get "${QUICK_KEY_DEVICE}" "${nro}" "rulespec"`
+
+		lib_debug "devfs#${nro}: ${rulespec}"
+
+		appjail devfs set -- "${QUICK_JAILNAME}" "${rulespec}"
+	done
+}
+
+quick_set_device()
+{
+	local rulespec
+
+	rulespec="$1"; quick_reqoption "device" "${rulespec}"
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_DEVICE}"
+	lib_keys_append "${QUICK_KEY_DEVICE}" "rulespec" "${rulespec}" > /dev/null
+
+	QUICK_OPTION_DEVICE=1
+}
+
 quick_run_macaddr()
 {
 	local errlevel
@@ -3437,6 +3471,13 @@ Options:
 			     Examples:
 			         - create_args="nginx_conf=/home/op/tmp/nginx.conf"
                              Descr: Default arguments to *create functions. See \`appjail enable\`.
+
+    device                -- Syntax: device=rulespec
+                             Type: str
+			     Examples:
+			         - device="path bpf unhide"
+				 - device="path 'mixer*' unhide"
+			     Descr: Add a DEVFS rule.
 
     devfs_ruleset         -- Syntax: devfs_ruleset=ruleset
                              Type: number

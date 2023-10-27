@@ -35,6 +35,7 @@ lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/tempfile"
 lib_load "${LIBDIR}/zfs"
 
@@ -235,6 +236,26 @@ start_main()
 		done
 		lib_warn "You can use \`appjail-config\` to set the required parameters."
 		exit ${EX_CONFIG}
+	fi
+
+	local devfsdir="${jail_path}/conf/boot/devfs"
+
+	if [ -d "${devfsdir}" ] && [ `lib_countfiles "${devfsdir}"` -gt 0 ]; then
+		lib_debug "Loading DEVFS rules ..."
+
+		local devfs_ruleset=`lib_ajconf get -inj "${jail_name}" devfs_ruleset`
+	
+		if lib_check_empty "${devfs_ruleset}"; then
+			devfs_ruleset="auto"
+		fi
+
+		"${APPJAIL_PROGRAM}" devfs load -r "${devfs_ruleset}" -- "${jail_name}" || exit $?
+
+		devfs_ruleset=`"${APPJAIL_PROGRAM}" devfs ruleset get "${jail_name}" || exit $?`
+
+		lib_ajconf set -Vt "${template_temp}" "devfs_ruleset=${devfs_ruleset}"
+
+		lib_debug -- "devfs_ruleset: ${devfs_ruleset}"
 	fi
 
 	for jail_param in \

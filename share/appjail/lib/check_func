@@ -69,6 +69,21 @@ lib_check_var()
 	fi
 }
 
+lib_check_varname()
+{
+	local name="$1"
+
+	if [ -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_varname name"
+	fi
+
+	if printf "%s" "${name}" | grep -Eq '^[a-zA-Z_][a-zA-Z0-9_]*$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 lib_check_mkvar()
 {
 	local variable="$1" only_mkvar="$2"
