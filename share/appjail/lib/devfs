@@ -51,6 +51,8 @@ lib_devfs_showallsets()
 lib_devfs_get_assigned_rulesets()
 {
 	cat "${JAILDIR}/"*/conf/boot/devfs_ruleset 2> /dev/null
+
+	return 0
 }
 
 lib_devfs_showsets()
