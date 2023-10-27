@@ -1709,11 +1709,11 @@ COPY --verbose --jail "${gonic_builder}" --glob-right /usr/local/lib/libtag.so /
 DESTROY [--force] [--with-all-dependents] jail
 ```
 
-#### --force
+##### --force
 
 See `-f` in `appjail jail destroy`.
 
-#### --with-all-dependents
+##### --with-all-dependents
 
 See `-R` in `appjail jail destroy`.
 
@@ -1803,45 +1803,45 @@ ENV TOKEN=bba06278ca32777dc3724d42fe6fd3d9
 EXEC [--continue-with-errors] [--verbose] [[--after-include include_file] ...] [[--arg parameter[=value]] ...] [[--before-include include_file] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail
 ```
 
-#### --continue-with-errors
+##### --continue-with-errors
 
 See `-e` in `appjail makejail`.
 
-#### --verbose
+##### --verbose
 
 See `-v` in `appjail makejail`.
 
-#### --after-include
+##### --after-include
 
 See `-a` in `appjail makejail`.
 
 Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
 
-#### --arg
+##### --arg
 
 Sets the value of a parameter to the Makejail to be executed.
 
-#### --before-include
+##### --before-include
 
 See `-B` in `appjail makejail`.
 
 Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
 
-#### --build-arg
+##### --build-arg
 
 See `-b` in `appjail makejail`.
 
-#### --option
+##### --option
 
 See `-o` in `appjail makejail`.
 
-#### --file
+##### --file
 
 See `-f` in `appjail makejail`.
 
 Global instructions can be used using the global name created by `GLOBAL`. See `GLOBAL` for details.
 
-#### --name
+##### --name
 
 See `-j` in `appjail makejail`.
 
@@ -2216,43 +2216,43 @@ MOUNT --nopersist device mountpoint [type] [options] [dump] [pass]
 MOUNT [--nomount] [--nro [auto | nro]] device mountpoint [type] [options] [dump] [dump]
 ```
 
-#### --nopersist
+##### --nopersist
 
 By default, `MOUNT` uses `appjail fstab`, this option uses `mount(8)` instead.
 
-#### --nomount
+##### --nomount
 
 By default, `appjail fstab` fields are compiled and mounted, this option disables it.
 
 If you use `MOUNT` serveral times, it is recommended to use this option except the last time it is called at the same stage.
 
-#### device
+##### device
 
 Device to be mounted.
 
-#### mountpoint
+##### mountpoint
 
 Mountpoint relative to the jail directory.
 
-#### type
+##### type
 
 File system type.
 
 The default is `nullfs`.
 
-#### options
+##### options
 
 Options for `mount(8)`.
 
 The default is `rw`.
 
-#### dump
+##### dump
 
 This field is used for these file systems by the `dump(8)` command to determine which file systems need to be dumped. See `fstab(5)` for more details.
 
 The default is `0`.
 
-#### pass
+##### pass
 
 This field is used by the `fsck(8)` and `quotacheck(8)` programs to determine the order in which file system and quota checks are done at reboot time. See `fstab(5)` for more details.
 
