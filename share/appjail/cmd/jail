@@ -37,6 +37,7 @@ lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/tempfile"
 lib_load "${LIBDIR}/zfs"
 
@@ -2004,7 +2005,7 @@ jail_list()
 		return $?
 	fi
 
-	if [ ! -d "${JAILDIR}" ]; then
+	if [ ! -d "${JAILDIR}" ] || [ `lib_countfiles "${JAILDIR}"` -eq 0 ]; then
 		return
 	fi
 
