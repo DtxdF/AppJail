@@ -2666,7 +2666,7 @@ The default user is `root`.
 
 Use `appjail login` to log into the jail.
 
-#### Example
+#### Examples
 
 ```
 LOGIN
