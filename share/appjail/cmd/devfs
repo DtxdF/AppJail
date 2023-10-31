@@ -644,8 +644,15 @@ devfs_ruleset_assign()
 	_devfs_chk_jail "${jail_name}"
 
 	local jail_path="${JAILDIR}/${jail_name}"
-	local ruleset_file="${jail_path}/conf/boot/devfs_ruleset"
+	local bootdir="${jail_path}/conf/boot"
+	local ruleset_file="${bootdir}/devfs_ruleset"
 	local current_ruleset=0
+
+	if [ ! -d "${bootdir}" ]; then
+		if ! mkdir -p -- "${bootdir}"; then
+			lib_err ${EX_IOERR} "Error creating ${bootdir}"
+		fi
+	fi
 
 	if [ -f "${ruleset_file}" ]; then
 		current_ruleset=`head -1 -- "${ruleset_file}"` || exit $?

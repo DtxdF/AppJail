@@ -101,7 +101,7 @@ QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
 QUICK_OPTION_CPUSET=
 QUICK_OPTION_CREATE_ARGS=
 QUICK_OPTION_DEFNET=
-QUICK_OPTION_DEVFS_RULESET="${DEFAULT_DEVFS_RULESET}"
+QUICK_OPTION_DEVFS_RULESET=
 QUICK_OPTION_DEVICE=0
 QUICK_OPTION_DHCP=0
 QUICK_OPTION_EMPTY=0
@@ -2150,6 +2150,10 @@ quick_run_linuxfs()
 	
 	lib_debug "Using linuxfs option ..."
 
+	quick_assign_devfs_ruleset
+
+	quick_chknumber "devfs_ruleset" "${QUICK_OPTION_DEVFS_RULESET}"
+
 	appjail fstab jail "${QUICK_JAILNAME}" set -d devfs -m /dev -t devfs -o rw,ruleset="${QUICK_OPTION_DEVFS_RULESET}" || exit $?
 	appjail fstab jail "${QUICK_JAILNAME}" set -d tmpfs -m /dev/shm -t tmpfs -o rw,size=1g,mode=1777 || exit $?
 	appjail fstab jail "${QUICK_JAILNAME}" set -d fdescfs -m /dev/fd -t fdescfs -o rw,linrdlnk || exit $?
@@ -2378,9 +2382,11 @@ quick_run_devfs()
 		return 0
 	fi
 
-	quick_chknumber "devfs_ruleset" "${QUICK_OPTION_DEVFS_RULESET}"
-
 	lib_debug "Using devfs option ..."
+
+	quick_assign_devfs_ruleset
+
+	quick_chknumber "devfs_ruleset" "${QUICK_OPTION_DEVFS_RULESET}"
 
 	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" mount.devfs
 	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" devfs_ruleset="${QUICK_OPTION_DEVFS_RULESET}"
@@ -3393,6 +3399,25 @@ quick_reqoptions()
 	fi
 
 	lib_err ${EX_CONFIG} "${option} requires the following options: ${options}."
+}
+
+quick_assign_devfs_ruleset()
+{
+	if [ ${QUICK_OPTION_DEVICE} -eq 1 ]; then
+		if lib_check_empty "${QUICK_OPTION_DEVFS_RULESET}"; then
+			QUICK_OPTION_DEVFS_RULESET="auto"
+		fi
+
+		lib_debug "Assigning a ruleset ..."
+
+		QUICK_OPTION_DEVFS_RULESET=`appjail devfs ruleset assign -r "${QUICK_OPTION_DEVFS_RULESET}" -- "${QUICK_JAILNAME}"` || exit $?
+	else
+		if lib_check_empty "${QUICK_OPTION_DEVFS_RULESET}"; then
+			QUICK_OPTION_DEVFS_RULESET="${DEFAULT_DEVFS_RULESET}"
+		fi
+	fi
+
+	lib_debug "Current ruleset is ${QUICK_OPTION_DEVFS_RULESET}"
 }
 
 quick_help()
