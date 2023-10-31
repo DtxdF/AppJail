@@ -243,7 +243,7 @@ start_main()
 	if [ -d "${devfsdir}" ] && [ `lib_countfiles "${devfsdir}"` -gt 0 ]; then
 		lib_debug "Loading DEVFS rules ..."
 
-		local devfs_ruleset=`lib_ajconf get -inj "${jail_name}" devfs_ruleset`
+		local devfs_ruleset=`lib_ajconf get -int "${template_temp}" devfs_ruleset`
 	
 		if lib_check_empty "${devfs_ruleset}"; then
 			devfs_ruleset="auto"
