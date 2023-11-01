@@ -1685,6 +1685,7 @@ jail_get()
 	local flag_status=0
 	local flag_type=0
 	local flag_version=0
+	local flag_version_extra=0
 	
 	while getopts ":eHIpt" _o; do
 		case "${_o}" in
@@ -1751,7 +1752,7 @@ jail_get()
 		fi
 
 		case "${keyword}" in
-			appjail_version|arch|boot|created|dirty|devfs_ruleset|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version) ;;
+			appjail_version|arch|boot|created|dirty|devfs_ruleset|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version|version_extra) ;;
 			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
 		esac
 
@@ -1908,6 +1909,11 @@ jail_get()
 						value=`lib_ajconf get -t "${config_file}" -Vni osversion`
 					fi
 					;;
+				version_extra)
+					if [ ${status_config} -eq 1 ]; then
+						value=`_jail_get_version_extra "${config_file}"`
+					fi
+					;;
 			esac
 
 			if lib_check_empty "${value}"; then
@@ -1931,6 +1937,53 @@ jail_get()
 	else
 		cat
 	fi
+}
+
+_jail_get_version_extra()
+{
+	local config_file="$1"
+
+	if [ -z "${config_file}" ]; then
+		lib_err ${EX_USAGE} "usage: _jail_get_version_extra config_file"
+	fi
+
+	local osarch
+	osarch=`lib_ajconf get -Vnt "${config_file}" osarch` || return $?
+
+	if lib_check_empty "${osarch}"; then
+		return 0
+	fi
+
+	local osversion
+	osversion=`lib_ajconf get -Vnt "${config_file}" osversion` || return $?
+
+	if lib_check_empty "${osversion}"; then
+		return 0
+	fi
+
+	local release_name
+	release_name=`lib_ajconf get -Vnt "${config_file}" release_name` || return $?
+
+	if lib_check_empty "${release_name}"; then
+		return 0
+	fi
+
+	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
+	if [ ! -f "${releasedir}/.from_src" ] || [ ! -f "${releasedir}/.srcdir" ]; then
+		return 0
+	fi
+
+	local srcdir
+	srcdir=`head -1 -- "${releasedir}/.srcdir" 2> /dev/null` || return $?
+
+	local param_h="${srcdir}/sys/sys/param.h"
+
+	if [ ! -f "${param_h}" ]; then
+		return 0
+	fi
+
+	awk '/^#define[[:space:]]*__FreeBSD_version/ {print $3}' "${param_h}" 2> /dev/null
 }
 
 jail_list()
@@ -2584,6 +2637,7 @@ Keywords for get and list:
     status                    -- Shows whether the jail is running or stopped.
     type                      -- Jail type.
     version                   -- OS version.
+    version_extra             -- Version Extra.
 
 Parameters for mark:
     clean                     -- Mark a jail as clean. This is used by some commands, especially for those who take some responsability
