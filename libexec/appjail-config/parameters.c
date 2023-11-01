@@ -92,6 +92,7 @@ const char *template_parameters[] = {
     "allow.mount.procfs",
     "allow.mount.tmpfs",
     "allow.mount.zfs",
+    "allow.nfsd",
     "allow.nochflags",
     "allow.nodying",
     "allow.nomlock",
