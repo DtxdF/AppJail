@@ -930,6 +930,7 @@ Options for get:
                               in order not to display strange values, this option displays <TAB> instead of \\t.
     -H                     -- Display the name of the columns.
     -I                     -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -i                     -- Do not complain when the NRO does not exist.
     -p                     -- Columnate the list.
     -t                     -- Tabulate columns and values.
     -n nro                 -- Operate in this NRO.
@@ -938,6 +939,7 @@ Options for list:
     -e                     -- This option is the opposite in \`Options for get\`.
     -H                     -- This option is the opposite in \`Options for get\`.
     -I                     -- This option is the same as in \`Options for get\`.
+    -i                     -- This option is the same as in \`Options for get\`.
     -p                     -- This option is the opposite in \`Options for get\`.
     -t                     -- This option is the opposite in \`Options for get\`.
     -n nro                 -- Operate in this NRO. If not set, operate in all NROes.
