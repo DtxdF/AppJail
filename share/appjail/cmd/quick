@@ -2424,6 +2424,10 @@ quick_run_device()
 
 		appjail devfs set -- "${QUICK_JAILNAME}" "${rulespec}"
 	done
+
+	if [ ${QUICK_OPTION_DEVICE} -eq 1 ]; then
+		lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail devfs delset -q -- \"${name}\""'
+	fi
 }
 
 quick_set_device()

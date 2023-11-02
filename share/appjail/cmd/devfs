@@ -212,6 +212,22 @@ devfs_del()
 
 devfs_delset()
 {
+	local _o
+	local opt_quiet=0
+
+	while getopts ":q" _o; do
+		case "${_o}" in
+			q)
+				opt_quiet=1
+				;;
+			*)
+				devfs_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
 	local jail_name="$1"
 
 	local ruleset
@@ -225,6 +241,10 @@ devfs_delset()
 	fi
 
 	if ! lib_check_devfs_ruleset "${ruleset}"; then
+		if [ ${opt_quiet} -eq 1 ]; then
+			return 0
+		fi
+
 		lib_err ${EX_NOINPUT} -- "${ruleset}: This ruleset is not currently loaded."
 	fi
 
@@ -925,6 +945,9 @@ Options for apply, applyset, ruleset assign and show:
     -r auto|ruleset        -- Operate in this ruleset. If not set, \`auto\` is used, which implies that
                               \`{DEVFS_ASSIGN_ALGO}\` is used to obtain an unused ruleset number.
 
+Options for delset:
+    -q                     -- Quiet mode.
+
 Options for get:
     -e                     -- This option is not required when using -p. The \\t character is used to delimit columns,
                               in order not to display strange values, this option displays <TAB> instead of \\t.
@@ -972,7 +995,7 @@ usage: devfs append jail_name devfs_rules
        devfs apply [-r auto | ruleset] jail_name rulespec ...
        devfs applyset [-r auto | ruleset] jail_name
        devfs del jail_name rulenum
-       devfs delset jail_name
+       devfs delset [-q] jail_name
        devfs get [-eHIipt] -n nro jail_name [keyword ...]
        devfs list [eHIipt] [-n nro] jail_name [keyword ...]
        devfs load [-r auto | ruleset] jail_name
