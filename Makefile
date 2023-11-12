@@ -6,6 +6,8 @@ RM?=rm
 SED?=sed
 PREFIX?=/usr/local
 
+APPJAIL_VERSION?=2.9.0
+
 all: install
 
 install: utils-strip
@@ -42,6 +44,9 @@ install: utils-strip
 	# lib
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail/lib"
 	${FIND} share/appjail/lib -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+
+	# version
+	${SED} -i '' -e 's|%%VERSION%%|${APPJAIL_VERSION}|' "${DESTDIR}${PREFIX}/share/appjail/lib/version"
 	
 	# makejail
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail/makejail"
