@@ -386,13 +386,25 @@ start_main()
 	local escape_fifo_filename=`lib_escape_string "${fifo_filename}"`
 	lib_atexit_add "rm -f \"${escape_fifo_filename}\""
 
-	local jail_pid cat_pid
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
+	local jail_pid
 
 	jail -c -f "${jail_path}/conf/jail.conf" "${jail_name}" > "${fifo_filename}" 2>&1 &
 	jail_pid=$!
 
+	lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${jail_pid} > /dev/null 2>&1"
+
+	local cat_pid
+
 	cat < "${fifo_filename}" >&2 &
 	cat_pid=$!
+
+	lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${cat_pid} > /dev/null 2>&1"
 
 	wait ${jail_pid}
 
