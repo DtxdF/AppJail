@@ -60,6 +60,8 @@ main()
 	fi
 
 	if [ ${current_parent_pid} -eq ${parent_pid} ]; then
+		lib_debug "Killing ${pid} ..."
+
 		kill "${pid}"
 	fi
 }
