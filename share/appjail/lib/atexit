@@ -51,6 +51,9 @@ lib_atexit_cleanup()
 		/bin/sh "${_ATEXIT_CMDS}"
 		rm -f "${_ATEXIT_CMDS}"
 	fi
+
+	# restore
+	trap - SIGINT SIGQUIT SIGTERM EXIT
 }
 
 lib_atexit_add()
