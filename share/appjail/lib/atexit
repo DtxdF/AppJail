@@ -58,7 +58,7 @@ lib_atexit_add()
 	local cmd="$@"
 
 	if [ ! -f "${_ATEXIT_CMDS}" ]; then
-		lib_err ${EX_NOINPUT} "You must first executed lib_atexit_init() function before use this function."
+		lib_err ${EX_NOINPUT} "You must first execute lib_atexit_init() function before use this function."
 	fi
 
 	if ! printf "%s\n" "${cmd}" >> "${_ATEXIT_CMDS}"; then
