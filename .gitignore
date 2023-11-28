@@ -7,3 +7,4 @@
 /libexec/find-smallest-missing-number/find-smallest-missing-number
 *.o
 /*.vim
+/.cpignore
