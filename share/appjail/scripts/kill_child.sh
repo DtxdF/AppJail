@@ -3,6 +3,7 @@
 main()
 {
 	local _o
+	local config
 	local parent_pid
 	local pid
 
