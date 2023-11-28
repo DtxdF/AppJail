@@ -880,6 +880,8 @@ _makejail_config()
 {
 	# Configuration and functions
 	cat << EOF
+set -T
+
 . "\${APPJAIL_CONFIG}"
 . "\${LIBDIR}/load"
 

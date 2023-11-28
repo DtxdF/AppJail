@@ -31,6 +31,9 @@ lib_load "${LIBDIR}/log"
 lib_load "${LIBDIR}/sysexits"
 lib_load "${LIBDIR}/tempfile"
 
+ATEXIT_IGNORED_SIGNALS="SIGALRM SIGVTALRM SIGPROF SIGUSR1 SIGUSR2"
+ATEXIT_HANDLER_SIGNALS="SIGHUP SIGINT SIGQUIT SIGTERM SIGXCPU SIGXFSZ"
+
 lib_atexit_init()
 {
 	_ATEXIT_CMDS=`lib_generate_tempfile`
@@ -39,13 +42,15 @@ lib_atexit_init()
 		lib_err ${EX_SOFTWARE} "Error initializing the atexit file."
 	fi
 
-	trap "ATEXIT_ERRLEVEL=\$?; lib_atexit_cleanup; exit \${ATEXIT_ERRLEVEL}" SIGINT SIGQUIT SIGTERM EXIT
+	trap '' ${ATEXIT_IGNORED_SIGNALS}
+	trap "ATEXIT_ERRLEVEL=\$?; lib_atexit_cleanup; exit \${ATEXIT_ERRLEVEL}" EXIT
+	trap "lib_atexit_cleanup; exit 70" ${ATEXIT_HANDLER_SIGNALS}
 }
 
 lib_atexit_cleanup()
 {
 	# ignore
-	trap '' SIGINT SIGQUIT SIGTERM EXIT
+	trap '' ${ATEXIT_HANDLER_SIGNALS} EXIT
 
 	if [ -f "${_ATEXIT_CMDS}" ]; then
 		/bin/sh "${_ATEXIT_CMDS}"
@@ -53,7 +58,7 @@ lib_atexit_cleanup()
 	fi
 
 	# restore
-	trap - SIGINT SIGQUIT SIGTERM EXIT
+	trap - ${ATEXIT_IGNORED_SIGNALS} ${ATEXIT_HANDLER_SIGNALS} EXIT
 }
 
 lib_atexit_add()

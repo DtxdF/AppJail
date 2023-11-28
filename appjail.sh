@@ -33,6 +33,8 @@ CONFIG="%%PREFIX%%/share/appjail/files/config.conf"
 
 main()
 {
+	set -T
+
 	. "${CONFIG}"
 
 	if [ `id -u` -ne 0 ]; then
@@ -102,6 +104,14 @@ main()
 	fi
 
 	lib_atexit_init
+
+	local kill_tree_cmd
+	kill_tree_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_tree.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
+	lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$"
 
 	${cmd}_main "$@"
 }
