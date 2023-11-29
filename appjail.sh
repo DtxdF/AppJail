@@ -105,13 +105,18 @@ main()
 
 	lib_atexit_init
 
-	local kill_tree_cmd
-	kill_tree_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_tree.sh"`
+	if [ -z "${APPJAIL_KILL_TREE}" ]; then
+		# To avoid using kill_tree.sh more times than necessary.
+		export APPJAIL_KILL_TREE=1
 
-	local config_file
-	config_file=`lib_escape_string "${CONFIG}"`
+		local kill_tree_cmd
+		kill_tree_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_tree.sh"`
 
-	lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$"
+		local config_file
+		config_file=`lib_escape_string "${CONFIG}"`
+
+		lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$"
+	fi
 
 	${cmd}_main "$@"
 }
