@@ -1443,7 +1443,7 @@ makejail_getinclude_git()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE git+url [--baseurl url] [--file makejail_filename] [--global | --local [--cachedir directory]]"
+		lib_err ${EX_USAGE} "usage: INCLUDE git+url [--baseurl url] [--file makejail_filename] [--global | --local [--cachedir directory] | --tmp]"
 	fi
 
 	# Arguments
@@ -1465,6 +1465,7 @@ makejail_getinclude_git()
 	local makejail_filename="${DEFAULT_MAKEJAIL_FILE}"
 	local global=1
 	local local=0
+	local tmp=0
 	local cachedir=".makejail_local"
 
 	while [ ${current_index} -lt ${total_items} ]; do 
@@ -1496,6 +1497,9 @@ makejail_getinclude_git()
 			--local)
 				local=1
 				;;
+			--tmp)
+				tmp=1
+				;;
 			--baseurl)
 				url="${optarg}${url}"
 				;;
@@ -1522,14 +1526,23 @@ makejail_getinclude_git()
 		gitdir="${cachedir}"
 
 		lib_debug "Using local cache directory (git): ${gitdir}"
+	elif [ ${tmp} -eq 1 ]; then
+		gitdir=`lib_generate_tempdir` || exit $?
+
+		local escape_gitdir
+		escape_gitdir=`lib_escape_string "${gitdir}"`
+
+		lib_atexit_add "rm -rf \"${escape_gitdir}\" > /dev/null 2>&1"
 	else
 		gitdir="${GLOBAL_GIT_CACHEDIR}"
 
 		lib_debug "Using global cache directory (git): ${gitdir}"
 	fi
 
-	if ! mkdir -p "${gitdir}"; then
-		lib_err ${EX_IOERR} "Error creating ${cachedir}"
+	if [ ${local} -eq 1 -o ${global} -eq 1 ]; then
+		if ! mkdir -p "${gitdir}"; then
+			lib_err ${EX_IOERR} "Error creating ${cachedir}"
+		fi
 	fi
 
 	_makejail_git_clone "${url}" "${gitdir}" "${makejail_filename}"
