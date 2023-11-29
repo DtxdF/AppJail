@@ -1462,6 +1462,7 @@ makejail_getinclude_git()
 	fi
 
 	# options
+	local gitdir
 	local makejail_filename="${DEFAULT_MAKEJAIL_FILE}"
 	local global=1
 	local local=0
