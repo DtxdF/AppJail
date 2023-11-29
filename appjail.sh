@@ -115,7 +115,7 @@ main()
 		local config_file
 		config_file=`lib_escape_string "${CONFIG}"`
 
-		lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$"
+		lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$ > /dev/null 2>&1"
 	fi
 
 	${cmd}_main "$@"
