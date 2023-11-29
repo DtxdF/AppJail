@@ -891,6 +891,8 @@ lib_load "\${LIBDIR}/log"
 lib_load "\${LIBDIR}/check_func"
 
 lib_atexit_init
+
+trap '' SIGINT
 EOF
 }
 
