@@ -311,7 +311,7 @@ quick_create_jail()
 {
 	if [ "${QUICK_OPTION_OVERWRITE}" != 0 ]; then
 		if [ -d "${JAILDIR}/${QUICK_JAILNAME}" ]; then
-			lib_debug "Trying to remove ${QUICK_JAILNAME} ..."
+			lib_warn "Trying to remove ${QUICK_JAILNAME} ..."
 
 			appjail stop -- "${QUICK_JAILNAME}" || exit $?
 
