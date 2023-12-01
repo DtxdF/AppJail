@@ -876,6 +876,10 @@ jail_install_clone+release()
                 lib_err ${EX_DATAERR} "clone+release syntax: snapname"
         fi
 
+	lib_info "Cloning ${osarch}/${osversion}/${release_name} to ${jail_name} ..."
+
+	_warn_dirty_release "${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
+
 	local extra=
 
 	case "${jail_type}" in
@@ -895,8 +899,6 @@ jail_install_clone+release()
 	fi
 
 	local dataset="${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}${extra}"
-
-	lib_info "Cloning ${osarch}/${osversion}/${release_name} to ${jail_name} ..."
 
 	if ! lib_check_zfs_snapshot "${dataset}" "${snapshot_name}"; then
 		if ! lib_zfs_snapshot "${dataset}" "${snapshot_name}"; then
@@ -1014,6 +1016,8 @@ jail_install_standard()
 	fi
 
 	lib_info "Creating a standard jail (${jail_type}) ..."
+
+	_warn_dirty_release "${releasedir}"
 
 	case "${jail_type}" in
 		${JAIL_TYPE_THICK})
@@ -2487,6 +2491,20 @@ _compress2tar_args()
 	esac
 
 	echo "${tar_args}"
+}
+
+_warn_dirty_release()
+{
+	local releasedir="$1"
+
+	if [ -z "${releasedir}" ]; then
+		lib_err ${EX_USAGE} "usage: _warn_dirty_release releasedir"
+	fi
+
+	if [ ! -f "${releasedir}/.done" ]; then
+		lib_warn "Dirty release directory detected, please note that your jail will not be able to run properly."
+		lib_warn "Consider reinstalling the release directory used by this jail."
+	fi
 }
 
 jail_help()
