@@ -262,9 +262,6 @@ quick_main()
 	# write template
 	quick_write_template
 
-	# end
-	quick_end_jail
-
 	# start must be executed after the template is written
 	quick_run_start
 
@@ -276,6 +273,9 @@ quick_main()
 	for option in ${other_options}; do
 		quick_run_${option}
 	done
+	
+	# end
+	quick_end_jail
 }
 
 quick_temp_template()
