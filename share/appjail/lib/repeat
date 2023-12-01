@@ -83,12 +83,6 @@ lib_repeat_run()
 
 	local tries=0
 	while [ ${tries} -lt ${total} ]; do
-		if [ "${sleep}" = "random" ]; then
-			sleep `random_number 0 3`.`random_number 3 9`
-		elif [ ${sleep} -gt 0 ]; then
-			sleep ${sleep}
-		fi
-
 		cmd_output=`"${cmd}" "$@" 2>&1`
 		cmd_errlevel=$?
 
@@ -99,6 +93,12 @@ lib_repeat_run()
 				done
 			fi
 			return 0
+		fi
+
+		if [ "${sleep}" = "random" ]; then
+			sleep `random_number 0 3`.`random_number 3 9`
+		elif [ ${sleep} -gt 0 ]; then
+			sleep ${sleep}
 		fi
 
 		tries=$((tries+1))
