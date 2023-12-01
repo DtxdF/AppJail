@@ -133,6 +133,7 @@ QUICK_OPTION_NONAT=0
 QUICK_OPTION_OSARCH="${FREEBSD_ARCH}"
 QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
 QUICK_OPTION_OVERWRITE="${DEFAULT_OVERWRITE}"
+QUICK_OPTION_PKG="${DEFAULT_PACKAGES}"
 QUICK_OPTION_PRIORITY="${DEFAULT_PRIORITY}"
 QUICK_OPTION_RELEASE="${DEFAULT_RELEASE}"
 QUICK_OPTION_RESTART="${DEFAULT_RESTART}"
@@ -192,7 +193,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -266,6 +267,15 @@ quick_main()
 
 	# start must be executed after the template is written
 	quick_run_start
+
+	# Options that are executed after starting the jail.
+
+	local other_options
+	other_options="pkg"
+
+	for option in ${other_options}; do
+		quick_run_${option}
+	done
 }
 
 quick_temp_template()
@@ -3309,6 +3319,51 @@ quick_set_overwrite()
 	fi
 }
 
+quick_run_pkg()
+{
+	local errlevel
+
+	if lib_check_empty "${QUICK_OPTION_PKG}"; then
+		return 0
+	fi
+
+	if [ "${QUICK_OPTION_START}" = 0 ] || ! appjail status -q -- "${QUICK_JAILNAME}"; then
+		lib_err ${EX_CONFIG} "Packages '${QUICK_OPTION_PKG}' cannot be installed because the jail is not started."
+	fi
+
+	lib_split_jailparams "${QUICK_OPTION_PKG}" | while IFS= read -r package; do
+		lib_debug "Installing package '${package}' ..."
+
+		appjail pkg jail "${QUICK_JAILNAME}" install -y -- "${package}"
+
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "Failed to install package '${package}'."
+		fi
+	done
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_pkg()
+{
+	local package
+
+	package="$1"; quick_reqoption "pkg" "${package}"
+	package=`lib_escape_string "${package}" "" '\"' "-"`
+
+	if [ -z "${QUICK_OPTION_PKG}" ]; then
+		QUICK_OPTION_PKG="\"${package}\""
+	else
+		QUICK_OPTION_PKG="${QUICK_OPTION_PKG} \"${package}\""
+	fi
+}
+
 quick_set_nooverwrite()
 {
 	QUICK_OPTION_OVERWRITE=0
@@ -3851,6 +3906,11 @@ Options:
                              Descr: If the jail exists, stop it and remove it. Use \`force\` to force the destruction of the jail,
 			            \`recursive\` to remove the jail and all references to it, use \`force+recursive\` for both.
 				    Both are ignored when using a non-ZFS file system.
+
+    pkg                   -- Syntax: pkg="package"
+                             Type: str
+			     Requires: start
+			     Descr: Install one or more packages.
 
     priority              -- Syntax: priority=priority_number
                              Type: number
