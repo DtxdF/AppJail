@@ -55,13 +55,29 @@ main()
 	local name=`lib_jailparam_name "${env}" "="`
 	local value=`lib_jailparam_value "${env}" "="`
 
-	env="${name}=${value}"
+	# Harmful characters.
 
-	local escape_chars
-	escape_chars='`"\'
+	local escape_regex='\$\(|["`\]'
+	local escape_prefix='\\\\\\'
 
-	env=`lib_escape_string "${env}" 3 "${escape_chars}"`
-	env="\\\"${env}\\\""
+	value=`printf "%s" "${value}" | sed -Ee "s/(${escape_regex})/${escape_prefix}\\1/g"`
+
+	if printf "%s" "${value}" | grep -qEe '\\\\\\\$'; then
+		# Escape \$.
+
+		escape_regex='\\(\$[^(])'
+
+		value=`printf "%s" "${value}" | sed -Ee "s/${escape_regex}/\1/g"`
+	else
+		# Escape $.
+
+		escape_regex='\$[^(]'
+		escape_prefix='\\'
+
+		value=`printf "%s" "${value}" | sed -Ee "s/(${escape_regex})/${escape_prefix}\\1/g"`
+	fi
+
+	env="\\\"${name}=${value}\\\""
 
 	local env_vars
 	# The user environment variables must override the environment variables defined by
