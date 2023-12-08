@@ -1155,8 +1155,15 @@ makejail_include()
 		# Remove tabs and spaces.
 		line=`printf "%s" "${line}" | sed -Ee 's/^[\t ]*//'`
 
-		# Support for line-continuation.
-		if printf "%s" "${line}" | grep -qEe '\\[[:space:]]*$'; then
+		if printf "%s" "${line}" | grep -qEe '\\\\[[:space:]]*$'; then # Escape \.
+			line=`printf "%s" "${line}" | sed -Ee 's/\\\\[[:space:]]*$//'`
+
+			if [ -n "${lines}" ]; then
+				line="${lines}${line}"
+			fi
+
+			lines=
+		elif printf "%s" "${line}" | grep -qEe '\\[[:space:]]*$'; then # line-continuation.
 			line=`printf "%s" "${line}" | sed -Ee 's/\\\\[[:space:]]*$//'`
 			if [ -z "${lines}" ]; then
 				lines="${line}"
@@ -1164,7 +1171,7 @@ makejail_include()
 				lines="${lines}${line}"
 			fi
 			continue
-		else
+		else # concat all previous lines.
 			if [ -n "${lines}" ]; then
 				line="${lines}${line}"
 			fi
