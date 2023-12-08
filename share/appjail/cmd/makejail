@@ -213,9 +213,9 @@ makejail_main()
 
 				local env_name=`lib_jailparam_name "${env}" "="`
 				local env_value=`lib_jailparam_value "${env}" "="`
+				env_value=`"${SCRIPTSDIR}/escape-env-val.sh" "${env_value}"`
 
 				env="${env_name}=${env_value}"
-				env=`lib_escape_string "${env}" 3`
 
 				if [ -z "${environment}" ]; then
 					environment="\\\"${env}\\\""

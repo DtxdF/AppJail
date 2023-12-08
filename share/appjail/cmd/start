@@ -50,6 +50,7 @@ start_main()
 	local start_args=
 	local jail_name=
 	local template=
+	local env_var env_name env_val
 	local jail_path
 	local line
 	local errlevel=0
@@ -63,9 +64,9 @@ start_main()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":Ic:i:s:t:" _o; do
+	while getopts ":Ic:i:s:t:V:" _o; do
 		case "${_o}" in
-			c|i|s|t)
+			c|i|s|t|V)
 				if lib_check_empty "${OPTARG}"; then
 					start_usage
 					exit ${EX_USAGE}
@@ -95,6 +96,18 @@ start_main()
 				;;
 			t)
 				template="${OPTARG}"
+				;;
+			V)
+				env_var="${OPTARG}"
+
+				if ! lib_check_var "${env_var}"; then
+					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
+				fi
+
+				env_name=`lib_jailparam_name "${env_var}" "="`
+				env_val=`lib_jailparam_value "${env_var}" "="`
+
+				export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
 				;;
 			*)
 				start_usage
@@ -614,13 +627,15 @@ Options:
 Options for -i:
     -c parameter=value        -- Parameters for *create functions.
     -s parameter=value        -- Parameters for *start functions.
+    -V env=value              -- Environment variables.
 EOF
 }
 
 start_usage()
 {
 	cat << EOF
-usage: start [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...] [-t template] jail
+usage: start [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...]
+             [-t template] [[-V env=value] ...] jail
        start [-I] [-t template] jail
 EOF
 }

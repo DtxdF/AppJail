@@ -42,10 +42,11 @@ run_main()
 	local initscript=
 	local args=
 	local custom_stage=
+	local env_var env_name env_val
 
-	while getopts ":i:p:s:" _o; do
+	while getopts ":i:p:s:V:" _o; do
 		case "${_o}" in
-			i|p|s)
+			i|p|s|V)
 				if lib_check_empty "${OPTARG}"; then
 					run_usage
 					exit ${EX_USAGE}
@@ -65,6 +66,18 @@ run_main()
 				;;
 			s)
 				custom_stage="${OPTARG}"
+				;;
+			V)
+				env_var="${OPTARG}"
+
+				if ! lib_check_var "${env_var}"; then
+					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
+				fi
+
+				env_name=`lib_jailparam_name "${env_var}" "="`
+				env_val=`lib_jailparam_value "${env_var}" "="`
+
+				export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
 				;;
 			*)
 				run_usage
@@ -128,10 +141,14 @@ Options:
     -i initscript             -- Use a custom initscript.
     -p parameter=value        -- Parameters for *cmd or a custom stage.
     -s custom_stage           -- Run a custom stage instead of *cmd.
+    -V env=value              -- Environment variables.
 EOF
 }
 
 run_usage()
 {
-	echo "usage: run [-i initscript] [[-p parameter=value] ...] [-s custom_stage] jail"
+	cat << EOF
+usage: run [-i initscript] [[-p parameter=value] ...] [-s custom_stage]
+           [[-V env=value] ...] jail"
+EOF
 }

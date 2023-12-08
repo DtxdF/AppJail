@@ -187,7 +187,43 @@ main()
 		su_args="-l"
 	fi
 
-	echo "echo \"cd \\\"${WORKDIR}\\\"; env ${ENV_VARS} ${prg_args}\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su ${su_args} \"${USERNAME}\" -c \"sh -s\""
+	local rundir="${MAKEJAIL_TEMPDIR}/rundir"
+	if ! mkdir -p "${rundir}"; then
+		lib_err ${EX_IOERR} "Error creating ${rundir}"
+	fi
+
+	dynamic_env_file="${rundir}/${MAKEJAIL_CURRENT_STAGE}.dynamic-env"
+
+	if [ ! -f "${dynamic_env_file}" ]; then
+		cat << "EOF"
+__APPJAIL_RUN_ENVIRONMENT_FILE__=`lib_generate_tempfile` || exit $?
+
+__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__=`lib_escape_string "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"`
+
+lib_atexit_add "rm -f \"${__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__}\""
+
+env | grep -Ee '^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$' | sed -Ee 's/__APPJAIL_RUN_ENVIRONMENT_VAR__(.+)/\1/' | while IFS= read -r env_var; do
+	name=`lib_jailparam_name "${env_var}" "="`
+	value=`lib_jailparam_value "${env_var}" "="`
+	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}"`
+
+	env="${name}=${value}"
+
+	printf "%s " "\"${env}\""
+done > "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"
+
+__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__=`lib_escape_string "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" 3`
+
+__APPJAIL_RUN_ENVIRONMENT__=`head -1 -- "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" | sed -Ee 's/;$//'`
+__APPJAIL_RUN_ENVIRONMENT__=`printf "%s" "${__APPJAIL_RUN_ENVIRONMENT__}" | sed -Ee 's/(\\\\\\\\)//g'`
+EOF
+
+		if ! touch -- "${dynamic_env_file}"; then
+			lib_err ${EX_IOERR} "Error creating ${dynamic_env_file}"
+		fi
+	fi
+
+	echo "echo \"cd \\\"${WORKDIR}\\\"; env ${ENV_VARS} \${__APPJAIL_RUN_ENVIRONMENT__} ${prg_args}\" | \"\${APPJAIL_SCRIPT}\" cmd jexec \"\${APPJAIL_JAILNAME}\" ${jexec_args} su ${su_args} \"${USERNAME}\" -c \"sh -s\""
 }
 
 get_entrypoint()

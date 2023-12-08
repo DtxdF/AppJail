@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,51 +28,43 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-. "${AJ_CONFIG}"
-. "${LIBDIR}/load"
-
-lib_load "${LIBDIR}/log"
-lib_load "${LIBDIR}/check_func"
-lib_load "${LIBDIR}/jail"
-lib_load "${LIBDIR}/replace"
-
 main()
 {
-	local env="$1"
-	if lib_check_empty "${env}"; then
-		lib_err ${EX_USAGE} "usage: ENV name[=value]"
+	local value="$1"
+
+	if [ -z "${value}" ]; then
+		usage
+		exit 64 # EX_USAGE
 	fi
 
-	local envdir="${MAKEJAIL_TEMPDIR}/env"
-	if ! mkdir -p "${envdir}"; then
-		lib_err ${EX_IOERR} "Error creating ${envdir}"
-	fi
+	# Harmful characters.
 
-	if ! lib_check_var "${env}"; then
-		lib_err ${EX_DATAERR} -- "${env}: Invalid environment variable."
-	fi
+	local escape_regex='\$\(|["`\]'
+	local escape_prefix='\\\\\\'
 
-	local name=`lib_jailparam_name "${env}" "="`
-	local value=`lib_jailparam_value "${env}" "="`
+	value=`printf "%s" "${value}" | sed -Ee "s/(${escape_regex})/${escape_prefix}\\1/g"`
 
-	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}"`
+	if printf "%s" "${value}" | grep -qEe '\\\\\\\$'; then
+		# Escape \$.
 
-	env="\\\"${name}=${value}\\\""
+		escape_regex='\\(\$[^(])'
 
-	local env_vars
-	# The user environment variables must override the environment variables defined by
-	# the Makejail to honor the intent.
-	local env_tmp="${envdir}/${MAKEJAIL_CURRENT_STAGE}.tmp"
-	if [ -f "${env_tmp}" ]; then
-		env_vars="${env} `head -1 "${env_tmp}"`"
-		rm -f "${env_tmp}"
+		value=`printf "%s" "${value}" | sed -Ee "s/${escape_regex}/\1/g"`
 	else
-		env_vars="${env}"
+		# Escape $.
+
+		escape_regex='\$[^(]'
+		escape_prefix='\\'
+
+		value=`printf "%s" "${value}" | sed -Ee "s/(${escape_regex})/${escape_prefix}\\1/g"`
 	fi
 
-	if ! printf "%s " "${env_vars}" >> "${envdir}/${MAKEJAIL_CURRENT_STAGE}"; then
-		lib_err ${EX_IOERR} "Error writing in ${envdir}/${MAKEJAIL_CURRENT_STAGE}"
-	fi
+	printf "%s\n" "${value}"
+}
+
+usage()
+{
+	echo "usage: escape-env-val.sh value"
 }
 
 main "$@"
