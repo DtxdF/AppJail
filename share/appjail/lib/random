@@ -62,7 +62,7 @@ random_color()
 	local clr
 	local bold
 
-	if [ "${ENABLE_RANDOM_COLORS}" = "0" ]; then
+	if [ "${ENABLE_COLORS}" = "0" -o "${ENABLE_RANDOM_COLORS}" = "0" ]; then
 		return 0
 	fi
 
