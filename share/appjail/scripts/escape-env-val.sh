@@ -30,13 +30,38 @@
 
 main()
 {
-	local value="$1"
+	local value="$1" type="${2:-makejail}"
 
 	if [ -z "${value}" ]; then
 		usage
 		exit 64 # EX_USAGE
 	fi
 
+	if [ "${type}" = "makejail" ]; then
+		escape_makejail "${value}"
+	elif [ "${type}" = "internal" ]; then
+		escape_internal "${value}"
+	else
+		usage
+		exit 64 # EX_USAGE
+	fi
+}
+
+escape_makejail()
+{
+	local escape_harmful_regex='(\$\(|["`\])'
+	local escape_harmful_prefix='\\'
+
+	local escape_var_regex='\\(\$[^(])'
+
+	printf "%s\n" "${value}" | \
+		sed -E \
+		-e "s/${escape_harmful_regex}/${escape_harmful_prefix}\1/g" \
+		-e "s/${escape_var_regex}/\1/g"
+}
+
+escape_internal()
+{
 	# Harmful characters.
 
 	local escape_regex='\$\(|["`\]'
@@ -64,7 +89,7 @@ main()
 
 usage()
 {
-	echo "usage: escape-env-val.sh value"
+	echo "usage: escape-env-val.sh value [[makejail|internal]]"
 }
 
 main "$@"

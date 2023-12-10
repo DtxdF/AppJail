@@ -55,7 +55,7 @@ main()
 	local name=`lib_jailparam_name "${env}" "="`
 	local value=`lib_jailparam_value "${env}" "="`
 
-	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}"`
+	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}" "internal"`
 
 	env="\\\"${name}=${value}\\\""
 

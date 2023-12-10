@@ -214,8 +214,7 @@ done > "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"
 
 __APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__=`lib_escape_string "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" 3`
 
-__APPJAIL_RUN_ENVIRONMENT__=`head -1 -- "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" | sed -Ee 's/;$//'`
-__APPJAIL_RUN_ENVIRONMENT__=`printf "%s" "${__APPJAIL_RUN_ENVIRONMENT__}" | sed -Ee 's/(\\\\\\\\)//g'`
+__APPJAIL_RUN_ENVIRONMENT__=`head -1 -- "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"`
 EOF
 
 		if ! touch -- "${dynamic_env_file}"; then
