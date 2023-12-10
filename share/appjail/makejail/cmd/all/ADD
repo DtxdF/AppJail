@@ -138,7 +138,7 @@ main()
 	local escape_url=`lib_escape_string "${url}" "" "${escape_chars}"`
 	local fetch_cmd=`lib_multi_replace "${MAKEJAIL_ADD_FETCH_CMD}" u "\"${escape_url}\""`
 
-	echo "${fetch_cmd} | tar ${tar_args} -C \"${escape_dst}\" -xf -"
+	echo "(set -o pipefail; ${fetch_cmd} | tar ${tar_args} -C \"${escape_dst}\" -xf -)"
 }
 
 main "$@"
