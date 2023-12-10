@@ -42,7 +42,7 @@ run_main()
 	local initscript=
 	local args=
 	local custom_stage=
-	local env_var env_name env_val
+	local environment=
 
 	while getopts ":i:p:s:V:" _o; do
 		case "${_o}" in
@@ -68,16 +68,14 @@ run_main()
 				custom_stage="${OPTARG}"
 				;;
 			V)
-				env_var="${OPTARG}"
-
+				local env_var="${OPTARG}"
 				if ! lib_check_var "${env_var}"; then
 					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
 				fi
 
-				env_name=`lib_jailparam_name "${env_var}" "="`
-				env_val=`lib_jailparam_value "${env_var}" "="`
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
 
-				export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				run_usage
@@ -116,6 +114,11 @@ run_main()
 
 	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" run -i`}"
 	args="${args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" run -p`}"
+	environment="${environment:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" run -V`}"
+
+	if ! lib_check_empty "${environment}"; then
+		lib_jail_setenv "${environment}"
+	fi
 
 	if lib_check_empty "${initscript}"; then
 		initscript="${JAILDIR}/${jail_name}/init"

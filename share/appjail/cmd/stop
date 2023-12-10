@@ -45,7 +45,7 @@ stop_main()
 	local opt_run_initscript=1 _opt_run_initscript=0
 	local initscript=
 	local args=
-	local env_var env_name env_val
+	local environment=
 	local jail_name
 	local jail_path
 	local errlevel=0
@@ -84,16 +84,14 @@ stop_main()
 				args="${args} \"${arg}\""
 				;;
 			V)
-				env_var="${OPTARG}"
-
+				local env_var="${OPTARG}"
 				if ! lib_check_var "${env_var}"; then
 					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
 				fi
 
-				env_name=`lib_jailparam_name "${env_var}" "="`
-				env_val=`lib_jailparam_value "${env_var}" "="`
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
 
-				export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				stop_usage
@@ -158,6 +156,11 @@ stop_main()
 
 	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -i`}"
 	args="${args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -p`}"
+	environment="${environment:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" stop -V`}"
+
+	if ! lib_check_empty "${environment}"; then
+		lib_jail_setenv "${environment}"
+	fi
 	
 	if [ ${opt_run_initscript} -eq 1 ]; then
 		if [ -n "${initscript}" ]; then

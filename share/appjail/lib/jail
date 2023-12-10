@@ -139,3 +139,33 @@ lib_ajconf()
 
     "${UTILDIR}/appjail-config/appjail-config" "$@"
 }
+
+lib_jail_setenv()
+{
+	local environment="$1"
+
+	if [ -z "${environment}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_jail_setenv environment"
+	fi
+
+	local env_list env_total env_index=0
+	local env_var env_name env_val
+
+	env_list=`lib_split_jailparams "${environment}"` || exit $?
+	env_total=`printf "%s\n" "${env_list}" | wc -l`
+
+	while [ ${env_index} -lt ${env_total} ]; do
+		env_index=$((env_index+1))
+		env_var=`printf "%s\n" "${env_list}" | head -${env_index} | tail -n 1`
+
+		env_name=`lib_jailparam_name "${env_var}" =`
+
+		if lib_check_empty "${env_name}"; then
+			lib_err ${EX_DATAERR} "Environment variable (${env_index}) is empty."
+		fi
+
+		env_val=`lib_jailparam_value "${env_var}" =`
+
+		export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
+	done
+}

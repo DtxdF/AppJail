@@ -50,7 +50,7 @@ start_main()
 	local start_args=
 	local jail_name=
 	local template=
-	local env_var env_name env_val
+	local environment=
 	local jail_path
 	local line
 	local errlevel=0
@@ -98,16 +98,14 @@ start_main()
 				template="${OPTARG}"
 				;;
 			V)
-				env_var="${OPTARG}"
-
+				local env_var="${OPTARG}"
 				if ! lib_check_var "${env_var}"; then
 					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
 				fi
 
-				env_name=`lib_jailparam_name "${env_var}" "="`
-				env_val=`lib_jailparam_value "${env_var}" "="`
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
 
-				export "__APPJAIL_RUN_ENVIRONMENT_VAR__${env_name}=${env_val}"
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				start_usage
@@ -175,6 +173,15 @@ start_main()
 	initscript="${initscript:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -i`}"
 	start_args="${start_args:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -s`}"
 	template="${template:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -t`}"
+	environment="${environment:-`"${APPJAIL_PROGRAM}" enabled "${jail_name}" start -V`}"
+
+	# Set environment variables.
+
+	if ! lib_check_empty "${environment}"; then
+		lib_jail_setenv "${environment}"
+	fi
+
+	# Template.
 
 	if ! lib_check_empty "${template}"; then
 		if [ ! -f "${template}" ]; then
@@ -199,6 +206,8 @@ start_main()
 	fi
 
 	lib_debug "Using \`${template}\` as the template."
+
+	# Initscript.
 
 	if [ ${opt_run_initscript} -eq 1 ]; then
 		if ! lib_check_empty "${initscript}"; then

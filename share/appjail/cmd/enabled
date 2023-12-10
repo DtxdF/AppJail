@@ -74,17 +74,7 @@ enabled_main()
 		return 0
 	fi
 
-	case "${command}" in
-		start)
-			enabled_start "${jail_name}" "$@"
-			;;
-		stop)
-			enabled_stop "${jail_name}" "$@"
-			;;
-		run)
-			enabled_run "${jail_name}" "$@"
-			;;
-	esac
+	enabled_${command} "${jail_name}" "$@"
 }
 
 enabled_start()
@@ -98,20 +88,13 @@ enabled_start()
 	local opt_initscript=0
 	local opt_start_args=0
 	local opt_template=0
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enabled_start jail_name [-I | -c | -i | -s | -t]"
-	fi
+	local opt_environment=0
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enabled_start # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/start"
 
-	while getopts ":cIist" _o; do
+	while getopts ":cIistV" _o; do
 		case "${_o}" in
 			c)
 				opt_create_args=1
@@ -127,6 +110,9 @@ enabled_start()
 				;;
 			t)
 				opt_template=1
+				;;
+			V)
+				opt_environment=1
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -154,6 +140,10 @@ enabled_start()
 		if [ -f "${bootdir}/template" ]; then
 			head -1 "${bootdir}/template"
 		fi
+	elif [ ${opt_environment} -eq 1 ]; then
+		if [ -f "${bootdir}/environment" ]; then
+			head -1 "${bootdir}/environment"
+		fi
 	fi
 }
 
@@ -166,20 +156,13 @@ enabled_stop()
 	local opt_run_initscript=0
 	local opt_initscript=0
 	local opt_args=0
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enabled_stop jail_name [-I | -i | -p]"
-	fi
+	local opt_environment=0
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enabled_stop # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/stop"
 
-	while getopts ":Iip" _o; do
+	while getopts ":IipV" _o; do
 		case "${_o}" in
 			I)
 				opt_run_initscript=1
@@ -189,6 +172,9 @@ enabled_stop()
 				;;
 			p)
 				opt_args=1
+				;;
+			V)
+				opt_environment=1
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -208,6 +194,10 @@ enabled_stop()
 		if [ -f "${bootdir}/args" ]; then
 			head -1 "${bootdir}/args"
 		fi
+	elif [ ${opt_environment} -eq 1 ]; then
+		if [ -f "${bootdir}/environment" ]; then
+			head -1 "${bootdir}/environment"
+		fi
 	fi
 }
 
@@ -219,26 +209,22 @@ enabled_run()
 	local bootdir
 	local opt_initscript=0
 	local opt_args=0
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enabled_run jail_name [-i | -p]"
-	fi
+	local opt_environment=0
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enabled_run # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/run"
 
-	while getopts ":ip" _o; do
+	while getopts ":ipV" _o; do
 		case "${_o}" in
 			i)
 				opt_initscript=1
 				;;
 			p)
 				opt_args=1
+				;;
+			V)
+				opt_environment=1
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -253,6 +239,10 @@ enabled_run()
 	elif [ ${opt_args} -eq 1 ]; then
 		if [ -f "${bootdir}/args" ]; then
 			head -1 "${bootdir}/args"
+		fi
+	elif [ ${opt_environment} -eq 1 ]; then
+		if [ -f "${bootdir}/environment" ]; then
+			head -1 "${bootdir}/environment"
 		fi
 	fi
 }
@@ -271,27 +261,29 @@ Parameters:
 
 Options for start:
     -c           -- Get parameters for the *create functions.
-    -I           -- Print zero if the initscript will not be executed.
-    -i           -- Get path to the custom initscript.
     -s           -- Get parameters for the *start functions.
     -t           -- Get path to the custom template.
 
 Options for stop:
-    -I           -- Print zero if the initscript will not be executed.
-    -i           -- Get path to the custom initscript.
     -p           -- Get parameters for the *stop functions.
 
 Options for run:
-    -i           -- Get path to the custom initscript.
     -p           -- Get parameters for the *cmd functions.
+
+Options for start, stop and run:
+    -i           -- Get path to the custom initscript.
+    -V           -- Get environment variables.
+
+Options for start and stop:
+    -I           -- Print zero if the initscript will not be executed.
 EOF
 }
 
 enabled_usage()
 {
 	cat << EOF
-usage: enabled jail start [-I | -c | -i | -s | -t]
-       enabled jail stop [-I | -i | -p]
-       enabled jail run [-i | -p]
+usage: enabled jail start [-I | -c | -i | -s | -t | -V]
+       enabled jail stop [-I | -i | -p | -V]
+       enabled jail run [-i | -p | -V]
 EOF
 }

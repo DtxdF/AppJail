@@ -76,17 +76,7 @@ enable_main()
 		lib_err ${EX_SOFTWARE} "Error creating ${bootdir}."
 	fi
 
-	case "${command}" in
-		start)
-			enable_start "${jail_name}" "$@"
-			;;
-		stop)
-			enable_stop "${jail_name}" "$@"
-			;;
-		run)
-			enable_run "${jail_name}" "$@"
-			;;
-	esac
+	enable_${command} "${jail_name}" "$@"
 }
 
 enable_start()
@@ -100,20 +90,13 @@ enable_start()
 	local initscript=
 	local start_args=
 	local template=
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enable_start jail_name [-I | [[-c parameter=value ...]] [-i initscript] [[-s parameter=value ...]]] [-t template]"
-	fi
+	local environment=
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enable_start # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/start"
 
-	while getopts "Ic:i:s:t:" _o; do
+	while getopts "Ic:i:s:t:V:" _o; do
 		case "${_o}" in
 			I)
 				opt_run_initscript=0
@@ -135,6 +118,12 @@ enable_start()
 				;;
 			t)
 				template="${OPTARG}"
+				;;
+			V)
+				local env_var="${OPTARG}"
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
+
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -161,6 +150,10 @@ enable_start()
 	if ! lib_check_empty "${template}"; then
 		printf "%s\n" "${template}" > "${bootdir}/template" || exit ${EX_IOERR}
 	fi
+
+	if ! lib_check_empty "${environment}"; then
+		printf "%s\n" "${environment}" > "${bootdir}/environment" || exit ${EX_IOERR}
+	fi
 }
 
 enable_stop()
@@ -172,20 +165,13 @@ enable_stop()
 	local opt_run_initscript=1
 	local initscript=
 	local args=
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enable_stop jail_name [-I | [-i initscript] [[-p parameter=value ...]]]"
-	fi
+	local environment=
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enable_stop # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/stop"
 
-	while getopts ":Ii:p:" _o; do
+	while getopts ":Ii:p:V:" _o; do
 		case "${_o}" in
 			I)
 				opt_run_initscript=0
@@ -198,6 +184,12 @@ enable_stop()
 				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				args="${args} \"${arg}\""
+				;;
+			V)
+				local env_var="${OPTARG}"
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
+
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -216,6 +208,10 @@ enable_stop()
 	if ! lib_check_empty "${args}"; then
 		printf "%s\n" "${args}" > "${bootdir}/args" || exit ${EX_IOERR}
 	fi
+
+	if ! lib_check_empty "${environment}"; then
+		printf "%s\n" "${environment}" > "${bootdir}/environment" || exit ${EX_IOERR}
+	fi
 }
 
 enable_run()
@@ -226,20 +222,13 @@ enable_run()
 	local bootdir
 	local initscript=
 	local args=
-
-	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: enable_run jail_name [-i initscript] [[-p parameter=value ...]]"
-	fi
+	local environment=
 
 	jail_name="$1"; shift
-	if [ -z "${jail_name}" ]; then
-		enable_run # usage
-	fi
-
 	jail_path="${JAILDIR}/${jail_name}"
 	bootdir="${jail_path}/conf/boot/run"
 
-	while getopts ":i:p:" _o; do
+	while getopts ":i:p:V:" _o; do
 		case "${_o}" in
 			i)
 				initscript="${OPTARG}"
@@ -249,6 +238,12 @@ enable_run()
 				arg=`lib_escape_string "${arg}" "" '\"' "-"`
 
 				args="${args} \"${arg}\""
+				;;
+			V)
+				local env_var="${OPTARG}"
+				env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
+
+				environment="${environment} \"${env_var}\""
 				;;
 			*)
 				lib_err ${EX_DATAERR} "Invalid option -- ${OPTARG}"
@@ -262,6 +257,10 @@ enable_run()
 
 	if ! lib_check_empty "${args}"; then
 		printf "%s\n" "${args}" > "${bootdir}/args" || exit ${EX_IOERR}
+	fi
+
+	if ! lib_check_empty "${environment}"; then
+		printf "%s\n" "${environment}" > "${bootdir}/environment" || exit ${EX_IOERR}
 	fi
 }
 
@@ -278,28 +277,31 @@ Parameters:
     run                       -- Enable parameters for the run command.
 
 Options for start:
-    -I                        -- Don't run the initscript.
     -c parameter=value        -- Parameters for *create functions.
-    -i initscript             -- Use a custom initscript.
     -s parameter=value        -- Parameters for *start functions.
     -t template               -- Use a custom template.
 
 Options for stop:
-    -I                        -- Don't run the initscript.
-    -i initscript             -- Use a custom initscript.
     -p parameter=value        -- Parameters for *stop functions.
 
 Options for run:
-    -i initscript             -- Use a custom initscript.
     -p parameter=value        -- Parameters for *cmd functions.
+
+Options for start, stop and run:
+    -i initscript             -- Use a custom initscript.
+    -V env=value              -- Environment variables.
+
+Options for start and stop:
+    -I                        -- Don't run the initscript.
 EOF
 }
 
 enable_usage()
 {
 	cat << EOF
-usage: enable jail start [-I | [[-c parameter=value ...]] [-i initscript] [[-s parameter=value ...]]] [-t template]
-       enable jail stop [-I | [-i initscript] [[-p parameter=value ...]]]
-       enable jail run [-i initscript] [[-p parameter=value ...]]
+usage: enable jail start [-I | [[-c parameter=value ...]] [-i initscript] [[-s parameter=value ...]]]
+                         [-t template] [[-V env=value] ...]
+       enable jail stop [-I | [-i initscript] [[-p parameter=value ...]]] [[-V env=value] ...]
+       enable jail run [-i initscript] [[-p parameter=value ...]] [[-V env=value] ...]
 EOF
 }
