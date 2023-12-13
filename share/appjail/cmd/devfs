@@ -997,7 +997,7 @@ usage: devfs append jail_name devfs_rules
        devfs del jail_name rulenum
        devfs delset [-q] jail_name
        devfs get [-eHIipt] -n nro jail_name [keyword ...]
-       devfs list [eHIipt] [-n nro] jail_name [keyword ...]
+       devfs list [-eHIipt] [-n nro] jail_name [keyword ...]
        devfs load [-r auto | ruleset] jail_name
        devfs remove [all | nro nro] jail_name
        devfs ruleset assign [-R] [-r auto | ruleset] jail_name

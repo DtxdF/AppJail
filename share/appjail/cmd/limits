@@ -936,7 +936,7 @@ limits_usage()
 {
 	cat << EOF
 usage: limits get [-eHIipt] -n nro jail_name [keyword ...]
-       limits list [eHIipt] [-n nro] jail_name [keyword ...]
+       limits list [-eHIipt] [-n nro] jail_name [keyword ...]
        limits off jail_name
        limits on jail_name
        limits remove [all | nro nro] jail_name
