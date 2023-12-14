@@ -207,6 +207,7 @@ fstab_compile()
 				fs_file=`_fstab_pre_mount_volumefs "${jail_name}" "${fs_spec}" "${fs_file}"` || exit $?
 				;;
 			*)
+				fs_file="${jail_path}/jail/${fs_file}"
 				_fstab_pre_mount "${fs_file}"
 				;;
 		esac
