@@ -67,11 +67,11 @@ volume_add()
 
 		case "${_o}" in
 			g)
+				gid="${OPTARG}"
+
 				if ! lib_check_number "${gid}"; then
 					lib_err ${EX_DATAERR} "Invalid GID '${gid}'"
 				fi
-
-				gid="${OPTARG}"
 				;;
 			m)
 				mountpoint="${OPTARG}"
