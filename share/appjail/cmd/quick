@@ -74,6 +74,7 @@ QUICK_KEY_NETWORK="network"
 QUICK_KEY_NONAT="nonat"
 QUICK_KEY_SLAAC="slaac"
 QUICK_KEY_VIRTUALNET="virtualnet"
+QUICK_KEY_VOLUME="volume"
 
 # Fstab constants
 QUICK_FSTAB_OPTION_DEVICE=1
@@ -152,6 +153,7 @@ QUICK_OPTION_USE_TZDATA="${USE_TIMEZONE}"; QUICK_OPTION_TZDATA="${DEFAULT_TIMEZO
 QUICK_OPTION_VIRTUALNET=0
 QUICK_OPTION_VNET=0
 QUICK_OPTION_VNET_INTERFACES=
+QUICK_OPTION_VOLUME=0
 QUICK_OPTION_X11=0
 QUICK_OPTION_ZFS_IMPORT_JAIL=0
 QUICK_OPTION_ZFS_IMPORT_ROOT=0
@@ -193,7 +195,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -241,7 +243,7 @@ quick_main()
 	limits_options="cpuset limits"
 
 	local device_options
-	device_options="devfs device fstab tmpdir linuxfs x11"
+	device_options="devfs device volume fstab tmpdir linuxfs x11"
 
 	local startup_options
 	startup_options="boot priority"
@@ -1884,6 +1886,142 @@ quick_set_bridge()
 	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "interfaces" "${interfaces}"
 
 	QUICK_OPTION_BRIDGE=1
+}
+
+quick_run_volume()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_VOLUME} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring volumes ..."
+
+	lib_keys_list "${QUICK_KEY_VOLUME}" | while IFS= read -r volume_name
+	do
+		volume_add_cmd="appjail volume add"
+
+		group=`lib_keys_get "${QUICK_KEY_VOLUME}" "${volume_name}" "group"`
+		if ! lib_check_empty "${group}"; then
+			escape_group=`lib_escape_string "${group}"`
+
+			volume_add_cmd="${volume_add_cmd} -g \"${escape_group}\""
+		fi
+
+		mountpoint=`lib_keys_get "${QUICK_KEY_VOLUME}" "${volume_name}" "mountpoint"`
+		if ! lib_check_empty "${mountpoint}"; then
+			escape_mountpoint=`lib_escape_string "${mountpoint}"`
+
+			volume_add_cmd="${volume_add_cmd} -m \"${escape_mountpoint}\""
+		fi
+
+		owner=`lib_keys_get "${QUICK_KEY_VOLUME}" "${volume_name}" "owner"`
+		if ! lib_check_empty "${owner}"; then
+			escape_owner=`lib_escape_string "${owner}"`
+
+			volume_add_cmd="${volume_add_cmd} -o \"${escape_owner}\""
+		fi
+
+		perm=`lib_keys_get "${QUICK_KEY_VOLUME}" "${volume_name}" "perm"`
+		if ! lib_check_empty "${perm}"; then
+			escape_perm=`lib_escape_string "${perm}"`
+
+			volume_add_cmd="${volume_add_cmd} -p \"${escape_perm}\""
+		fi
+
+		type=`lib_keys_get "${QUICK_KEY_VOLUME}" "${volume_name}" "type"`
+		if ! lib_check_empty "${type}"; then
+			escape_type=`lib_escape_string "${type}"`
+
+			volume_add_cmd="${volume_add_cmd} -t \"${escape_type}\""
+		fi
+
+		escape_volume_name=`lib_escape_string "${volume_name}"`
+
+		# tail
+		volume_add_cmd="${volume_add_cmd} -- \"${QUICK_JAILNAME}\" \"${escape_volume_name}\""
+
+		lib_debug "volume (${volume_name}): \"group:${group}\" \"mountpoint:${mountpoint}\" \"owner:${owner}\" \"perm:${mode}\" \"type:${type}\""
+
+		# profit!
+		sh -c "${volume_add_cmd}" || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_volume()
+{
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "volume syntax: volume [group:gid] [mountpoint:/path/to/some/directory] [owner:uid] [perm:mode] [type:fs_type]"
+	fi
+
+	params=`lib_split_jailparams "${params}"` || exit $?
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local volume_name=
+	local uid=
+	local mountpoint=
+	local gid=
+	local mode=
+	local type=
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		if [ -z "${volume_name}" ]; then
+			volume_name="${arg}"
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			group)
+				gid="${value}"
+				;;
+			mountpoint)
+				mountpoint="${value}"
+				;;
+			owner)
+				uid="${value}"
+				;;
+			perm)
+				mode="${value}"
+				;;
+			type)
+				type="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (volume): parameter not found."
+				;;
+		esac
+	done
+
+	if lib_check_empty "${volume_name}"; then
+		quick_set_volume # usage
+	fi
+
+	lib_keys_set "${QUICK_KEY_VOLUME}" "${volume_name}" "group" "${gid}"
+	lib_keys_set "${QUICK_KEY_VOLUME}" "${volume_name}" "mountpoint" "${mountpoint}"
+	lib_keys_set "${QUICK_KEY_VOLUME}" "${volume_name}" "owner" "${uid}"
+	lib_keys_set "${QUICK_KEY_VOLUME}" "${volume_name}" "perm" "${mode}"
+	lib_keys_set "${QUICK_KEY_VOLUME}" "${volume_name}" "type" "${type}"
+
+	QUICK_OPTION_VOLUME=1
 }
 
 quick_run_fstab()
@@ -4026,6 +4164,23 @@ Options:
 			     Conflicts: alias
 			     Descr: A network interface to give to a vnet-enabled jail after is it created. The interface will automatically
 			            be released when the jail is removed.
+
+    volume                -- Syntax: volume="volume [group:gid] [mountpoint:/path/to/some/directory] [owner:uid] [perm:mode] [type:fs_type]"
+                             Type: options
+			     Parameters:
+				 - volume (str, required):
+				     Volume name.
+				 - group (int, optional):
+				     Group ID of the specified volume.
+				 - mountpoint (str, optional):
+				     Path within the jail to mount the specified volume.
+				 - owner (int, optional):
+				     User ID of the specified volume.
+				 - perm (str, optional):
+				     File mode of the specified volume.
+				 - type (str, optional):
+				     File system type.
+			     Descr: Create a new volume.
 
     x11                   -- Syntax: x11
                              Type: bool

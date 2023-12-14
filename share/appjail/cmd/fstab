@@ -186,11 +186,9 @@ fstab_compile()
 
 		lib_debug "Compiling fstab #${nro}: ${fs_spec} ${fs_file} ${fs_vfstype} ${fs_mntops} ${fs_freq} ${fs_passno}"
 
-		# Actual fs_file.
-		fs_file="${jail_path}/jail/${fs_file}"
-
 		case "${fs_vfstype}" in
 			\<pseudofs\>)
+				fs_file="${jail_path}/jail/${fs_file}"
 				fs_vfstype="nullfs"
 				fs_freq=0
 				fs_passno=0
@@ -198,7 +196,15 @@ fstab_compile()
 				_fstab_pre_mount_pseudofs "${fs_spec}" "${fs_file}"
 				;;
 			nullfs)
+				fs_file="${jail_path}/jail/${fs_file}"
 				_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}" > /dev/null
+				;;
+			\<volumefs\>)
+				fs_vfstype="nullfs"
+				fs_freq=0
+				fs_passno=0
+
+				fs_file=`_fstab_pre_mount_volumefs "${jail_name}" "${fs_spec}" "${fs_file}"` || exit $?
 				;;
 			*)
 				_fstab_pre_mount "${fs_file}"
@@ -268,6 +274,62 @@ _fstab_pre_mount_nullfs()
 	fi
 
 	echo "${type}"
+}
+
+_fstab_pre_mount_volumefs()
+{
+	local jail_name="$1"
+	local fs_file="$2"
+	local volume_name="$3"
+
+	local mountpoint type
+
+	mountpoint=`"${APPJAIL_PROGRAM}" volume get -Iv "${volume_name}" -- "${jail_name}" mountpoint` || exit $?
+
+	if lib_check_empty "${mountpoint}"; then
+		lib_err ${EX_CONFIG} "mountpoint is not defined!"
+	fi
+
+	mountpoint="${JAILDIR}/${jail_name}/jail/${mountpoint}"
+
+	type=`"${APPJAIL_PROGRAM}" volume get -Iv "${volume_name}" -- "${jail_name}" type` || exit $?
+
+	if lib_check_empty "${type}"; then
+		lib_err ${EX_CONFIG} "type is not defined!"
+	fi
+
+	case "${type}" in
+		\<pseudofs\>)
+			_fstab_pre_mount_pseudofs "${fs_file}" "${mountpoint}"
+			;;
+		nullfs)
+			_fstab_pre_mount_nullfs "${fs_file}" "${mountpoint}" > /dev/null
+			;;
+		*)
+			lib_err "Invalid file system type '${type}' for <volumefs>."
+			;;
+	esac
+
+	local uid gid
+
+	uid=`"${APPJAIL_PROGRAM}" volume get -Iv "${volume_name}" -- "${jail_name}" uid` || exit $?
+	gid=`"${APPJAIL_PROGRAM}" volume get -Iv "${volume_name}" -- "${jail_name}" gid` || exit $?
+
+	if ! chown -f -- "${uid}:${gid}" "${fs_file}"; then
+		lib_err "Can't change owner and/or group of ${fs_file}"
+	fi
+
+	local perm
+
+	perm=`"${APPJAIL_PROGRAM}" volume get -Iv "${volume_name}" -- "${jail_name}" perm` || exit $?
+
+	if ! lib_check_empty "${perm}"; then
+		if ! chmod -- "${perm}" "${fs_file}"; then
+			lib_err "Can't change mode of ${fs_file}"
+		fi
+	fi
+
+	printf "%s\n" "${mountpoint}"
 }
 
 _fstab_pre_mount()

@@ -213,6 +213,21 @@ lib_check_imagename()
 	fi
 }
 
+lib_check_volumename()
+{
+	local volumename="$1"
+
+	if [ -z "${volumename}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_volumename volumename"
+	fi
+
+	if _lib_check_humanname "${volumename}"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 _lib_check_humanname()
 {
 	local name="$1"

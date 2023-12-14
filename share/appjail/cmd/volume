@@ -1,0 +1,504 @@
+#!/bin/sh
+#
+# Copyright (c) 2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+volume_desc="Volume management for jails."
+
+volume_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		add|get|list|remove) ;;
+		*) volume_usage; exit ${EX_USAGE} ;;
+	esac
+
+	volume_${entity} "$@"
+}
+
+volume_add()
+{
+	local _o
+	local gid=
+	local mountpoint=
+	local uid=
+	local mode=
+	local type=
+
+	while getopts ":g:m:o:p:t:" _o; do
+		case "${_o}" in
+			g|m|o|p|t)
+				if lib_check_empty "${OPTARG}"; then
+					volume_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			g)
+				if ! lib_check_number "${gid}"; then
+					lib_err ${EX_DATAERR} "Invalid GID '${gid}'"
+				fi
+
+				gid="${OPTARG}"
+				;;
+			m)
+				mountpoint="${OPTARG}"
+				;;
+			o)
+				uid="${OPTARG}"
+
+				if ! lib_check_number "${uid}"; then
+					lib_err ${EX_DATAERR} "Invalid UID '${uid}'"
+				fi
+				;;
+			p)
+				mode="${OPTARG}"
+				;;
+			t)
+				type="${OPTARG}"
+
+				case "${type}" in
+					nullfs|\<pseudofs\>) ;;
+					*) lib_err ${EX_DATAERR} "Only nullfs and <pseudofs> file system types are allowed." ;;
+				esac
+				;;
+			*)
+				volume_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"
+	_volume_chk_jail "${jail_name}"
+
+	local volume_name="$2"
+
+	if lib_check_empty "${volume_name}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_volumename "${volume_name}"; then
+		lib_err ${EX_DATAERR} "Invalid volume name '${volume_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local volumedir="${jail_path}/conf/volumes/${volume_name}"
+
+	if [ -d "${volumedir}" ]; then
+		lib_err ${EX_CANTCREAT} "Volume '${volume_name}' already exists."
+	fi
+
+	if ! mkdir -p -- "${volumedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${volumedir}"
+	fi
+
+	if [ -n "${gid}" ]; then
+		if ! printf "%s" "${gid}" > "${volumedir}/gid"; then
+			lib_err ${EX_IOERR} "An error occurred while setting the GID."
+		fi
+	fi
+
+	if ! printf "%s" "${mountpoint:-${VOLUMESDIR}/${volume_name}}" > "${volumedir}/mountpoint"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the mount point."
+	fi
+
+	if [ -n "${uid}" ]; then
+		if ! printf "%s" "${uid}" > "${volumedir}/uid"; then
+			lib_err ${EX_IOERR} "An error occurred while setting the UID."
+		fi
+	fi
+
+	if [ -n "${mode}" ]; then
+		if ! printf "%s" "${mode}" > "${volumedir}/perm"; then
+			lib_err ${EX_DATAERR} "An error occurred while setting permissions for this volume."
+		fi
+	fi
+
+	if ! printf "%s" "${type:-<pseudofs>}" > "${volumedir}/type"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the file system type."
+	fi
+}
+
+volume_get()
+{
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_pretty=0
+	local opt_tabulate=0
+	local volume_name=
+
+        local flag_name=0
+        local flag_mountpoint=0
+        local flag_type=0
+        local flag_uid=0
+        local flag_gid=0
+        local flag_perm=0
+	
+	while getopts ":eHIptv:" _o; do
+		case "${_o}" in
+			v)
+				if lib_check_empty "${OPTARG}"; then
+					volume_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			v)
+				volume_name="${OPTARG}"
+				;;
+			*)
+				volume_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_volume_chk_jail "${jail_name}"
+
+	if lib_check_empty "${volume_name}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_volumename "${volume_name}"; then
+		lib_err ${EX_DATAERR} "Invalid volume name '${volume_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/volumes/${volume_name}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Volume '${volume_name}' does not exist."
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "name" "mountpoint" "type" "uid" "gid" "perm"
+	fi
+
+	local empty_separator
+	if [ $# -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local keywords= keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		case "${keyword}" in
+			name|mountpoint|type|uid|gid|perm) ;;
+			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		fi
+
+		setvar flag_${keyword} 1
+
+		keywords="${keywords} ${keyword}"
+	done
+
+	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local value
+		for keyword in ${keywords}; do
+			value=
+			case "${keyword}" in
+				name)
+					value="${volume_name}"
+					;;
+				*)
+					if [ ! -f "${basedir}/${keyword}" ]; then
+						value=
+					else
+						value=`head -1 "${basedir}/${keyword}"`
+					fi
+					;;
+			esac
+
+			if lib_check_empty "${value}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					value="${empty_separator}"
+				else
+					value="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${value}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+volume_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local volume_name=
+
+	while getopts ":eHIptv:" _o; do
+		case "${_o}" in
+			v)
+				if lib_check_empty "${OPTARG}"; then
+					volume_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			v)
+				volume_name="${OPTARG}"
+				;;
+			*)
+				volume_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	_volume_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${volume_name}" ]; then
+		volume_get ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -v "${volume_name}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local volumesdir="${jail_path}/conf/volumes"
+
+	if [ ! -d "${volumesdir}" ]; then
+		return 0
+	fi
+
+	ls -A -- "${volumesdir}" | while IFS= read -r volume_name
+	do
+		volume_get ${eflag} ${Hflag} ${Iflag} ${tflag} -v "${volume_name}" -- "${jail_name}" "$@"
+
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+volume_remove()
+{
+	local jail_name="$1"
+	_volume_chk_jail "${jail_name}"
+
+	local volume_name="$2"
+	if lib_check_empty "${volume_name}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_volumename "${volume_name}"; then
+		lib_err ${EX_DATAERR} "Invalid volume name '${volume_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local volumedir="${jail_path}/conf/volumes/${volume_name}"
+
+	if [ ! -d "${volumedir}" ]; then
+		lib_err ${EX_CANTCREAT} "Volume '${volume_name}' does not exist."
+	fi
+
+	rm -rf "${volumedir}"
+}
+
+_volume_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		volume_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+volume_help()
+{
+	cat << EOF
+`volume_usage`
+
+Parameters:
+    add                   -- Add a new volume.
+    get                   -- Get information about a volume.
+    list                  -- Like \`get\` but for all targets.
+    remove                -- Remove a volume.
+
+Options for add:
+    -g gid                -- Changes the group ID of the specified volume.
+    -m mountpoint         -- Path within the jail to mount the specified volume. Default: ${VOLUMESDIR}/{volume_name}
+    -o uid                -- Changes the user ID of the specified volume.
+    -p mode               -- Changes the file mode of the specified volume.
+    -t type               -- File system type. Valid are \`nullfs\` and \`<pseudofs>\`.
+
+Options for get:
+    -e                    -- This option is not required when using -p. The \\t character is used to delimit columns,
+                             in order not to display strange values, this option displays <TAB> instead of \\t.
+    -H                    -- Display the name of the columns.
+    -I                    -- Include empty values. By default, a minus sign is displayed when a value is empty.
+    -p                    -- Columnate the list.
+    -t                    -- Tabulate columns and values.
+    -v volume_name        -- Operate in this volume.
+
+Options for list:
+    -e                    -- This option is the opposite in \`Options for get\`.
+    -H                    -- This option is the opposite in \`Options for get\`.
+    -I                    -- This option is the same as in \`Options for get\`.
+    -p                    -- This option is the opposite in \`Options for get\`.
+    -t                    -- This option is the opposite in \`Options for get\`.
+    -v volume_name        -- Operate in this volume. If not defined, operate in all volumes.
+EOF
+}
+
+volume_usage()
+{
+	cat << EOF
+usage: volume add [-g gid] [-m mountpoint] [-o uid] [-p mode] [-t type] jail_name volume_name
+       volume get [-eHIpt] -v volume_name jail_name [keyword ...]
+       volume list [-eHIpt] [-v volume_name] jail_name [keyword ...]
+       volume remove jail_name volume_name
+EOF
+}

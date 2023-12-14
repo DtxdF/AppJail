@@ -486,7 +486,7 @@ _jail_export()
 				mkdir -p "${jail_path}/conf" || exit $?
 				touch "${jail_path}/conf/config.conf" || exit $?
 
-				include_files="./jail/ ./init ./conf/config.conf"
+				include_files="./jail/ ./init ./conf/volumes/ ./conf/config.conf"
 			fi
 
 			if ! sh -c "tar -C \"${escape_jail_path}\" ${tar_args} -cf \"${escape_output}\" ${include_files}"; then
@@ -632,7 +632,7 @@ _jail_import()
 
 			local include_files=
 			if [ ${portable} -eq 1 -a "${function}" = "import+root" ]; then
-				include_files="./jail/ ./init ./conf/config.conf"
+				include_files="./jail/ ./init ./conf/volumes/ ./conf/config.conf"
 			fi
 
 			if ! sh -c "tar -C \"${escape_jail_path}\" ${TAR_DECOMPRESS_ARGS} -xf \"${escape_input}\" ${include_files}"; then

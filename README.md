@@ -58,7 +58,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 
 **Characters Allowed**:
 
-* Jail Name, Network Name and Custom Stage: Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`.
+* Jail Name, Network Name, Custom Stage and Volume Name: Although jail names can use any character (except `.`), AppJail does not use any possible character. Valid regex is `^[a-zA-Z0-9_][a-zA-Z0-9_-]*$`.
 * Interface Name: For interface names, the regex is `^[a-zA-Z0-9_][a-zA-Z0-9_.]*$`.
 * JNG: For `jng`, the regex is `^[a-zA-Z_]+[a-zA-Z0-9_]*$` and for its links the regex is `^[0-9a-zA-Z_]+$`.
 
