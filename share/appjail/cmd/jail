@@ -485,6 +485,7 @@ _jail_export()
 				chmod +x "${jail_path}/init" || exit $?
 				mkdir -p "${jail_path}/conf" || exit $?
 				touch "${jail_path}/conf/config.conf" || exit $?
+				mkdir -p "${jail_path}/conf/volumes" || exit $?
 
 				include_files="./jail/ ./init ./conf/volumes/ ./conf/config.conf"
 			fi
