@@ -23,11 +23,11 @@ load_rc_config ${name}
 
 command="%%PREFIX%%/bin/appjail"
 start_cmd="${name}_start"
-start_postcmd="_show_logfile"
+start_precmd="precmd"
 stop_cmd="${name}_stop"
-stop_postcmd="_show_logfile"
+stop_precmd="precmd"
 restart_cmd="${name}_restart"
-restart_postcmd="_show_logfile"
+restart_precmd="precmd"
 status_cmd="${name}_status"
 
 precmd()
@@ -35,26 +35,23 @@ precmd()
 	if [ ! -f "${appjail_natnet_logfile}" ]; then
 		install -m 640 /dev/null "${appjail_natnet_logfile}"
 	fi
-}
-
-_show_logfile()
-{
 	echo "AppJail log file (NAT): ${appjail_natnet_logfile}"
 }
 
 appjail_natnet_start()
 {
-	(nohup "${command}" startup start nat networks >> "${appjail_natnet_logfile}" &)
+	daemon -o "${appjail_natnet_logfile}" \
+		"${command}" startup start nat networks
 }
 
 appjail_natnet_stop()
 {
-	(nohup "${command}" startup stop nat networks >> "${appjail_natnet_logfile}" &)
+	"${command}" startup stop nat networks >> "${appjail_natnet_logfile}" 2>&1
 }
 
 appjail_natnet_restart()
 {
-	(nohup "${command}" startup restart nat networks >> "${appjail_natnet_logfile}" &)
+	"${command}" startup restart nat networks >> "${appjail_natnet_logfile}" 2>&1
 }
 
 appjail_natnet_status()

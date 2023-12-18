@@ -24,11 +24,11 @@ load_rc_config ${name}
 
 command="%%PREFIX%%/bin/${name}"
 start_cmd="${name}_start"
-start_postcmd="_show_logfile"
+start_precmd="precmd"
 stop_cmd="${name}_stop"
-stop_postcmd="_show_logfile"
+stop_precmd="precmd"
 restart_cmd="${name}_restart"
-restart_postcmd="_show_logfile"
+restart_precmd="precmd"
 status_cmd="${name}_status"
 
 precmd()
@@ -36,27 +36,26 @@ precmd()
 	if [ ! -f "${appjail_logfile}" ]; then
 		install -m 640 /dev/null "${appjail_logfile}"
 	fi
-}
-
-_show_logfile()
-{
 	echo "AppJail log file (Jails): ${appjail_logfile}"
 }
 
 appjail_start()
 {
-	(nohup env PATH="${appjail_path}" "${command}" startup start jails >> "${appjail_logfile}" &)
+	env PATH="${appjail_path}" \
+		daemon -o "${appjail_logfile}" "${command}" startup start jails
 
 }
 
 appjail_stop()
 {
-	(nohup env PATH="${appjail_path}" "${command}" startup stop jails >> "${appjail_logfile}" &)
+	env PATH="${appjail_path}" \
+		"${command}" startup stop jails >> "${appjail_logfile}" 2>&1
 }
 
 appjail_restart()
 {
-	(nohup env PATH="${appjail_path}" "${command}" startup restart jails >> "${appjail_logfile}" &)
+	env PATH="${appjail_path}" \
+		"${command}" startup restart jails >> "${appjail_logfile}" 2>&1
 }
 
 appjail_status()
