@@ -43,7 +43,6 @@ appjail_start()
 {
 	env PATH="${appjail_path}" \
 		daemon -o "${appjail_logfile}" "${command}" startup start jails
-
 }
 
 appjail_stop()
