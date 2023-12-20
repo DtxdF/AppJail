@@ -6,7 +6,7 @@ RM?=rm
 SED?=sed
 PREFIX?=/usr/local
 
-APPJAIL_VERSION?=2.10.0
+APPJAIL_VERSION?=3.0.0
 
 all: install
 
