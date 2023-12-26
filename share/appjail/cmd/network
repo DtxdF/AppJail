@@ -42,7 +42,6 @@ NETWORK_ATTACH_TYPE_EPAIR="epair"
 NETWORK_ATTACH_TYPE_IFACE="iface"
 NETWORK_DEFAULT_ATTACH_TYPE="${NETWORK_ATTACH_TYPE_EPAIR}"
 
-NETWORK_GENERIC_BRG="bridge"
 NETWORK_GENERIC_EPR="epair"
 NETWORK_GENERIC_LO="lo"
 
@@ -439,29 +438,8 @@ _network_create_bridge()
 		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge"
 	fi
 
-	# Avoids a race condition at startup.
-
-	local total=3 tries=0
-	while [ ${tries} -lt ${total} ]; do
-		sleep `random_number 0 3`.`random_number 3 9`
-
-		if lib_check_iface "${bridge}"; then
-			if ! lib_check_ifacegrp "${bridge}" "${NETWORK_GENERIC_BRG}"; then
-				lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
-			fi
-
-			lib_debug -- "${bridge}: bridge already created."
-
-			return 0
-		fi
-
-		tries=$((tries+1))
-	done
-
-	ifconfig bridge create name "${bridge}" || exit $?
-	ifconfig -- "${bridge}" up || exit $?
-
-	lib_debug -- "${bridge}: the bridge has been created."
+	lockf -ks "${TMPDIR}/bridge.${bridge}.lock" \
+		"${SCRIPTSDIR}/create-bridge.sh" -c "${CONFIG}" -b "${bridge}"
 }
 
 _network_create_epair()
