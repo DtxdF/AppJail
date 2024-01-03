@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="assets/logos/appjail-logo.png" />
+    <img src="assets/img/Slogan.png" />
 </p>
 
 ----
