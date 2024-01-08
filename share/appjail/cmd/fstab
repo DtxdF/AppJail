@@ -186,6 +186,15 @@ fstab_compile()
 
 		lib_debug "Compiling fstab #${nro}: ${fs_spec} ${fs_file} ${fs_vfstype} ${fs_mntops} ${fs_freq} ${fs_passno}"
 
+		# Reverse order?
+		reverse=false
+		case "${fs_vfstype}" in
+			\<pseudofs\>:reverse|nullfs:reverse)
+				fs_vfstype="${fs_vfstype%%:reverse}"
+				reverse=true
+				;;
+		esac
+
 		case "${fs_vfstype}" in
 			\<pseudofs\>)
 				fs_file="${jail_path}/jail/${fs_file}"
@@ -193,10 +202,23 @@ fstab_compile()
 				fs_freq=0
 				fs_passno=0
 
+				if ${reverse}; then
+					aux="${fs_spec}"
+					fs_spec="${fs_file}"
+					fs_file="${aux}"
+				fi
+
 				_fstab_pre_mount_pseudofs "${fs_spec}" "${fs_file}"
 				;;
 			nullfs)
 				fs_file="${jail_path}/jail/${fs_file}"
+
+				if ${reverse}; then
+					aux="${fs_spec}"
+					fs_spec="${fs_file}"
+					fs_file="${aux}"
+				fi
+
 				_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}" > /dev/null
 				;;
 			\<volumefs\>)
@@ -660,6 +682,7 @@ fstab_mounted()
 	local jail_path="${JAILDIR}/${jail_name}"
 
 	lib_mountpoint_mounted -F '%2 -> %1' -- "${jail_path}/jail"
+	lib_mountpoint_mounted -pF '%2 <- %1' -- "${jail_path}/jail"
 }
 
 fstab_remove()
