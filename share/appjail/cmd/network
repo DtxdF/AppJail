@@ -43,6 +43,7 @@ NETWORK_ATTACH_TYPE_IFACE="iface"
 NETWORK_DEFAULT_ATTACH_TYPE="${NETWORK_ATTACH_TYPE_EPAIR}"
 
 NETWORK_GENERIC_EPR="epair"
+NETWORK_GENERIC_BRG="bridge"
 NETWORK_GENERIC_LO="lo"
 
 network_desc="Create, remove or manage virtual networks (IPv4 only) for jails."
