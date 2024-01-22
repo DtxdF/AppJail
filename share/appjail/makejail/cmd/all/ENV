@@ -55,6 +55,10 @@ main()
 	local name=`lib_jailparam_name "${env}" "="`
 	local value=`lib_jailparam_value "${env}" "="`
 
+	if lib_check_empty "${value}"; then
+		lib_err ${EX_DATAERR} -- "${name}: this environment variable requires a value."
+	fi
+
 	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}" "internal"`
 
 	env="\\\"${name}=${value}\\\""

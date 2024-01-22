@@ -213,6 +213,11 @@ makejail_main()
 
 				local env_name=`lib_jailparam_name "${env}" "="`
 				local env_value=`lib_jailparam_value "${env}" "="`
+
+				if lib_check_empty "${env_value}"; then
+					lib_err ${EX_DATAERR} -- "${env_name}: this environment variable requires a value."
+				fi
+
 				env_value=`"${SCRIPTSDIR}/escape-env-val.sh" "${env_value}" "internal"`
 
 				env="${env_name}=${env_value}"

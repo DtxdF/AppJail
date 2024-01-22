@@ -205,12 +205,21 @@ lib_atexit_add "rm -f \"${__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__}\""
 env | grep -Ee '^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$' | sed -Ee 's/__APPJAIL_RUN_ENVIRONMENT_VAR__(.+)/\1/' | while IFS= read -r env_var; do
 	name=`lib_jailparam_name "${env_var}" "="`
 	value=`lib_jailparam_value "${env_var}" "="`
+	if lib_check_empty "${value}"; then
+		lib_err ${EX_DATAERR} -- "${name}: this environment variable requires a value."
+	fi
 	value=`"${SCRIPTSDIR}/escape-env-val.sh" "${value}"`
 
 	env="${name}=${value}"
 
 	printf "%s " "\"${env}\""
 done > "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"
+
+__APPJAIL_RUN_RETURNCODE__=$?
+
+if [ ${__APPJAIL_RUN_RETURNCODE__} -ne 0 ]; then
+	exit ${__APPJAIL_RUN_RETURNCODE__}
+fi
 
 __APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__=`lib_escape_string "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" 3`
 
