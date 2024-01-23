@@ -139,7 +139,8 @@ edit_file(const char *f)
     default: {
             int stat_val;
 
-            wait(&stat_val);
+            if (wait(&stat_val) == -1)
+                err(EX_SOFTWARE, "wait()");
 
             if (WIFEXITED(stat_val) != 0)
                 errcode = WEXITSTATUS(stat_val);
