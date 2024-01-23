@@ -183,6 +183,7 @@ const char *template_parameters[] = {
     "sysvshm",
     "vnet",
     "vnet.interface",
+    "zfs.dataset",
 };
 
 size_t template_parameters_total = sizeof(template_parameters) / sizeof(template_parameters[0]);
