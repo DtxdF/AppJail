@@ -1076,3 +1076,20 @@ lib_check_kernelconf()
 		return 1
 	fi
 }
+
+lib_check_mtu()
+{
+	local mtu="$1"
+
+	if [ -z "${mtu}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_mtu mtu"
+	fi
+
+	# Min: RFC 791
+	# Max: 16 bit number
+	if [ "${mtu}" -lt 576 -o "${mtu}" -gt 65535 ]; then
+		return 1
+	fi
+
+	return 0
+}

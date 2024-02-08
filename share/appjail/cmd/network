@@ -80,11 +80,12 @@ network_add()
 	local network_name
 	local netaddr
 	local network_description
+	local mtu="${DEFAULT_VIRTUALNET_MTU}"
 	local errlevel=0
 
-	while getopts ":Od:" _o; do
+	while getopts ":Od:m:" _o; do
 		case "${_o}" in
-			d)
+			d|m)
 				if lib_check_empty "${OPTARG}"; then
 					network_usage
 					exit ${EX_USAGE}
@@ -98,6 +99,9 @@ network_add()
 				;;
 			d)
 				network_description="${OPTARG}"
+				;;
+			m)
+				mtu="${OPTARG}"
 				;;
 			*)
 				network_usage
@@ -139,6 +143,10 @@ network_add()
 
 	if [ ${cidr} -lt 0 -o ${cidr} -gt 30 ]; then
 		lib_err ${EX_DATAERR} "The CIDR is invalid. Valid ranges are 0-30."
+	fi
+
+	if ! lib_check_number "${mtu}" || ! lib_check_mtu "${mtu}"; then
+		lib_err ${EX_DATAERR} "The MTU is Invalid!"
 	fi
 
 	local network_conf
@@ -191,6 +199,7 @@ network_add()
 	printf "NAME=%s\n" "${network_name}" >> "${network_conf}"
 	printf "DESCRIPTION=%s\n" "${network_description}" >> "${network_conf}"
 	printf "GATEWAY=%s\n" "${network_gateway}" >> "${network_conf}"
+	printf "MTU=%s\n" "${mtu}" >> "${network_conf}"
 
 	if [ ${ENABLE_DEBUG} != "0" ]; then
 		lib_debug "Network information:"
@@ -836,6 +845,7 @@ network_get()
 	local flag_gateway=0
 	local flag_maxaddr=0
 	local flag_minaddr=0
+	local flag_mtu=0
 	local flag_name=0
 	local flag_netmask=0
 	local flag_network=0
@@ -882,7 +892,7 @@ network_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "name" "network" "cidr" "broadcast" "gateway" "minaddr" "maxaddr" "addresses" "description"
+		set -- "name" "network" "cidr" "broadcast" "gateway" "minaddr" "maxaddr" "addresses" "description" "mtu"
 	fi
 
 	local empty_separator
@@ -899,7 +909,7 @@ network_get()
 		fi
 
 		case "${keyword}" in
-			address|addresses|broadcast|cidr|description|gateway|maxaddr|minaddr|name|netmask|network|wildcard) ;;
+			address|addresses|broadcast|cidr|description|gateway|maxaddr|minaddr|mtu|name|netmask|network|wildcard) ;;
 			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
 		esac
 
@@ -1344,7 +1354,11 @@ network_plug()
 		ifconfig -- "${network_name}" group "${DEFAULT_NETWORK_GRPBRG}" || exit $?
 	fi
 
-	_network_create_epair "e" "${ether_name}"
+	mtu=`network_get -I -- "${network_name}" mtu`
+	# Backward compatibility.
+	mtu="${mtu:-${DEFAULT_VIRTUALNET_MTU}}"
+
+	_network_create_epair "e" "${ether_name}" "${mtu}"
 
 	if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPEPR}"; then
 		# Group
@@ -1646,6 +1660,8 @@ Options for add:
 			               avoids some problems. If you are sure that a network does not overlap another network,
 			               you can disable the test with this option.
     -d description                  -- Network description.
+    -m mtu                          -- Set this MTU to the network to be created. For a Virtual Network already created with
+                                       no MTU defined, the MTU is the default anyway. Default: ${DEFAULT_VIRTUALNET_MTU}
 
 Options for assign:
     -d                              -- Mark network_name as the default route.
@@ -1755,7 +1771,7 @@ EOF
 network_usage()
 {
 	cat << EOF
-usage: network add [-O] [-d description] network_name network_address/cidr
+usage: network add [-O] [-d description] [-m mtu] network_name network_address/cidr
        network assign -e ether_name -j jail_name -n network_name [-d] [-a auto|forceauto|address]
        network attach [-b bridge] [[epair|iface]:]interface ...
        network auto-create
