@@ -37,7 +37,13 @@ if ! which -s "${RUNAS}"; then
 	lib_load "${LIBDIR}/sysexits"
 	lib_load "${LIBDIR}/log"
 
-	lib_err ${EX_UNAVAILABLE} -- "${RUNAS}: program not found."
+	lib_err - "AppJail is designed to run as root and your UID (`id -u`) does not meet this requirement."
+	lib_err -
+	lib_err - "If you want to run AppJail as an unprivileged user, you need a suitable tool and set"
+	lib_err - "the 'RUNAS' option (default: ${RUNAS}) in your AppJail configuration file, and it must"
+	lib_err - "exist and have the execute bit set."
+
+	exit ${EX_UNAVAILABLE}
 fi
 
 CMD="$1"; shift
