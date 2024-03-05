@@ -273,7 +273,7 @@ start_main()
 
 		"${APPJAIL_PROGRAM}" devfs load -r "${devfs_ruleset}" -- "${jail_name}" || exit $?
 
-		devfs_ruleset=`"${APPJAIL_PROGRAM}" devfs ruleset get "${jail_name}" || exit $?`
+		devfs_ruleset=`"${APPJAIL_PROGRAM}" devfs ruleset get "${jail_name}"` || exit $?
 
 		lib_ajconf set -Vt "${template_temp}" "devfs_ruleset=${devfs_ruleset}"
 
