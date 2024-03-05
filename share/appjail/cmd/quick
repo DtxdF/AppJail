@@ -311,8 +311,8 @@ quick_temp_template()
 
 quick_create_jail()
 {
-	if [ "${QUICK_OPTION_OVERWRITE}" != 0 ]; then
-		if [ -d "${JAILDIR}/${QUICK_JAILNAME}" ]; then
+	if [ -d "${JAILDIR}/${QUICK_JAILNAME}" ]; then
+		if [ "${QUICK_OPTION_OVERWRITE}" != 0 ]; then
 			lib_warn "Trying to remove ${QUICK_JAILNAME} ..."
 
 			appjail stop -- "${QUICK_JAILNAME}" || exit $?
@@ -328,6 +328,8 @@ quick_create_jail()
 			lib_debug "Destroy flags: <${QUICK_OPTION_OVERWRITE}>"
 
 			appjail jail destroy ${destroy_flags} -- "${QUICK_JAILNAME}" || exit $?
+		else
+			lib_err ${EX_CANTCREAT} -- "Jail already created."
 		fi
 	fi
 
