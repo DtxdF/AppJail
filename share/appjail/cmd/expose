@@ -229,7 +229,7 @@ expose_get()
 					hport=`head -1 -- "${basedir}/hport"`
 					jport=`head -1 -- "${basedir}/jport"`
 
-					if [ "${hport}" -eq "${jport}" ]; then
+					if [ "${hport}" = "${jport}" ]; then
 						value="${hport}"
 					else
 						value="${hport} -> ${jport}"
@@ -671,33 +671,63 @@ expose_set()
 		jport="${hport}"
 	fi
 
-	if ! lib_check_port "${hport}"; then
-		local _hport=`lib_network_getservbyname "${hport}" "${protocol}" | grep "PORT=" | cut -d= -f2`
+	local min_hport=`echo "${hport}" | awk -F- '{print $1}'`
+	local max_hport=`echo "${hport}" | awk -F- '{print $2}'`
 
-		if [ -z "${_hport}" ]; then
-			lib_err ${EX_DATAERR} "Invalid port: ${hport} (${protocol})"
+	local min_jport=`echo "${jport}" | awk -F- '{print $1}'`
+	local max_jport=`echo "${jport}" | awk -F- '{print $2}'`
+
+	# Empty these variables as we need to set them again.
+	hport=
+	jport=
+
+	local port index=0
+
+	for port in "${min_hport}" "${max_hport}" "${min_jport}" "${max_jport}"; do
+		if lib_check_empty "${port}"; then
+			if [ ${index} -eq 0 ]; then
+				lib_err ${EX_DATAERR} "Invalid port specification."
+			elif [ ${index} -eq 1 -o ${index} -eq 2 ]; then
+				port="${min_hport}"
+			elif [ ${index} -eq 3 ]; then
+				port="${min_jport:-${min_hport}}"
+			fi
 		fi
 
-		hport="${_hport}"
-	fi
+		if ! lib_check_port "${port}"; then
+			local _port=`lib_network_getservbyname "${port}" "${protocol}" | grep "PORT=" | cut -d= -f2`
 
-	if ! lib_check_port "${jport}"; then
-		local _jport=`lib_network_getservbyname "${jport}" "${protocol}" | grep "PORT=" | cut -d= -f2`
+			if [ -z "${port}" ]; then
+				lib_err ${EX_DATAERR} "Invalid port: ${port} (${protocol})"
+			fi
 
-		if [ -z "${_jport}" ]; then
-			lib_err ${EX_DATAERR} "Invalid port: ${jport} (${protocol})"
+			port="${_port}"
 		fi
 
-		jport="${_jport}"
-	fi
+		if [ ${index} -lt 2 ]; then
+			if [ -z "${hport}" ]; then
+				hport="${port}"
+			elif [ "${hport}" -ne "${port}" ]; then
+				hport="${hport}:${port}"
+			fi
+		else
+			if [ -z "${jport}" ]; then
+				jport="${port}"
+			elif [ "${jport}" -ne "${port}" ]; then
+				jport="${jport}:${port}"
+			fi
+		fi
+
+		index=$((index+1))
+	done
 
 	local raw_rule=
 	case "${USE_FIREWALL}" in
 		pf)
 			if [ ${opt_log} -eq 1 ]; then
-				raw_rule="rdr pass log ${log_options} on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port = ${hport} -> ${jaddr} port ${jport}"
+				raw_rule="rdr pass log ${log_options} on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port ${hport} -> ${jaddr} port ${jport}"
 			else
-				raw_rule="rdr pass on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port = ${hport} -> ${jaddr} port ${jport}"
+				raw_rule="rdr pass on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port ${hport} -> ${jaddr} port ${jport}"
 			fi
 
 			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
