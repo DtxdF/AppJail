@@ -120,18 +120,18 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-network(1)**
   * [ ] **appjail-pkg(1)**
   * [ ] **appjail-quick(1)**
-  * [ ] **appjail-restart**
-  * [ ] **appjail-rstop**
-  * [ ] **appjail-run**
-  * [ ] **appjail-service**
-  * [ ] **appjail-start**
-  * [ ] **appjail-startup**
-  * [ ] **appjail-status**
-  * [ ] **appjail-stop**
-  * [ ] **appjail-sysrc**
+  * [ ] **appjail-restart(1)**
+  * [ ] **appjail-rstop(1)**
+  * [ ] **appjail-run(1)**
+  * [ ] **appjail-service(1)**
+  * [ ] **appjail-start(1)**
+  * [ ] **appjail-startup(1)**
+  * [ ] **appjail-status(1)**
+  * [ ] **appjail-stop(1)**
+  * [ ] **appjail-sysrc(1)**
   * [ ] **appjail-template(5)**
-  * [ ] **appjail-update**
-  * [ ] **appjail-upgrade**
+  * [ ] **appjail-update(1)**
+  * [ ] **appjail-upgrade(1)**
   * [X] **appjail-usage(1)**
   * [ ] **appjail-user(8)**
   * [ ] **appjail-volume(1)**
