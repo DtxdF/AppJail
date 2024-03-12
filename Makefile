@@ -5,6 +5,8 @@ MKDIR?=mkdir
 RM?=rm
 SED?=sed
 PREFIX?=/usr/local
+MANDIR?=${PREFIX}/share/man
+MANPAGES=man1/appjail-version.1
 
 APPJAIL_VERSION?=3.2.0
 
@@ -17,6 +19,16 @@ install: utils-strip
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail"
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc"
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc/rc.d"
+	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}"
+	# Sections used by manual pages.
+	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man1"
+	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man5"
+	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man8"
+
+	# man pages.
+.for manpage in ${MANPAGES}
+	${INSTALL} -m 444 share/man/${manpage} "${DESTDIR}${MANDIR}/${manpage}"
+.endfor
 	
 	# rc scripts.
 .for rc_script in appjail appjail-dns appjail-health appjail-natnet
@@ -113,3 +125,6 @@ uninstall:
 	${RM} -rf "${DESTDIR}${PREFIX}/share/appjail"
 	${RM} -rf "${DESTDIR}${PREFIX}/share/examples/appjail"
 	${RM} -rf "${DESTDIR}${PREFIX}/libexec/appjail"
+.for manpage in ${MANPAGES}
+	${RM} -f "${DESTDIR}${MANDIR}/${manpage}"
+.endfor

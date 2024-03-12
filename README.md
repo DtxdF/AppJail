@@ -135,7 +135,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-usage(1)**
   * [ ] **appjail-user(8)**
   * [ ] **appjail-volume(1)**
-  * [ ] **appjail-version(1)**
+  * [X] **appjail-version(1)**
   * [ ] **appjail-zfs(1)**
  
 ## Contributing
