@@ -6,7 +6,7 @@ RM?=rm
 SED?=sed
 PREFIX?=/usr/local
 MANDIR?=${PREFIX}/share/man
-MANPAGES=man1/appjail-version.1
+MANPAGES=man1/appjail-version.1 man1/appjail-usage.1
 
 APPJAIL_VERSION?=3.2.0
 

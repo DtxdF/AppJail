@@ -132,7 +132,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-template(5)**
   * [ ] **appjail-update**
   * [ ] **appjail-upgrade**
-  * [ ] **appjail-usage(1)**
+  * [X] **appjail-usage(1)**
   * [ ] **appjail-user(8)**
   * [ ] **appjail-volume(1)**
   * [X] **appjail-version(1)**
