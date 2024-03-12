@@ -23,6 +23,7 @@ install: utils-strip
 	# Sections used by manual pages.
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man1"
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man5"
+	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man7"
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man8"
 
 	# man pages.
