@@ -88,7 +88,55 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
 - [x] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`. (Done with the new tool, `appjail-config`)
 - [ ] Implement all `jail(8)` parameters in `appjail quick`.
 - [ ] The `jng` script is useful, but AppJail must create the Netgraph nodes in the same way as bridges and epairs.
-- [ ] Man pages.
+- [ ] Man pages (**WIP**):
+  * [ ] **appjail(1)**
+  * [ ] **appjail-ajspec(5)**
+  * [ ] **appjail-apply(1)**
+  * [ ] **appjail-checkOld(1)**
+  * [ ] **appjail-cmd(1)**
+  * [ ] **appjail-cpuset(1)**
+  * [ ] **appjail-conf(5)**
+  * [ ] **appjail-config(1)**
+  * [ ] **appjail-deleteOld(1)**
+  * [ ] **appjail-devfs(1)**
+  * [ ] **appjail-disable(1)**
+  * [ ] **appjail-dns(8)**
+  * [ ] **appjail-enable(1)**
+  * [ ] **appjail-enabled(1)**
+  * [ ] **appjail-etcupdate(1)**
+  * [ ] **appjail-expose(1)**
+  * [ ] **appjail-fetch(1)**
+  * [ ] **appjail-fstab(1)**
+  * [ ] **appjail-healthcheck(1)**
+  * [ ] **appjail-help(1)**
+  * [ ] **appjail-image(1)**
+  * [ ] **appjail-jail(1)**
+  * [ ] **appjail-limits(1)**
+  * [ ] **appjail-login(1)**
+  * [ ] **appjail-logs(1)**
+  * [ ] **appjail-makejail(1)**
+  * [ ] **appjail-makejail(5)**
+  * [ ] **appjail-nat(1)**:
+  * [ ] **appjail-network(1)**
+  * [ ] **appjail-pkg(1)**
+  * [ ] **appjail-quick(1)**
+  * [ ] **appjail-restart**
+  * [ ] **appjail-rstop**
+  * [ ] **appjail-run**
+  * [ ] **appjail-service**
+  * [ ] **appjail-start**
+  * [ ] **appjail-startup**
+  * [ ] **appjail-status**
+  * [ ] **appjail-stop**
+  * [ ] **appjail-sysrc**
+  * [ ] **appjail-template(5)**
+  * [ ] **appjail-update**
+  * [ ] **appjail-upgrade**
+  * [ ] **appjail-usage(1)**
+  * [ ] **appjail-user(8)**
+  * [ ] **appjail-volume(1)**
+  * [ ] **appjail-version(1)**
+  * [ ] **appjail-zfs(1)**
  
 ## Contributing
 
