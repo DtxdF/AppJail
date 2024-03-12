@@ -89,7 +89,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
 - [ ] Implement all `jail(8)` parameters in `appjail quick`.
 - [ ] The `jng` script is useful, but AppJail must create the Netgraph nodes in the same way as bridges and epairs.
 - [ ] Man pages (**WIP**):
-  * [ ] **appjail(1)**
+  * [X] **appjail(1)**
   * [ ] **appjail-ajspec(5)**
   * [ ] **appjail-apply(1)**
   * [ ] **appjail-checkOld(1)**
