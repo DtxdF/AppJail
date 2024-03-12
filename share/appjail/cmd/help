@@ -31,7 +31,7 @@
 lib_load "${LIBDIR}/whitespaces"
 lib_load "${LIBDIR}/strlen"
 
-help_desc="Show help for commands and list the available commands."
+help_desc="Display help information about AppJail"
 
 help_main()
 {
@@ -104,13 +104,10 @@ help_for()
 
 help_help()
 {
-	help_usage
-	
-	echo
-	echo "${help_desc}"
+	man 1 appjail-help
 }
 
 help_usage()
 {
-	echo "usage: help cmd"
+	echo "usage: help <command>"
 }

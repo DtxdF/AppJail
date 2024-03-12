@@ -108,7 +108,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-fetch(1)**
   * [ ] **appjail-fstab(1)**
   * [ ] **appjail-healthcheck(1)**
-  * [ ] **appjail-help(1)**
+  * [X] **appjail-help(1)**
   * [ ] **appjail-image(1)**
   * [ ] **appjail-jail(1)**
   * [ ] **appjail-limits(1)**
