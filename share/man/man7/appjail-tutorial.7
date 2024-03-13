@@ -1,0 +1,544 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 12, 2024
+.Dt APPJAIL-TUTORIAL 7
+.Os
+.Sh NAME
+.Nm appjail-tutorial
+.Nd A tutorial introduction to AppJail
+.Sh DESCRIPTION
+.Sy Welcome to the AppJail tutorial!
+.Pp
+AppJail is out of the box in many cases and does
+not need configuration files or third-party applications to work properly, however,
+this does not mean that AppJail is suitable for all kind of users without
+configuring it and does not mean that you cannot take advantage of third-party
+projects to provide more features.
+.Pp
+.Em NOTE ":"
+Sections are unordered, so you can jump to the section you really need.
+.Pp
+This tutorial is divided into the following sections:
+.Pp
+.Bl -tag -width xxxx
+.It Cm Introduction
+Introduction to the most basic commands to download FreeBSD components, create a
+jail and list the jails we have created.
+.It Cm External Interface
+Configuring the external interface, so that jails can access the outside and clients
+can connect to applications inside the jails using features such as
+.Sy NAT
+and
+.Sy port forwarding "."
+.It Cm Configuration
+Configuring some basic parameters explicitly to improve performance and stability.
+.It Cm Loopback Interface
+Configuring the loopback interface if we want to use
+.Sy LinuxJails
+in combination with
+.Sy Virtual Networks.
+.It Cm Packet Filter
+Configuring our packet filter with 
+.Xr pf 4
+anchors, so that jails can use
+.Sy NAT
+and
+.Sy port forwarding
+thanks to
+.Sy Virtual Networks.
+.It Cm Virtual Networks
+Quick explanation of how to create a jail and join it to a
+.Sy Virtual Network "."
+.It Cm DNS
+Using meaningful names instead of dotted IPv4 addresses is very useful in many cases,
+so AppJail can use the
+.Em Domain Name System
+.Aq DNS
+to take advantage of this feature.
+.It Cm RC Scripts
+AppJail uses some RC scripts to start jails at startup, enable NAT for an entire network
+instead of per jail, supervise jails, update DNS information, etc. All of them are
+optional and you may or may not need them.
+.It Cm Resource Limits
+Uncontrolled applications can exacerbate our system resources, but having an application
+inside a jail is very useful since we can limit the resources to what it really needs.
+.It Cm ZFS
+The most advanced file system available today for FreeBSD and valid for AppJail is what we
+want to use when possible.
+.El
+.Sh INTRO
+To create a very basic jail, only two things are needed: obtaining the FreeBSD components
+.Aq base.txz, lib32.txz, ...
+and creating the jail using those components.
+.Bd -literal -offset indent
+# appjail fetch
+# appjail quick jbasic start
+.Ed
+.Pp
+.Xr appjail-fetch 1
+will download
+.Sy MANIFEST
+and the components listed in
+.Sy COMPONENTS
+specified in your AppJail configuration file. By default, only 
+.Dq base.txz
+is downloaded.
+.Sy MANIFEST
+contains the component checksums, so
+.Xr appjail-fetch 1
+can check if they are incorrect.
+.Pp
+After retrieving the components, you can create jails using those components with
+.Xr appjail-quick 1 "."
+In the previous case only the 
+.Em start
+option is specified, so our jail will start after its creation.
+.Pp
+That's all! You have a jail! A very simple and basic jail with no customization,
+no colors and no powers. Be patient, you'll wonder how many things you can do
+with AppJail, from basic 
+.Aq create jails, start them, destroy them, ...
+to more
+advanced
+.Aq deploy complex applications using Makejails, each of them in separate \
+    jails with an active supervisor to avoid time of inactivity, ...
+.Pp
+List the jails you have created using
+.Xr appjail-jail 1 with the
+.Em list
+subcommand.
+.Bd -literal -offset indent
+# appjail jail list
+STATUS  NAME    TYPE  VERSION       PORTS  NETWORK_IP4
+UP      jbasic  thin  14.0-RELEASE  -      -
+.Ed
+.Pp
+Log in to your jail.
+.Bd -literal -offset indent
+# appjail login jbasic
+.Ed
+.Pp
+Stop your jail.
+.Bd -literal -offset indent
+# appjail stop jbasic
+.Ed
+.Pp
+And destroy it.
+.Bd -literal -offset indent
+# appjail jail destroy jbasic
+.Ed
+.Sh EXTERNAL INTERFACE
+To avoid wasting precious time getting the external interface every time AppJail
+.Aq and its child processes!
+runs, it's a good idea to explicitly configure an external interface in your
+AppJail configuration file. More than performance it's about stability, which is
+more relevant when you have more than one interface you want to use with your jails,
+so AppJail will only use the one you explicitly configure.
+.Pp
+Another recommendation is to change the name of your external interface. This is not
+necessary for AppJail, but it is necessary for you, as it is much easier to change one
+interface for another without your jails noticing under normal circumstances. Another
+reason is when you can use the same interface name on almost, if not all, of your servers,
+so you have fewer things to consider. AppJail is designed with the aforementioned problem
+in mind, so it is dynamic in almost all its phases, however, we recommend changing the
+interface name when possible.
+.Pp
+.Bd -literal -offset indent
+# sysrc ifconfig_<interface>_name="<custom name>"
+# sysrc ifconfig_<custom name>="<options>"
+.Ed
+.Pp
+For example: Suppose we want to use 
+.Em em0
+as our external interface and we want to change its name to
+.Em jext
+and configure it using DHCP.
+.Pp
+.Bd -literal -offset indent
+# sysrc ifconfig_em0_name="jext"
+# sysrc ifconfig_jext="DHCP"
+.Ed
+.Pp
+You can apply the same steps on another system but with a different interface, say,
+.Xr if_re 4 "."
+.Pp
+For the above changes to take effect, we must restart
+.Em etc/rc.d/netif "."
+.Pp
+.Bd -literal -offset indent
+# service netif restart
+.Ed
+.Pp
+We recommend performing the above steps physically, so that any errors can be fixed
+as soon as possible. Or at least you should have some other way to fix any networking
+related errors.
+.Pp
+The last step is to put the
+.Sy EXT_IF
+parameter in your AppJail configuration file, which is commonly
+.Pa %%PREFIX%%/etc/appjail/appjail.conf ":"
+.Bd -literal -offset indent
+EXT_IF=jext
+.Ed
+.Sh CONFIGURATION
+As mentioned, AppJail doesn't require a configuration file to work properly, but it's
+a good idea to have one to get better performance and stability, so we only use what
+we explicitly configure. Not all parameters are listed here, these are just a
+complement, see 
+.Xr appjail-conf 5
+.Pp
+.Bl -tag -width xxxx
+.It Cm EXT_IF
+External Interface. In almost all cases, the interface you use to access the network.
+.Pp
+See
+.Sx EXTERNAL INTERFACE "."
+.It Cm ON_IF
+The name or group of the network interface to transmit packets on. In almost all cases,
+it must have the same value as 
+.Sy EXT_IF "."
+.Pp
+See
+.Sx EXTERNAL INTERFACE "."
+.It Cm FREEBSD_VERSION
+Default FreeBSD version without patch level that jails will use.
+.It Cm FREEBSD_ARCH
+Default FreeBSD architecture that jails will use.
+.It Cm IMAGE_ARCH
+Default architecture used by AppJail images.
+.It Cm SHORTEN_DOMAIN_NAMES
+It is used to shorten the domain name of your jails, so that you can communicate
+between them using only their name, i.e.
+.Em redis
+instead of 
+.Em redis.ajnet.appjail
+when using the DNS system.
+.It Cm ENABLE_ZFS
+If you plan to take advantage of ZFS with AppJail, set this option.
+.El
+.Pp
+.Sy Configuration example:
+.Pp
+.Bd -literal -offset indent
+EXT_IF=jext
+ON_IF=jext
+FREEBSD_VERSION=14.0-RELEASE
+FREEBSD_ARCH=amd64
+IMAGE_ARCH=amd64
+SHORTEN_DOMAIN_NAMES=1
+# Remove the # character if you want to use ZFS with AppJail.
+#ENABLE_ZFS=1
+.Ed
+.Sh LOOPBACK INTERFACE
+Since
+.Sy LinuxJails
+uses aliasing in combination with
+.Sy Virtual Networks ","
+we need to clone a loopback interface.
+.Pp
+.Bd -literal -offset indent
+# sysrc cloned_interfaces="lo1"
+# sysrc ifconfig_lo1_name="appjail0"
+.Ed
+.Sh PACKET FILTER
+An application inside a jail is not as useful when they need to communicate with
+external clients. To enable this, we need to enable
+.Xr pf 4 ","
+.Xr pflog 4
+and add some anchors to our
+.Xr pf.conf 5 "."
+.Pp
+.Bd -literal -offset indent
+# sysrc pf_enable="YES"
+# sysrc pflog_enable="YES"
+.Ed
+.Pp
+.Pa /etc/pf.conf ":"
+.Bd -literal -offset indent
+nat-anchor 'appjail-nat/jail/*'
+nat-anchor "appjail-nat/network/*"
+rdr-anchor "appjail-rdr/*"
+.Ed
+.Pp
+Restart the rc scripts:
+.Bd -literal -offset indent
+service pf restart
+service pflog restart
+.Ed
+.Pp
+Some AppJail features require you to enable IPv4 forwarding.
+.Pp
+.Bd -literal -offset indent
+# sysrc gateway_enable="YES"
+# sysctl net.inet.ip.forwarding=1
+.Ed
+.Sh VIRTUAL NETWORKS
+In early versions of AppJail, when you want to create a jail that is part of a Virtual Network, you must first explicitly create the virtual network. You can do this if you want, but we recommend that you leave that responsibility to AppJail. AppJail has the ability to automatically create a virtual network with some default values when you create a jail.
+.Pp
+.Bd -literal -offset indent
+# appjail quick jtest \\
+	start \\
+	overwrite=force \\
+	virtualnet=":<random> default" \\
+	nat
+.Ed
+.Pp
+If you want more details see
+.Xr appjail-nat 1 ","
+.Xr appjail-network 1
+and
+.Xr appjail-quick 1 ","
+but basically we have created a jail named
+.Em jtest
+which will have an interface with a randomly chosen name thanks to the
+.Em <random>
+keyword. The left part of the character
+.Sy :
+is to indicate the virtual network that we want to use. If we leave that part empty
+.Aq as we do
+.XR appjail-quick 1
+will use the default virtual network. The default virtual network is created if it does not exist.
+.Sh DNS
+AppJail does not come with a DNS server nor does it officially support one, but
+it does come with a configuration for
+.Em dns/dnsmasq
+and generates a file similar to
+.Xr hosts 5
+that can be consumed by DNSMasq or any other. In theory, you can use any other DNS server; see
+.Xr appjail-dns 8
+for more details.
+.Pp
+.Bd -literal -offset indent
+# appjail-dns
+10.0.0.1        ajnet.appjail
+10.0.0.2        jtest jtest.ajnet.appjail
+.Ed
+.Pp
+As mentioned, this script generates a file similar to
+.Xr hosts 5 ","
+so we only need
+to tell a DNS system how to consume it. In the case of DNSMasq, we just need to
+enable, configure and start some RC scripts.
+.Pp
+.Bd -literal -offset indent
+# sysrc appjail_dns_enable="YES"
+# sysrc dnsmasq_enable="YES"
+# sysrc dnsmasq_conf="/usr/local/share/appjail/files/dnsmasq.conf"
+# touch /var/tmp/appjail-hosts
+# service dnsmasq start
+# service appjail-dns start
+.Ed
+.Pp
+That's all, but we have a new problem: what IP address should our jails use to send
+DNS queries? That depends entirely on your environment, but in many cases, or
+at least for AppJail, you only need a private IPv4 address, so we'll configure a
+.Xr tap 4
+interface and set a single IPv4 address. We recommend using this IP address instead of
+the host IP address because it is much easier to migrate between environments this way:
+if you use the host IP address and move to another environment with different network
+parameters, you must change
+.Xr resolv.conf 5
+for each jail, which is not really hard even when you have many jails, but it is
+preferable to change things as little as possible.
+.Pp
+.Bd -literal -offset indent
+# sysrc cloned_interfaces="tap0"
+# sysrc ifconfig_tap0_name="ajdns"
+# sysrc ifconfig_ajdns="inet 172.0.0.1/32"
+# service netif cloneup
+# service netif start ajdns
+.Ed
+.Pp
+The next step is to decide how our jails copy
+.Xr resolv.conf 5 "."
+There are many ways, but we recommend the most trivial and simplest: set
+.Sy DEFAULT_RESOLV_CONF
+in your AppJail configuration file to a
+.Xr resolv.conf 5
+file, so that AppJail copies it instead of
+.Pa /etc/resolv.conf "."
+Why is it preferable to use an explicitly
+.Xr resolv.conf 5 pathname instead of
+.Pa /etc/resolv.conf "?"
+Some applications can modify
+.Pa /etc/resolv.conf ","
+so our jails will break their connections due to DNS issues.
+.Pp
+.Bd -literal -offset indent
+DEFAULT_RESOLV_CONF="%%PREFIX%%/etc/appjail/resolv.conf"
+.Ed
+.Pp
+Our
+.Xr resolv.conf 5
+file should be very simple.
+.Bd -literal -offset indent
+nameserver 172.0.0.1
+.Ed
+.Pp
+Now our jails can use a DNS hostname to communicate with another jail. That is fine,
+but we might want to do the same task on the host, so we'll need to configure
+.Pa /etc/resolv.conf
+to point to the address we configured for the
+.Em ajdns
+interface. Very trivial, the problem is the one we mentioned: some applications can
+modify that file, but a solution may be to set the
+.Sy schg
+flag, preventing the modification of that file. Consider whether this will break your
+existing applications, but in many cases it will not.
+.Pp
+After successful configuration, you can resolve DNS hostnames to IPv4 addresses.
+.Bd -literal -offset indent
+# appjail jail list -j jtest
+STATUS  NAME   TYPE  VERSION       PORTS  NETWORK_IP4
+UP      jtest  thin  14.0-RELEASE  -      10.0.0.2
+# host jtest.ajnet.appjail
+jtest.ajnet.appjail has address 10.0.0.2
+.Ed
+.Pp
+If you set
+.Sy SHORTEN_DOMAIN_NAMES=1
+in your AppJail configuration file, you can use only the jail name.
+.Bd -literal -offset indent
+# host jtest
+jtest has address 10.0.0.2
+.Ed
+.Sh RC SCRIPTS
+Some RC scripts are part of AppJail and are commonly used to perform a task in
+the background or only during startup.
+.Pp
+.Bl -tag -width x
+.It Cm etc/rc.d/appjail
+This RC script has the responsibility of starting jails at startup in the background
+and stopping them in the foreground. The reason for starting jails in the background
+is that the user probably doesn't want to wait for each of its jails to say
+.Dq I'm up and running!
+The stop part must be in the foreground for
+.Xr rc.shutdown 8
+to work correctly.
+.It Cm etc/rc.d/appjail-dns
+This RC script is responsible for updating the DNS information, that is, updating
+the hostname with the IPv4 address of the jail.
+.Pp
+See
+.Sx DNS "."
+.It Cm etc/rc.d/appjail-health
+This RC script will start any healthcheckers you configure for any of your jails
+in the background. Note that the purpose of this RC script and healthcheckers is
+not to run forever: it will run only until no more healthcheckers are running.
+You must restart this RC script every time you add a new healthchecker or change
+a parameter. This means that if you exhaust your recovery attempts, the healthchecker
+will stop and won't run until you run it again. We recommend that you don't run
+healthcheckers forever, fix your application!
+.It Cm etc/rc.d/appjail-natnet
+You can perform NAT per jail or per network. Typically, NAT is performed per jail, but
+there are some advantages to performing NAT per network as you only need to do it once and
+not more. Of course, it may not be wise to perform NAT for an entire network. This
+RC script is responsible for performing NAT per network at startup.
+.El
+.Sh RESOURCE LIMITS
+For resource limits to work in AppJail and in general, you must enable RACCT in your
+.Xr loader.conf 5
+file and reboot your system.
+.Bd -literal -offset indent
+kern.racct.enable=1
+.Ed
+.Sh ZFS
+To take advantage of this amazing, powerful and advanced file system with AppJail, you must enable it using
+.Sy ENABLE_ZFS=1
+in your AppJail configuration file. There are other parameters you should consider, such as
+.Sy ZPOOL ","
+the pool you want to use, which by default is
+.Em zroot ";"
+.Sy ZROOTFS ","
+the datasets root part, which by default is
+.Em appjail ";"
+and
+.Sy ZOPTS ","
+parameters passed to
+.Xr zfs-create 8 ","
+which by default is
+.Sy -o compress=lz4 "."
+You need to escape the shell characters for the last parameter.
+.Sh SEE ALSO
+.Xr appjail 1
+.Xr appjail-fetch 1
+.Xr appjail-quick 1
+.Xr appjail-jail 1
+.Xr appjail-help 1
+.Xr appjail-usage 1
+.Xr appjail-conf 5
+.Xr appjail-dns 8
+.Xr appjail-healthcheck 1
+.Xr appjail-nat 1
+.Xr appjail-limits 1
+.Xr pf.conf 5
+.Xr rc.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh BUGS
+.Bl -tag -width xx
+.It Cm Don't mix ZFS and non-ZFS file systems!
+AppJail assumes that the user has correctly configured before use whether it want
+to use ZFS or not, i.e. it sets
+.Sy ENABLE_ZFS=1
+or
+.Sy ENABLE_ZFS=0 "."
+If you already have an AppJail installation with data, you must remove or migrate it.
+.Pp
+In any case if you have started jails, you must stop them all.
+.Bd -literal -offset indent
+service appjail stop
+.Pp
+.Ed
+.Aq Removing
+Assuming the
+.Sy PREFIX
+is
+.Pa %%PREFIX%% ":"
+.Bd -literal -offset indent
+chflags -R 0 %%PREFIX%%/appjail
+rm -rf %%PREFIX%%/appjail
+rm -f /var/log/appjail.log
+rm -rf /var/log/appjail
+.Ed
+.Pp
+.Aq Migrating
+Change the
+.Sy LOGDIR
+and
+.Sy PREFIX
+parameters in your AppJail configuration file to a different path or create a backup and delete those directories.
+.Pp
+.Aq ZFS or non-ZFS
+After cleaning you must decide whether you want to use ZFS or not. Review any ZFS-related AppJail configuration parameters
+before enabling it. After you set
+.Sy ENABLE_ZFS=1
+and run AppJail, the datasets are automatically created in the pool you specified.
+.El
+.Sh NOTES
+.Lk https://appjail.readthedocs.io/ "AppJail Documentation"
