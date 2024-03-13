@@ -513,10 +513,23 @@ If you already have an AppJail installation with data, you must remove or migrat
 In any case if you have started jails, you must stop them all.
 .Bd -literal -offset indent
 service appjail stop
-.Pp
 .Ed
-.Aq Removing
-Assuming the
+.Pp
+.Aq ZFS: Removing
+Assuming
+.Sy ZPOOL
+is
+.Em zroot
+and
+.Sy ZROOTFS
+is
+.Em appjail ":"
+.Bd -literal -offset indent
+zfs destroy -Rf zroot/appjail
+.Ed
+.Pp
+.Aq non-ZFS: Removing
+Assuming
 .Sy PREFIX
 is
 .Pa %%PREFIX%% ":"
