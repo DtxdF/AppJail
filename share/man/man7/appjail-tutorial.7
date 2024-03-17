@@ -97,6 +97,7 @@ To create a very basic jail, only two things are needed: obtaining the FreeBSD c
 and creating the jail using those components.
 .Bd -literal -offset indent
 # appjail fetch
+# appjail update release
 # appjail quick jbasic start
 .Ed
 .Pp
@@ -113,7 +114,9 @@ contains the component checksums, so
 .Xr appjail-fetch 1
 can check if they are incorrect.
 .Pp
-After retrieving the components, you can create jails using those components with
+After retrieving the components, update your release using
+.Xr appjail-update(1) "."
+At this point you can create jails using those components with
 .Xr appjail-quick 1 "."
 In the previous case only the 
 .Em start
