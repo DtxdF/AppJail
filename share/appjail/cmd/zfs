@@ -31,12 +31,12 @@
 lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/zfs"
 
-zfs_desc="Wrapper for common ZFS commands."
+zfs_desc="Common ZFS commands for jails."
 
 zfs_main()
 {
 	if [ "${ENABLE_ZFS}" = "0" ]; then
-		lib_err ${EX_CONFIG} "zfs is not enabled in the configuration file. The zfs command cannot be used."
+		lib_err ${EX_CONFIG} "ZFS is not enabled in the configuration file. This command cannot be used."
 	fi
 
 	local entity="$1"; shift
@@ -85,40 +85,22 @@ zfs_main()
 
 zfs_help()
 {
-	cat << EOF
-`zfs_usage`
-
-${zfs_desc}
-
-Parameters:
-    clone-src        -- Use {jail_name} as the source of a clone. See zfs-clone(8).
-    clone-dst        -- Use {jail_name} as the destination of a clone. See zfs-clone(8).
-    create           -- See zfs-create(8).
-    destroy          -- See zfs-destroy(8).
-    get              -- See zfs-get(8).
-    inherit          -- See zfs-set(8).
-    list             -- See zfs-list(8).
-    recv             -- See zfs-receive(8).
-    send             -- See zfs-send(8).
-    set              -- See zfs-set(8).
-    snapshot         -- See zfs-snapshot(8).
-
-EOF
+	man 1 appjail-zfs
 }
 
 zfs_usage()
 {
 	cat << EOF
-usage: zfs clone-src jail_name dst [args ...]
-       zfs clone-dst jail_name src [args ...]
-       zfs create jail_name [args ...]
-       zfs destroy jail_name [args ...]
-       zfs get jail_name [args ...]
-       zfs inherit jail_name [args ...]
-       zfs list jail_name [args ...]
-       zfs recv jail_name [args ...]
-       zfs send jail_name [args ...]
-       zfs set jail_name [args ...]
-       zfs snapshot jail_name [args ...]
+usage: zfs clone-dst <jail> <src> [args ...]
+       zfs clone-src <jail> <dst> [args ...]
+       zfs create <jail> [args ...]
+       zfs destroy <jail> [args ...]
+       zfs get <jail> [args ...]
+       zfs inherit <jail> [args ...]
+       zfs list <jail> [args ...]
+       zfs recv <jail> [args ...]
+       zfs send <jail> [args ...]
+       zfs set <jail> [args ...]
+       zfs snapshot <jail> [args ...]
 EOF
 }
