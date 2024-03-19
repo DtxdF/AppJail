@@ -1,0 +1,86 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 19, 2024
+.Dt APPJAIL-CPUSET 1
+.Os
+.Sh NAME
+.Nm appjail-cpuset
+.Nd Configure processor sets for jails
+.Sh SYNOPSIS
+.Nm appjail cpuset
+.Ar jail
+.Nm appjail cpuset
+.Ar jail
+.Ar cpu-list
+.Sh DESCRIPTION
+The
+.Sy appjail cpuset
+command uses
+.Xr cpuset 1
+to configure processor sets specified in
+.Ar cpu-list
+for the jail specified in
+.Ar jail "."
+If
+.Ar cpu-list
+is not specified, the
+.Sy appjail cpuset
+command will show you the CPU sets assigned for the given jail.
+.Pp
+If you want to use this command to assign a processor sets, you must place this
+command in the template for the jail specified in
+.Ar jail ","
+although it is much easier and recommended to use
+.Xr appjail-quick 1
+instead.
+.Sh EXIT STATUS
+.Ex -std "appjail cpuset"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_NOINPUT ":"
+The jail specified in
+.Ar jail
+cannot be found.
+.It
+.Em EX_DATAERR ":"
+The jail name specified in
+.Ar jail
+is invalid.
+.El
+.Sh SEE ALSO
+.Xr appjail-limits 1
+.Xr appjail-quick 1
+.Xr cpuset 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

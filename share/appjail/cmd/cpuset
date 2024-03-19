@@ -93,17 +93,13 @@ cpuset_cmd()
 
 cpuset_help()
 {
-	cat << EOF
-${cpuset_desc}
-
-`cpuset_usage`
-EOF
+	man 1 appjail-cpuset
 }
 
 cpuset_usage()
 {
 	cat << EOF
-usage: cpuset jail_name cpu_list
-       cpuset jail_name
+usage: cpuset <jail>
+       cpuset <jail> <cpu-list>
 EOF
 }
