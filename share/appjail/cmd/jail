@@ -38,6 +38,7 @@ lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
 lib_load "${LIBDIR}/zfs"
 
@@ -1743,205 +1744,305 @@ jail_get()
 		set -- "status" "name" "type" "version" "ports" "network_ip4"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
+	lib_table_init "jail_get"
 
-	local keywords= keyword value
+	local keywords= keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
 		fi
 
+		local value=
+
 		case "${keyword}" in
-			appjail_version|arch|boot|created|dirty|devfs_ruleset|hostname|ip4|ip6|locked|name|network_ip4|networks|path|priority|ports|release_name|status|type|version|version_extra) ;;
-			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
-		esac
-
-		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
-			continue
-		fi
-
-		setvar flag_${keyword} 1
-
-		keywords="${keywords} ${keyword}"
-	done
-
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${keywords}" | tr '[:lower:]' '[:upper:]' | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
+			appjail_version)
+				if [ ${flag_appjail_version} -eq 1 ]; then
+					continue
 				fi
-		fi
 
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni appjail_version`
+				fi
 
-		for keyword in ${keywords}; do
-			value=
-			case "${keyword}" in
-				appjail_version)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni appjail_version`
-					fi
-					;;
-				arch)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni osarch`
-					fi
-					;;
-				boot)
-					if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/boot" ]; then
-						value=1
-					else
-						value=0
-					fi
-					;;
-				created)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni birth`
+				flag_appjail_version=1
+				;;
+			arch)
+				if [ ${flag_arch} -eq 1 ]; then
+					continue
+				fi
 
-						if ! lib_check_empty "${value}"; then
-							if ! lib_check_number "${value}"; then
-								lib_warn -- "${value} is not a valid number to calculate the birth."
-							else
-								value=`date -r${value} +"${CREATED_FORMAT}"`
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni osarch`
+				fi
+				
+				flag_arch=1
+				;;
+			boot)
+				if [ ${flag_boot} -eq 1 ]; then
+					continue
+				fi
 
-								if [ $? -ne 0 ]; then
-									lib_warn "Error calculating the birth."
-								fi
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/boot" ]; then
+					value=1
+				else
+					value=0
+				fi
+
+				flag_boot=1
+				;;
+			created)
+				if [ ${flag_created} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni birth`
+
+					if ! lib_check_empty "${value}"; then
+						if ! lib_check_number "${value}"; then
+							lib_warn -- "${value} is not a valid number to calculate the birth."
+						else
+							value=`date -r${value} +"${CREATED_FORMAT}"`
+
+							if [ $? -ne 0 ]; then
+								lib_warn "Error calculating the birth."
 							fi
 						fi
 					fi
-					;;
-				dirty)
-					if [ -f "${JAILDIR}/${jail_name}/.done" ]; then
-						value="0"
-					else
-						value="1"
-					fi
-					;;
-				devfs_ruleset)
-					if [ -f "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset" ]; then
-						value=`head -1 -- "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset"`
-					fi
-					;;
-				ip4)
+				fi
 
-					if [ ${status_template} -eq 1 ]; then
-						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip4.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
-					fi
-					;;
-				ip6)
-					if [ ${status_template} -eq 1 ]; then
-						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip6.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
-					fi
-					;;
-				hostname)
-					if [ ${status_template} -eq 1 ]; then
-						value=`lib_ajconf getColumn -j "${jail_name}" -Ppi host.hostname | tr '\n' ',' | sed -Ee 's/,$/\n/'`
-					fi
-					;;
-				locked)
-					if [ -f "${JAILDIR}/${jail_name}/conf/boot/lock/locked" ]; then
-						value=1
-					else
-						value=0
-					fi
-					;;
-				name)
-					value="${jail_name}"
-					;;
-				network_ip4)
-					if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
-						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
-							value=`"${APPJAIL_PROGRAM}" network hosts -Rj "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
-						fi
-					fi
-					;;
-				networks)
-					if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
-						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
-							value=`"${APPJAIL_PROGRAM}" network hosts -ej "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
-						fi
-					fi
-					;;
-				path)
-					value="${JAILDIR}/${jail_name}/jail"
-					;;
-				priority)
-					if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/priority" ]; then
-						value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/startup/priority"`
-					else
-						value=0
-					fi
-					;;
-				ports)
-					if [ -d "${JAILDIR}/${jail_name}/conf/boot/expose" ]; then
-						if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/expose" | wc -l` -gt 0 ]; then
-							value=`"${APPJAIL_PROGRAM}" expose list -HIpt -- "${jail_name}" ports protocol | sed -Ee 's#(.+) (.+)#\1/\2#' | tr '\n' ',' | sed -Ee 's/,$//'`
-						fi
-					fi
-					;;
-				release_name)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni release_name`
-					fi
-					;;
-				status)
-					value="DOWN"
-					if lib_jail_exists "${jail_name}"; then
-						if lib_jail_created_by_appjail "${jail_name}"; then
-							value="UP"
-						fi
-					fi
-					;;
-				type)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni jail_type`
-					fi
-					;;
-				version)
-					if [ ${status_config} -eq 1 ]; then
-						value=`lib_ajconf get -t "${config_file}" -Vni osversion`
-					fi
-					;;
-				version_extra)
-					if [ ${status_config} -eq 1 ]; then
-						value=`_jail_get_version_extra "${config_file}"`
-					fi
-					;;
-			esac
+				flag_created=1
+				;;
+			dirty)
+				if [ ${flag_dirty} -eq 1 ]; then
+					continue
+				fi
 
-			if lib_check_empty "${value}"; then
-				if [ ${opt_empty} -eq 1 ]; then
-					value="${empty_separator}"
+				if [ -f "${JAILDIR}/${jail_name}/.done" ]; then
+					value="0"
 				else
-					value="-"
+					value="1"
 				fi
-			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
+
+				flag_dirty=1
+				;;
+			devfs_ruleset)
+				if [ ${flag_devfs_ruleset} -eq 1 ]; then
+					continue
 				fi
-			fi
-			printf "%s${sep}" "${value}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset" ]; then
+					value=`head -1 -- "${JAILDIR}/${jail_name}/conf/boot/devfs_ruleset"`
+				fi
+
+				flag_devfs_ruleset=1
+				;;
+			hostname)
+				if [ ${flag_hostname} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_template} -eq 1 ]; then
+					value=`lib_ajconf getColumn -j "${jail_name}" -Ppi host.hostname | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+				fi
+
+				flag_hostname=1
+				;;
+			ip4)
+				if [ ${flag_ip4} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_template} -eq 1 ]; then
+					value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip4.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+				fi
+
+				flag_ip4=1
+				;;
+			ip6)
+				if [ ${flag_ip6} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_template} -eq 1 ]; then
+					value=`lib_ajconf getColumn -j "${jail_name}" -Ppi ip6.addr | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+				fi
+
+				flag_ip6=1
+				;;
+			locked)
+				if [ ${flag_locked} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/lock/locked" ]; then
+					value=1
+				else
+					value=0
+				fi
+
+				flag_locked=1
+				;;
+			name)
+				if [ ${flag_name} -eq 1 ]; then
+					continue
+				fi
+
+				value="${jail_name}"
+
+				flag_name=1
+				;;
+			network_ip4)
+				if [ ${flag_network_ip4} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
+					if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
+						value=`"${APPJAIL_PROGRAM}" network hosts -Rj "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					fi
+				fi
+
+				flag_network_ip4=1
+				;;
+			networks)
+				if [ ${flag_networks} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -d "${JAILDIR}/${jail_name}/conf/boot/network" ]; then
+					if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/network" | wc -l` -gt 0 ]; then
+						value=`"${APPJAIL_PROGRAM}" network hosts -ej "${jail_name}" 2> /dev/null | tr '\n' ',' | sed -Ee 's/,$/\n/'`
+					fi
+				fi
+
+				flag_networks=1
+				;;
+			path)
+				if [ ${flag_path} -eq 1 ]; then
+					continue
+				fi
+
+				value="${JAILDIR}/${jail_name}/jail"
+
+				flag_path=1
+				;;
+			priority)
+				if [ ${flag_priority} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/startup/priority" ]; then
+					value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/startup/priority"`
+				else
+					value=0
+				fi
+
+				flag_priority=1
+				;;
+			ports)
+				if [ ${flag_ports} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -d "${JAILDIR}/${jail_name}/conf/boot/expose" ]; then
+					if [ `ls -A -- "${JAILDIR}/${jail_name}/conf/boot/expose" | wc -l` -gt 0 ]; then
+						value=`"${APPJAIL_PROGRAM}" expose list -HIpt -- "${jail_name}" ports protocol | sed -Ee 's#(.+) (.+)#\1/\2#' | tr '\n' ',' | sed -Ee 's/,$//'`
+					fi
+				fi
+
+				flag_ports=1
+				;;
+			release_name)
+				if [ ${flag_release_name} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni release_name`
+				fi
+
+				flag_release_name=1
+				;;
+			status)
+				if [ ${flag_status} -eq 1 ]; then
+					continue
+				fi
+
+				value="DOWN"
+				if lib_jail_exists "${jail_name}"; then
+					if lib_jail_created_by_appjail "${jail_name}"; then
+						value="UP"
+					fi
+				fi
+
+				flag_status=1
+				;;
+			type)
+				if [ ${flag_type} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni jail_type`
+				fi
+
+				flag_type=1
+				;;
+			version)
+				if [ ${flag_version} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni osversion`
+				fi
+
+				flag_version=1
+				;;
+			version_extra)
+				if [ ${flag_version_extra} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`_jail_get_version_extra "${config_file}"`
+				fi
+
+				flag_version_extra=1
+				;;
+			*)
+				lib_warn -- "${keyword}: keyword not found."
+				continue
+				;;
+		esac
+
+		lib_table_set "${keyword}" "${value}"
+	done
+
+	local flags=
+
+	if [ ${opt_escape} -eq 1 ]; then
+		flags="-e"
 	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		flags="${flags} -H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		flags="${flags} -I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		flags="${flags} -p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		flags="${flags} -t"
+	fi
+
+	lib_table_print ${flags}
 }
 
 _jail_get_version_extra()
