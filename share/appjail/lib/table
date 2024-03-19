@@ -1,0 +1,167 @@
+#
+# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+TABLE_NAME=
+COLUMNS=
+COLUMNS_COUNT=0
+
+lib_table_init()
+{
+	TABLE_NAME="$1"
+
+	if [ -z "${TABLE_NAME}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_table_init table_name"
+	fi
+
+	COLUMNS=
+	COLUMNS_COUNT=0
+}
+
+lib_table_set()
+{
+	if [ -z "${TABLE_NAME}" ]; then
+		lib_err ${EX_CONFIG} "Table name must be set!"
+	fi
+
+	local name="$1" value="$2"
+
+	if [ -z "${name}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_table_set name [value]"
+	fi
+
+	COLUMNS="${COLUMNS} ${name}"
+	COLUMNS_COUNT=$((COLUMNS_COUNT+1))
+
+	setvar "${TABLE_NAME}_${name}" "${value}"
+}
+
+lib_table_print()
+{
+	if [ -z "${TABLE_NAME}" ]; then
+		lib_err ${EX_CONFIG} "Table name must be set!"
+	fi
+
+	# There is no problem when no columns are defined.
+	if [ -z "${COLUMNS}" ]; then
+		return 0
+	fi
+
+	local _o
+	local opt_escape=0
+	local opt_columns=0
+	local opt_empty=0
+	local opt_only_once=1
+	local opt_pretty=0
+	local opt_tabulate=0
+
+	while getopts ":eHIOpt" _o; do
+		case "${_o}" in
+			e)
+				opt_escape=1
+				;;
+			H)
+				opt_columns=1
+				;;
+			I)
+				opt_empty=1
+				;;
+			O)
+				opt_only_once=0
+				;;
+			p)
+				opt_pretty=1
+				;;
+			t)
+				opt_tabulate=1
+				;;
+			*)
+				lib_err ${EX_USAGE} "usage: lib_table_print [-eHIpt]"
+				;;
+		esac
+	done
+
+	local empty_separator
+	if [ ${COLUMNS_COUNT} -eq 1 ]; then
+		empty_separator=
+	else
+		empty_separator=" "
+	fi
+
+	local columns_upper=`echo "${COLUMNS}" | tr '[:lower:]' '[:upper:]'`
+
+	{
+		if [ ${opt_columns} -eq 1 ]; then
+			printf "%s\n" "${columns_upper}" | \
+				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+					sed -Ee 's/ /\t/g'
+				else
+					cat
+				fi
+		fi
+
+		local sep=" "
+		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+			sep="\t"
+		fi
+
+		local column content
+		for column in ${COLUMNS}; do
+			content=`lib_loaded_var "${TABLE_NAME}_${column}"`
+
+			if [ ${opt_only_once} -eq 1 ]; then
+				unset "${TABLE_NAME}_${column}"
+			fi
+
+			if lib_check_empty "${content}"; then
+				if [ ${opt_empty} -eq 1 ]; then
+					content="${empty_separator}"
+				else
+					content="-"
+				fi
+			else
+				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+					content=`printf "%s" "${content}" | sed -Ee 's/\t/<TAB>/g'`
+				fi
+			fi
+
+			printf "%s${sep}" "${content}"
+		done
+		echo
+	} | \
+	sed -Ee 's/ *$//' | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+
+	if [ ${opt_only_once} -eq 1 ]; then
+		unset "${TABLE_NAME}"
+	fi
+}
