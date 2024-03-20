@@ -112,7 +112,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-image(1)**
   * [ ] **appjail-jail(1)**
   * [ ] **appjail-limits(1)**
-  * [ ] **appjail-login(1)**
+  * [X] **appjail-login(1)**
   * [ ] **appjail-logs(1)**
   * [ ] **appjail-makejail(1)**
   * [ ] **appjail-makejail(5)**

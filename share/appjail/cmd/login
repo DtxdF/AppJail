@@ -135,19 +135,12 @@ login_check_shell()
 
 login_help()
 {
-	cat << EOF
-`login_usage`
-
-${login_desc}
-
-Options:
-    -u username        -- The username to try to log in.
-EOF
+	man 1 appjail-login
 }
 
 login_usage()
 {
 	cat << EOF
-usage: login [-u username] jail
+usage: login [-u username] <jail>
 EOF
 }
