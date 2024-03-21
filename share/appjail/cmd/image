@@ -32,6 +32,7 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mksum"
 lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/table"
 
 IMAGE_DEFAULT_NAME="image.appjail"
 IMAGE_DEFAULT_AJSPEC=".ajspec"
@@ -209,32 +210,35 @@ image_export()
 image_get()
 {
 	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
-	local opt_pretty=0
-	local opt_tabulate=0
 	local image_name
 
 	local flag_has_metadata=0
 	local flag_name=0
+
+	lib_table_init "image_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
 	
 	while getopts ":eHIpt" _o; do
 		case "${_o}" in
 			e)
-				opt_escape=1
+				lib_table_enable_escape
 				;;
 			H)
-				opt_columns=1
+				lib_table_enable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			p)
-				opt_pretty=1
+				lib_table_enable_pretty
 				;;
 			t)
-				opt_tabulate=1
+				lib_table_enable_tabulate
 				;;
 			*)
 				image_usage
@@ -256,84 +260,41 @@ image_get()
 		set -- "name"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
-
-	local keywords= keyword value
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
 		fi
 
+		local value=
+
 		case "${keyword}" in
-			has_metadata|name) ;;
-			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+			has_metadata)
+				if [ -f "${rootdir}/${IMAGE_DEFAULT_AJSPEC}" ]; then
+					value=1
+				else
+					value=0
+				fi
+				;;
+			name)
+				value="${image_name}"
+				;;
+			*)
+				lib_warn -- "${keyword}: keyword not found."
+				continue
+				;;
 		esac
 
 		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
 			continue
+		else
+			setvar flag_${keyword} 1
 		fi
 
-		setvar flag_${keyword} 1
-
-		keywords="${keywords} ${keyword}"
+		lib_table_set "${keyword}" "${value}"
 	done
 
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${keywords}" | tr '[:lower:]' '[:upper:]' | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
-				fi
-		fi
-
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
-
-		for keyword in ${keywords}; do
-			value=
-			case "${keyword}" in
-				name)
-					value="${image_name}"
-					;;
-				has_metadata)
-					if [ -f "${rootdir}/${IMAGE_DEFAULT_AJSPEC}" ]; then
-						value=1
-					else
-						value=0
-					fi
-					;;
-			esac
-
-			if lib_check_empty "${value}"; then
-				if [ ${opt_empty} -eq 1 ]; then
-					value="${empty_separator}"
-				else
-					value="-"
-				fi
-			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
-				fi
-			fi
-			printf "%s${sep}" "${value}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
-	fi
+	lib_table_print
 }
 
 image_import()
