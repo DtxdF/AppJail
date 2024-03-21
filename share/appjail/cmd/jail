@@ -1747,7 +1747,7 @@ jail_get()
 		set -- "status" "name" "type" "version" "ports" "network_ip4"
 	fi
 
-	local keywords= keyword
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
