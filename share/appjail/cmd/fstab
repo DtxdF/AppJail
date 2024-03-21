@@ -34,6 +34,7 @@ lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/strlen"
+lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
 
 FSTAB_DEFAULT_FSFREQ="0"
@@ -367,16 +368,8 @@ _fstab_pre_mount()
 fstab_get()
 {
 	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
 	local opt_ignore_unknro=0
-	local opt_pretty=0
-	local opt_tabulate=0
 	local nro
-	local keyword
-	local files= file2read content
-	local columns=
 	
 	local flag_enabled=0
 	local flag_dump=0
@@ -398,6 +391,14 @@ fstab_get()
 		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
 	fi
 
+	lib_table_init "fstab_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
+
 	while getopts ":eHIiptn:" _o; do
 		case "${_o}" in
 			n)
@@ -410,22 +411,22 @@ fstab_get()
 
 		case "${_o}" in
 			e)
-				opt_escape=1
+				lib_table_enable_escape
 				;;
 			H)
-				opt_columns=1
+				lib_table_enable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			i)
 				opt_ignore_unknro=1
 				;;
 			p)
-				opt_pretty=1
+				lib_table_enable_pretty
 				;;
 			t)
-				opt_tabulate=1
+				lib_table_enable_tabulate
 				;;
 			n)
 				nro="${OPTARG}"
@@ -462,17 +463,14 @@ fstab_get()
 		set -- "nro" "enabled" "name" "device" "mountpoint" "type" "options" "dump" "pass"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
-
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue # ignore
 		fi
+
+		local file2read=
+		local value=
 
 		case "${keyword}" in
 			device|dump|enabled|mountpoint|name|options|pass|type)
@@ -489,77 +487,20 @@ fstab_get()
 
 		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
 			continue
-		fi
-
-		setvar flag_${keyword} 1
-
-		if [ -z "${columns}" ]; then
-			columns="${keyword}"
 		else
-			columns="${columns} ${keyword}"
+			setvar flag_${keyword} 1
 		fi
 
-		files="${files} ${file2read}"
+		if [ "${file2read}" = "nro" ]; then
+			value="${nro}"
+		elif [ -f "${basedir}/${file2read}" ]; then
+			value=`head -1 -- "${basedir}/${file2read}"`
+		fi
+
+		lib_table_set "${keyword}" "${value}"
 	done
 
-	columns=`echo "${columns}" | tr '[:lower:]' '[:upper:]'`
-
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${columns}" | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
-				fi
-		fi
-
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
-
-		for file2read in ${files}; do
-			content=
-			case "${file2read}" in
-				nro)
-					content="${nro}"
-					;;
-				*)
-					if [ ! -f "${basedir}/${file2read}" ]; then
-						if [ ${opt_empty} -eq 1 ]; then
-							content="${empty_separator}"
-						else
-							content="-"
-						fi
-					else
-						content=`cat "${basedir}/${file2read}"`
-
-						if lib_check_empty "${content}"; then
-							if [ ${opt_empty} -eq 1 ]; then
-								content="${empty_separator}"
-							else
-								content="-"
-							fi
-						fi
-					fi
-					;;
-			esac
-
-			if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-				content=`printf "%s" "${content}" | sed -Ee 's/\t/<TAB>/g'`
-			fi
-
-			printf "%s${sep}" "${content}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
-	fi
+	lib_table_print
 }
 
 fstab_list()
