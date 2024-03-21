@@ -95,7 +95,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-checkOld(1)**
   * [ ] **appjail-cmd(1)**
   * [X] **appjail-cpuset(1)**
-  * [ ] **appjail-conf(5)**
+  * [ ] **appjail.conf(5)**
   * [ ] **appjail-config(1)**
   * [ ] **appjail-deleteOld(1)**
   * [ ] **appjail-devfs(1)**
