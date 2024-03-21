@@ -28,6 +28,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+lib_load "${LIBDIR}/table"
+
 volume_desc="Volume management for jails."
 
 volume_main()
@@ -157,11 +159,6 @@ volume_add()
 volume_get()
 {
 	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
-	local opt_pretty=0
-	local opt_tabulate=0
 	local volume_name=
 
         local flag_name=0
@@ -170,6 +167,14 @@ volume_get()
         local flag_uid=0
         local flag_gid=0
         local flag_perm=0
+
+	lib_table_init "volume_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
 	
 	while getopts ":eHIptv:" _o; do
 		case "${_o}" in
@@ -183,19 +188,19 @@ volume_get()
 		
 		case "${_o}" in
 			e)
-				opt_escape=1
+				lib_table_enable_escape
 				;;
 			H)
-				opt_columns=1
+				lib_table_enable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			p)
-				opt_pretty=1
+				lib_table_enable_pretty
 				;;
 			t)
-				opt_tabulate=1
+				lib_table_enable_tabulate
 				;;
 			v)
 				volume_name="${OPTARG}"
@@ -230,88 +235,39 @@ volume_get()
 		set -- "name" "mountpoint" "type" "uid" "gid" "perm"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
-
-	local keywords= keyword
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
 		fi
 
+		local value=
+
 		case "${keyword}" in
-			name|mountpoint|type|uid|gid|perm) ;;
-			*) lib_warn -- "${keyword}: keyword not found."; continue ;;
+			name)
+				value="${volume_name}"
+				;;
+			mountpoint|type|uid|gid|perm)
+				if [ -f "${basedir}/${keyword}" ]; then
+					value=`head -1 "${basedir}/${keyword}"`
+				fi
+				;;
+			*)
+				lib_warn -- "${keyword}: keyword not found."
+				continue
+				;;
 		esac
 
 		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
 			continue
+		else
+			setvar flag_${keyword} 1
 		fi
 
-		setvar flag_${keyword} 1
-
-		keywords="${keywords} ${keyword}"
+		lib_table_set "${keyword}" "${value}"
 	done
 
-	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
-
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${columns}" | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
-				fi
-		fi
-
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
-
-		local value
-		for keyword in ${keywords}; do
-			value=
-			case "${keyword}" in
-				name)
-					value="${volume_name}"
-					;;
-				*)
-					if [ ! -f "${basedir}/${keyword}" ]; then
-						value=
-					else
-						value=`head -1 "${basedir}/${keyword}"`
-					fi
-					;;
-			esac
-
-			if lib_check_empty "${value}"; then
-				if [ ${opt_empty} -eq 1 ]; then
-					value="${empty_separator}"
-				else
-					value="-"
-				fi
-			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
-				fi
-			fi
-
-			printf "%s${sep}" "${value}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
-	fi
+	lib_table_print
 }
 
 volume_list()
