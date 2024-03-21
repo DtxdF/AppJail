@@ -30,6 +30,12 @@
 TABLE_NAME=
 COLUMNS=
 COLUMNS_COUNT=0
+TABLE_FLAG_ESCAPE=0
+TABLE_FLAG_COLUMNS=0
+TABLE_FLAG_EMPTY=0
+TABLE_FLAG_ONLY_ONCE=1
+TABLE_FLAG_PRETTY=0
+TABLE_FLAG_TABULATE=0
 
 lib_table_init()
 {
@@ -41,6 +47,13 @@ lib_table_init()
 
 	COLUMNS=
 	COLUMNS_COUNT=0
+
+	TABLE_FLAG_ESCAPE=0
+	TABLE_FLAG_COLUMNS=0
+	TABLE_FLAG_EMPTY=0
+	TABLE_FLAG_ONLY_ONCE=1
+	TABLE_FLAG_PRETTY=0
+	TABLE_FLAG_TABULATE=0
 }
 
 lib_table_set()
@@ -61,6 +74,66 @@ lib_table_set()
 	setvar "${TABLE_NAME}_${name}" "${value}"
 }
 
+lib_table_enable_escape()
+{
+	TABLE_FLAG_ESCAPE=1
+}
+
+lib_table_disable_escape()
+{
+	TABLE_FLAG_ESCAPE=0
+}
+
+lib_table_enable_columns()
+{
+	TABLE_FLAG_COLUMNS=1
+}
+
+lib_table_disable_columns()
+{
+	TABLE_FLAG_COLUMNS=0
+}
+
+lib_table_enable_empty()
+{
+	TABLE_FLAG_EMPTY=1
+}
+
+lib_table_disable_empty()
+{
+	TABLE_FLAG_EMPTY=0
+}
+
+lib_table_enable_only_once()
+{
+	TABLE_FLAG_ONLY_ONCE=1
+}
+
+lib_table_disable_only_once()
+{
+	TABLE_FLAG_ONLY_ONCE=0
+}
+
+lib_table_enable_pretty()
+{
+	TABLE_FLAG_PRETTY=1
+}
+
+lib_table_disable_pretty()
+{
+	TABLE_FLAG_PRETTY=0
+}
+
+lib_table_enable_tabulate()
+{
+	TABLE_FLAG_TABULATE=1
+}
+
+lib_table_disable_tabulate()
+{
+	TABLE_FLAG_TABULATE=0
+}
+
 lib_table_print()
 {
 	if [ -z "${TABLE_NAME}" ]; then
@@ -72,40 +145,6 @@ lib_table_print()
 		return 0
 	fi
 
-	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
-	local opt_only_once=1
-	local opt_pretty=0
-	local opt_tabulate=0
-
-	while getopts ":eHIOpt" _o; do
-		case "${_o}" in
-			e)
-				opt_escape=1
-				;;
-			H)
-				opt_columns=1
-				;;
-			I)
-				opt_empty=1
-				;;
-			O)
-				opt_only_once=0
-				;;
-			p)
-				opt_pretty=1
-				;;
-			t)
-				opt_tabulate=1
-				;;
-			*)
-				lib_err ${EX_USAGE} "usage: lib_table_print [-eHIpt]"
-				;;
-		esac
-	done
-
 	local empty_separator
 	if [ ${COLUMNS_COUNT} -eq 1 ]; then
 		empty_separator=
@@ -116,9 +155,9 @@ lib_table_print()
 	local columns_upper=`echo "${COLUMNS}" | tr '[:lower:]' '[:upper:]'`
 
 	{
-		if [ ${opt_columns} -eq 1 ]; then
+		if [ ${TABLE_FLAG_COLUMNS} -eq 1 ]; then
 			printf "%s\n" "${columns_upper}" | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+				if [ ${TABLE_FLAG_PRETTY} -eq 1 -o ${TABLE_FLAG_TABULATE} -eq 1 ]; then
 					sed -Ee 's/ /\t/g'
 				else
 					cat
@@ -126,7 +165,7 @@ lib_table_print()
 		fi
 
 		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
+		if [ ${TABLE_FLAG_PRETTY} -eq 1 -o ${TABLE_FLAG_TABULATE} -eq 1 ]; then
 			sep="\t"
 		fi
 
@@ -134,18 +173,18 @@ lib_table_print()
 		for column in ${COLUMNS}; do
 			content=`lib_loaded_var "${TABLE_NAME}_${column}"`
 
-			if [ ${opt_only_once} -eq 1 ]; then
+			if [ ${TABLE_FLAG_ONLY_ONCE} -eq 1 ]; then
 				unset "${TABLE_NAME}_${column}"
 			fi
 
 			if lib_check_empty "${content}"; then
-				if [ ${opt_empty} -eq 1 ]; then
+				if [ ${TABLE_FLAG_EMPTY} -eq 1 ]; then
 					content="${empty_separator}"
 				else
 					content="-"
 				fi
 			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
+				if [ ${TABLE_FLAG_PRETTY} -eq 1 -o ${TABLE_FLAG_ESCAPE} -eq 1 ]; then
 					content=`printf "%s" "${content}" | sed -Ee 's/\t/<TAB>/g'`
 				fi
 			fi
@@ -155,13 +194,13 @@ lib_table_print()
 		echo
 	} | \
 	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
+	if [ ${TABLE_FLAG_PRETTY} -eq 1 ]; then
 		column -ts $'\t'
 	else
 		cat
 	fi
 
-	if [ ${opt_only_once} -eq 1 ]; then
+	if [ ${TABLE_FLAG_ONLY_ONCE} -eq 1 ]; then
 		unset "${TABLE_NAME}"
 	fi
 }

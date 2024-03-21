@@ -1664,11 +1664,6 @@ jail_mark_unlocked()
 jail_get()
 {
 	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
-	local opt_pretty=0
-	local opt_tabulate=0
 	local jail_name
 
 	local flag_appjail_version=0
@@ -1692,23 +1687,31 @@ jail_get()
 	local flag_type=0
 	local flag_version=0
 	local flag_version_extra=0
+
+	lib_table_init "jail_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
 	
 	while getopts ":eHIpt" _o; do
 		case "${_o}" in
 			e)
-				opt_escape=1
+				lib_table_enable_escape
 				;;
 			H)
-				opt_columns=1
+				lib_table_enable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			p)
-				opt_pretty=1
+				lib_table_enable_pretty
 				;;
 			t)
-				opt_tabulate=1
+				lib_table_enable_tabulate
 				;;
 			*)
 				jail_usage
@@ -1743,8 +1746,6 @@ jail_get()
 	if [ $# -eq 0 ]; then
 		set -- "status" "name" "type" "version" "ports" "network_ip4"
 	fi
-
-	lib_table_init "jail_get"
 
 	local keywords= keyword
 	for keyword in "$@"; do
@@ -2020,29 +2021,7 @@ jail_get()
 		lib_table_set "${keyword}" "${value}"
 	done
 
-	local flags=
-
-	if [ ${opt_escape} -eq 1 ]; then
-		flags="-e"
-	fi
-
-	if [ ${opt_columns} -eq 1 ]; then
-		flags="${flags} -H"
-	fi
-
-	if [ ${opt_empty} -eq 1 ]; then
-		flags="${flags} -I"
-	fi
-
-	if [ ${opt_pretty} -eq 1 ]; then
-		flags="${flags} -p"
-	fi
-
-	if [ ${opt_tabulate} -eq 1 ]; then
-		flags="${flags} -t"
-	fi
-
-	lib_table_print ${flags}
+	lib_table_print
 }
 
 _jail_get_version_extra()
