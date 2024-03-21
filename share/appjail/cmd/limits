@@ -652,11 +652,14 @@ limits_set()
 limits_stats()
 {
 	local _o
-	local opt_escape=1
-	local opt_columns=1
-	local opt_empty=0
-	local opt_pretty=1
-	local opt_tabulate=1
+
+	lib_table_init "limits_stats"
+
+	lib_table_enable_escape
+	lib_table_enable_columns
+	lib_table_disable_empty
+	lib_table_enable_pretty
+	lib_table_enable_tabulate
 	
 	while getopts ":eHIptn:" _o; do
 		case "${_o}" in
@@ -670,19 +673,19 @@ limits_stats()
 		
 		case "${_o}" in
 			e)
-				opt_escape=0
+				lib_table_disable_escape
 				;;
 			H)
-				opt_columns=0
+				lib_table_disable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			p)
-				opt_pretty=0
+				lib_table_disable_pretty
 				;;
 			t)
-				opt_tabulate=0
+				lib_table_disable_tabulate
 				;;
 			*)
 				limits_usage
@@ -709,14 +712,7 @@ limits_stats()
 		set -- "maxproc" "cputime" "pcpu" "vmemoryuse" "readiops" "writeiops"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
-
-	local keywords= keyword
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
@@ -733,52 +729,12 @@ limits_stats()
 
 		setvar flag_limits_${keyword} 1
 
-		keywords="${keywords} ${keyword}"
+		local value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -Ee "^${keyword}=" | cut -d= -f2-`
+
+		lib_table_set "${keyword}" "${value}"
 	done
 
-	local columns=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
-
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${columns}" | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
-				fi
-		fi
-
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
-
-		local value
-		for keyword in ${keywords}; do
-			value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -Ee "^${keyword}=" | cut -d= -f2-`
-
-			if lib_check_empty "${value}"; then
-				if [ ${opt_empty} -eq 1 ]; then
-					value="${empty_separator}"
-				else
-					value="-"
-				fi
-			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
-				fi
-			fi
-
-			printf "%s${sep}" "${value}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
-	fi
+	lib_table_print
 }
 
 _limits_chk_jail()
