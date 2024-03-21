@@ -33,6 +33,7 @@ lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
 
 DEFAULT_NETWORK_GRPBRG="appjail_bridge"
@@ -830,11 +831,6 @@ network_fix_addr()
 network_get()
 {
 	local _o
-	local opt_escape=0
-	local opt_columns=0
-	local opt_empty=0
-	local opt_pretty=0
-	local opt_tabulate=0
 	local network_name
 
 	local flag_address=0
@@ -850,23 +846,31 @@ network_get()
 	local flag_netmask=0
 	local flag_network=0
 	local flag_wildcard=0
+
+	lib_table_init "network_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
 	
 	while getopts ":eHIpt" _o; do
 		case "${_o}" in
 			e)
-				opt_escape=1
+				lib_table_enable_escape
 				;;
 			H)
-				opt_columns=1
+				lib_table_enable_columns
 				;;
 			I)
-				opt_empty=1
+				lib_table_enable_empty
 				;;
 			p)
-				opt_pretty=1
+				lib_table_enable_pretty
 				;;
 			t)
-				opt_tabulate=1
+				lib_table_enable_tabulate
 				;;
 			*)
 				network_usage
@@ -895,14 +899,7 @@ network_get()
 		set -- "name" "network" "cidr" "broadcast" "gateway" "minaddr" "maxaddr" "addresses" "description" "mtu"
 	fi
 
-	local empty_separator
-	if [ $# -eq 1 ]; then
-		empty_separator=
-	else
-		empty_separator=" "
-	fi
-
-	local keywords= keyword
+	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
 			continue
@@ -915,56 +912,18 @@ network_get()
 
 		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
 			continue
+		else
+			setvar flag_${keyword} 1
 		fi
 
-		setvar flag_${keyword} 1
+		keyword=`echo "${keyword}" | tr '[:lower:]' '[:upper:]'`
 
-		keywords="${keywords} ${keyword}"
+		local value=`grep "^${keyword}=" "${network_conf}" | cut -d= -f2-`
+
+		lib_table_set "${keyword}" "${value}"
 	done
 
-	keywords=`echo "${keywords}" | tr '[:lower:]' '[:upper:]'`
-
-	{
-		if [ ${opt_columns} -eq 1 ]; then
-			printf "%s\n" "${keywords}" | \
-				if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-					sed -Ee 's/ /\t/g'
-				else
-					cat
-				fi
-		fi
-
-		local sep=" "
-		if [ ${opt_pretty} -eq 1 -o ${opt_tabulate} -eq 1 ]; then
-			sep="\t"
-		fi
-
-		local value
-		for keyword in ${keywords}; do
-			value=`grep "^${keyword}=" "${network_conf}" | cut -d= -f2-`
-
-			if lib_check_empty "${value}"; then
-				if [ ${opt_empty} -eq 1 ]; then
-					value="${empty_separator}"
-				else
-					value="-"
-				fi
-			else
-				if [ ${opt_pretty} -eq 1 -o ${opt_escape} -eq 1 ]; then
-					value=`printf "%s" "${value}" | sed -Ee 's/\t/<TAB>/g'`
-				fi
-			fi
-
-			printf "%s${sep}" "${value}"
-		done
-		echo
-	} | \
-	sed -Ee 's/ *$//' | \
-	if [ ${opt_pretty} -eq 1 ]; then
-		column -ts $'\t'
-	else
-		cat
-	fi
+	lib_table_print
 }
 
 network_hosts()
