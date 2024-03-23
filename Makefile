@@ -6,7 +6,15 @@ RM?=rm
 SED?=sed
 PREFIX?=/usr/local
 MANDIR?=${PREFIX}/share/man
-MANPAGES=man1/appjail.1 man1/appjail-cpuset.1 man1/appjail-login.1 man1/appjail-version.1 man1/appjail-usage.1 man1/appjail-help.1 man7/appjail-tutorial.7 man1/appjail-zfs.1
+MANPAGES=man1/appjail.1 \
+	 man1/appjail-cpuset.1 \
+	 man1/appjail-login.1 \
+	 man1/appjail-version.1 \
+	 man1/appjail-usage.1 \
+	 man1/appjail-help.1 \
+	 man7/appjail-tutorial.7 \
+	 man1/appjail-zfs.1 \
+	 man5/appjail.conf.5
 
 APPJAIL_VERSION?=3.2.0
 
@@ -80,7 +88,7 @@ install: utils-strip
 	${FIND} share/appjail/scripts -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# Prefix.
-.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh share/appjail/scripts/ajuser.sh share/man/man7/appjail-tutorial.7
+.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh share/appjail/scripts/ajuser.sh share/man/man7/appjail-tutorial.7 share/man/man5/appjail.conf.5
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 
