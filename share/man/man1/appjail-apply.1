@@ -1,0 +1,84 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 23, 2024
+.Dt APPJAIL-APPLY 1
+.Os
+.Sh NAME
+.Nm appjail-apply
+.Nd Apply a Makejail to an existing jail 
+.Sh SYNOPSIS
+.Nm appjail apply
+.Ar jail
+.Op Ar makejail
+.Op Ar args
+.Sh DESCRIPTION
+The
+.Sy appjail appply
+command apply a Makejail to an existing jail specified in
+.Ar jail "."
+If
+.Ar makejail
+is empty the default
+.Aq Makejail
+is used.
+.Pp
+.Sy appjail apply
+is just a wrapper for the
+.Fl A
+parameter in
+.Xr appjail-makejail 1 ","
+so the arguments specified in
+.Ar args
+are passed to it as is.
+.Sh EXIT STATUS
+.Ex -std "appjail apply"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.El
+.Sh SEE ALSO
+.Xr appjail-makejail 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh CAVEATS
+.Bl -tag -width xx
+.It Cm Working directory for the build stage and the apply stage
+Applying a Makejail is not the same as running it, specifically the working directory used.
+Applying a Makejail generates a initscript and the current directory is used as
+the working directory, while running a Makejail, at least for the
+.Sy build
+stage, generates a
+.Xr sh 1
+script that changes the working directory depending on the
+.Sy INCLUDE
+instruction in a Makejail file.
+.El

@@ -91,7 +91,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
 - [ ] Man pages (**WIP**):
   * [X] **appjail(1)**
   * [ ] **appjail-ajspec(5)**
-  * [ ] **appjail-apply(1)**
+  * [X] **appjail-apply(1)**
   * [ ] **appjail-checkOld(1)**
   * [ ] **appjail-cmd(1)**
   * [X] **appjail-cpuset(1)**

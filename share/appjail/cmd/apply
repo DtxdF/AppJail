@@ -50,14 +50,10 @@ apply_main()
 
 apply_help()
 {
-	cat << EOF
-`apply_usage`
-
-${apply_desc}
-EOF
+	man 1 appjail-apply
 }
 
 apply_usage()
 {
-	echo "usage: apply jail [makejail] [makejail_args ...]"
+	echo "usage: apply <jail> [makejail] [args ...]"
 }
