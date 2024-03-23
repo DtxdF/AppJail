@@ -33,7 +33,7 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/random"
 
-service_desc="control (start/stop/etc.) or list system services within a jail."
+service_desc="Control (start/stop/etc.) or list system services within a jail."
 
 service_main()
 {
@@ -117,24 +117,13 @@ service_jail()
 
 service_help()
 {
-	cat << EOF
-`service_usage`
-
-${service_desc}
-
-Parameters:
-    all         -- Run service(8) in all jails.
-    jail        -- Run service(8) in a jail.
-
-Options for all:
-    -e          -- Exits when a command returns a non-zero value.     
-EOF
+	man 1 appjail-service
 }
 
 service_usage()
 {
 	cat << EOF
-usage: service all -e -- service_args ...
-       service jail jail_name service_args ...
+usage: service all [-e] [-i file] [--] [args ...]
+       service jail <jail> [args ...]
 EOF
 }

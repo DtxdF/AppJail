@@ -15,7 +15,8 @@ MANPAGES=man1/appjail.1 \
 	 man7/appjail-tutorial.7 \
 	 man1/appjail-zfs.1 \
 	 man5/appjail.conf.5 \
-	 man1/appjail-apply.1
+	 man1/appjail-apply.1 \
+	 man1/appjail-service.1
 
 APPJAIL_VERSION?=3.2.0
 
