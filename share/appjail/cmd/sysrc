@@ -141,27 +141,14 @@ sysrc_local()
 
 sysrc_help()
 {
-	cat << EOF
-`sysrc_usage`
-
-${sysrc_desc}
-
-Parameters:
-    all              -- Run sysrc(8) in all jails.
-    jail             -- Run sysrc(8) in a jail.
-    local            -- Operate within the root directory {JAILDIR}/{jail_name}/jail.
-                        sysrc(8) will be executed from the host.
-
-Options for all:
-    -e               -- Exits when a command returns a non-zero value.     
-EOF
+	man 1 appjail-sysrc
 }
 
 sysrc_usage()
 {
 	cat << EOF
-usage: sysrc all [-e] [jail|local] sysrc_args ...
-       sysrc jail jail_name sysrc_args ...
-       sysrc local jail_name sysrc_args ...
+usage: sysrc all [-e] <target> [args ...]
+       sysrc jail <jail> [args ...]
+       sysrc local <jail> [args ...]
 EOF
 }

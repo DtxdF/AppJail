@@ -1,0 +1,107 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 23, 2024
+.Dt APPJAIL-SYSRC 1
+.Os
+.Sh NAME
+.Nm appjail-sysrc
+.Nd Safely edit system rc files within a jail
+.Sh SYNOPSIS
+.Nm appjail sysrc
+.Cm all
+.Op Fl e
+.Ar target
+.Op Ar args "..."
+.Nm appjail sysrc
+.Cm jail
+.Ar jail
+.Op Ar args "..."
+.Nm appjail sysrc
+.Cm local
+.Ar jail
+.Op Ar args "..."
+.Sh DESCRIPTION
+The
+.Sy appjail sysrc
+utility is a wrapper of the
+.Xr sysrc 8
+command for managing rc files, i.e. retrieve
+.Xr rc.conf 5
+variables and allows processes to change values in a safe and effective manner.
+.Pp
+.Cm all
+is used to run
+.Xr sysrc 8
+in all existing jails. If
+.Fl e
+is specified,
+.Sy appjail sysrc
+exits when
+.Xr sysrc 8
+returns a non-zero exit status.
+.Ar target
+is any of the subcommands described below.
+.Pp
+.Cm jail
+is used to run
+.Xr sysrc 8
+in a given jail.
+.Pp
+.Cm local
+is used to run
+.Xr sysrc 8
+in the jail directory from the host.
+.Sh EXIT STATUS
+.Ex -std "appjail sysrc"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+The jail name specified in
+.Ar jail
+is invalid.
+.It
+An invalid subcommand was specified.
+.El
+.It
+.Em EX_NOINPUT ":"
+The jail specified in
+.Ar jail
+cannot be found.
+.El
+.Sh SEE ALSO
+.Xr sysexits 3
+.Xr sysrc 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

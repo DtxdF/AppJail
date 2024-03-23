@@ -129,7 +129,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-startup(1)**
   * [ ] **appjail-status(1)**
   * [ ] **appjail-stop(1)**
-  * [ ] **appjail-sysrc(1)**
+  * [X] **appjail-sysrc(1)**
   * [ ] **appjail-template(5)**
   * [X] **appjail-tutorial(7)**
   * [ ] **appjail-update(1)**
