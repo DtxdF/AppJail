@@ -1,0 +1,110 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 24, 2024
+.Dt APPJAIL-STARTUP 1
+.Os
+.Sh NAME
+.Nm appjail-startup
+.Nd Unattended command to start jails and other related things
+.Sh SYNOPSIS
+.Nm appjail startup
+.Cm start
+.Cm healthcheckers
+.Nm appjail startup
+.Op Cm restart Ns | Ns Cm start Ns | Ns Cm stop
+.Op Cm jails Ns | Ns Cm "nat networks"
+.Sh DESCRIPTION
+The
+.Sy appjail startup
+utility starts jails, performs NAT per network, and starts healthcheckers at startup
+without user intervention. This is the core of RC scripts.
+.Pp
+Unlike jails and network NAT, starting healthcheckers is a long-term operation,
+so only the
+.Sy start
+command
+is implemented. Remember that healthcheckers can be stopped using the RC script
+or when all healthcheckers are stopped, i.e. they fail.
+.Pp
+.Sy jails
+only starts jails that have the
+.Sy boot
+flag set. This command organizes the list of jails using a priority that is set
+individually for each jail: jails with a lower number
+.Aq starting from 0
+are started first. If the
+.Sy USE_PARALLEL
+parameter is enabled, jails are started in parallel depending on their priority, e.g. if we have jails
+.Sy A
+.Aq 0
+.Ns ,
+.Sy B
+.Aq 0
+.Ns ,
+.Sy C
+.Aq 1
+and
+.Sy D
+.Aq 2
+.Ns ,
+jails
+.Sy A
+and
+.Sy B
+are started first
+.Aq in parallel
+.Ns ,
+then
+.Sy B
+is started and then
+.Sy D
+is started.
+.Pp
+.Sy nat networks
+performs NAT per network at startup. If the
+.Sy USE_PARALLEL_NATNET
+parameter is enabled, this operation is performed in parallel.
+.Sh EXIT STATUS
+.Ex -std "appjail startup"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_DATAERR ":"
+The log name specified in the
+.Sy STARTUPLOG_NAME
+parameter is invalid.
+.El
+.Sh SEE ALSO
+.Xr appjail-jail 1
+.Xr appjail-rstop 1
+.Xr appjail-start 1
+.Xr appjail-stop 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
