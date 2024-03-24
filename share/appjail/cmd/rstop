@@ -70,14 +70,10 @@ rstop_main()
 
 rstop_help()
 {
-	cat << EOF
-`rstop_usage`
-
-${rstop_desc}
-EOF
+	man 1 appjail-rstop
 }
 
 rstop_usage()
 {
-	echo "usage: rstop jail"
+	echo "usage: rstop <jail>"
 }
