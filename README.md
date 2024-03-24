@@ -119,7 +119,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-makejail(5)**
   * [ ] **appjail-nat(1)**:
   * [ ] **appjail-network(1)**
-  * [ ] **appjail-pkg(1)**
+  * [X] **appjail-pkg(1)**
   * [ ] **appjail-quick(1)**
   * [ ] **appjail-restart(1)**
   * [ ] **appjail-rstop(1)**

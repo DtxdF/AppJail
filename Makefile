@@ -17,7 +17,8 @@ MANPAGES=man1/appjail.1 \
 	 man5/appjail.conf.5 \
 	 man1/appjail-apply.1 \
 	 man1/appjail-service.1 \
-	 man1/appjail-sysrc.1
+	 man1/appjail-sysrc.1 \
+	 man1/appjail-pkg.1
 
 APPJAIL_VERSION?=3.2.0
 

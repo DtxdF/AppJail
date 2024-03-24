@@ -243,30 +243,14 @@ _chk_jail()
 
 pkg_help()
 {
-	cat << EOF
-`pkg_usage`
-
-${pkg_desc}
-
-Parameters:
-    all                   -- Run pkg(8) in all jails.
-    chroot                -- pkg(8) will chroot in the (chroot path) environment.
-    jail                  -- Run pkg(8) in a jail.
-
-Options jail:
-    -j                   -- Use pkg(8) from jail instead of host.
-
-Options for all:
-    -e                   -- Exits when a command returns a non-zero value.
-    -i input_file        -- File to use as input for all commands.
-EOF
+	man 1 appjail-pkg
 }
 
 pkg_usage()
 {
 cat << EOF
-usage: pkg all [-e] [-i input_file] [chroot | jail] args ... -- pkg_args ...
-       pkg chroot jail_name pkg_args ...
-       pkg jail jail_name [-j] pkg_args ...
+usage: pkg all [-e] [-i file] <target> [args ...] [--] [pkg-args ...]
+       pkg chroot <jail> [args ...]
+       pkg jail <jail> [-j] [args ...]
 EOF
 }
