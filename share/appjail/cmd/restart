@@ -52,16 +52,12 @@ restart_main()
 
 restart_help()
 {
-cat << EOF
-`restart_usage`
-
-${restart_desc}
-EOF
+	man 1 appjail-restart
 }
 
 restart_usage()
 {
 cat << EOF
-usage: restart jail
+usage: restart <jail>
 EOF
 }

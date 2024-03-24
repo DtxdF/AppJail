@@ -121,7 +121,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-network(1)**
   * [X] **appjail-pkg(1)**
   * [ ] **appjail-quick(1)**
-  * [ ] **appjail-restart(1)**
+  * [X] **appjail-restart(1)**
   * [X] **appjail-rstop(1)**
   * [ ] **appjail-run(1)**
   * [X] **appjail-service(1)**
