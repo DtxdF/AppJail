@@ -93,17 +93,10 @@ status_main()
 
 status_help()
 {
-	cat << EOF
-`status_usage`
-
-${status_desc}
-
-Options:
-    -q        -- Quiet mode.
-EOF
+	man 1 appjail-status
 }
 
 status_usage()
 {
-	echo "usage: status [-q] jail"
+	echo "usage: status [-q] <jail>"
 }
