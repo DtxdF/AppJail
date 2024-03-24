@@ -266,42 +266,16 @@ cmd_local()
 
 cmd_help()
 {
-	cat << EOF
-`cmd_usage`
-
-${cmd_desc}
-
-Parameters:
-    all                     -- Run a command in all jails.
-    chroot                  -- Use chroot(8).
-    jaildir                 -- Like local, but use {JAILDIR}.
-    jexec                   -- Use jexec(8).
-    local                   -- Run a command after changing the directory to the
-                               jail directory.
-
-Options for all:
-    -e                      -- Exits when a command returns a non-zero value.
-    -i input_file           -- File to use as input for all commands.
-
-Options for jexec:
-    -l                      -- By default -l of jexec(8) is used. This option
-                               does not use -l to clean up the environment.
-    -U jail_username        -- See -U in jexec(8).
-    -u host_username        -- See -u in jexec(8).
-
-Options for local:
-    -j                      -- Use {JAILDIR}/{jail_name}/jail.
-    -r                      -- Use {JAILDIR}/{jail_name}.
-EOF
+	man 1 appjail-cmd
 }
 
 cmd_usage()
 {
 	cat << EOF
-usage: cmd all [-e] [-i input_file] [chroot | jexec | local] args ...
-       cmd jaildir [cmd args ...]
-       cmd chroot jail_name [cmd args ...]
-       cmd jexec jail_name [-l] [-U jail_username | -u host_username] [cmd args ...]
-       cmd local jail_name [-j | -r] [cmd args ...]
+usage: cmd all [-e] [-i file] <target> [args ...]
+       cmd chroot <jail> [command [args ...]]
+       cmd jaildir [command [args ...]]
+       cmd jexec <jail> [-l] [[-U username|-u username]] [command [args ...]]
+       cmd local <jail> [[-j|-r]] [command [args ...]]
 EOF
 }

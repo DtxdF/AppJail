@@ -1,0 +1,155 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 24, 2024
+.Dt APPJAIL-CMD 1
+.Os
+.Sh NAME
+.Nm appjail-cmd
+.Nd Execute commands in a jail
+.Sh SYNOPSIS
+.Nm appjail cmd
+.Cm all
+.Op Fl e
+.Op Fl i Ar file
+.Ar target
+.Op Ar args "..."
+.Nm appjail cmd
+.Cm chroot
+.Ar jail
+.Op Ar args "..."
+.Nm appjail cmd
+.Cm jaildir
+.Op Ar command Op Ar args "..."
+.Nm appjail cmd
+.Cm jexec
+.Ar jail
+.Op Fl l
+.Op Cm Fl U Ar username Ns | Ns Cm Fl u Ar username
+.Op Ar command Op Ar args "..."
+.Nm appjail cmd
+.Cm local
+.Ar jail
+.Op Op Cm Fl j Ns | Ns Cm Fl r
+.Op Ar command Op Ar args "..."
+.Sh DESCRIPTION
+The
+.Sy appjail cmd
+utility executes commands on a jail or on the host.
+.Pp
+.Cm all
+is used to run the given command in all existing jails. If
+.Fl e
+is specified,
+.Sy appjail cmd
+exits when the command returns a non-zero exit status. If
+.Fl i
+is specified, the content of the file specified by this parameter is used as
+input for each call of the given command instead of
+.Pa /dev/null "."
+.Ar target
+is any of the subcommands described below.
+.Pp
+.Cm chroot
+runs the given command in a chroot environment using the jail directory.
+.Pp
+.Cm jaildir
+is used to execute the given command from the host in the directory where the jails are located.
+.Pp
+.Cm jexec
+is used to execute the given command in the given jail. Use the
+.Fl l
+parameter to not run in a clean environment, or in other words, this is the opposite of the
+.Fl l
+option specified in
+.Xr jexec 8 "."
+For a more detailed description of the
+.Cm Fl U
+and
+.Cm Fl u
+parameters, see
+.Xr jexec 8 "."
+.Pp
+.Cm local
+is used to execute the given command from the host. If
+.Cm Fl j
+is specified
+.Aq default
+the jail directory is used, but if 
+.Cm Fl r
+is specified, the root directory of the jail is used.
+.Pp
+.Ev SHELL
+is used as the command to execute if no command or arguments are specified.
+.Sh EXIT STATUS
+.Ex -std "appjail cmd"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_NOINPUT ":"
+The jail specified in
+.Ar jail
+cannot be found.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+The jail name specified in
+.Ar jail
+is invalid.
+.It
+An invalid subcommand was specified.
+.El
+.El
+.Sh EXAMPLES
+.Ss Example 1 : No Knowing the default directories used by each subcommand
+.Bd -literal -compact -offset Ds
+.No # Nm appjail jail Cm list Fl j Ar jtest
+STATUS  NAME   TYPE  VERSION       PORTS  NETWORK_IP4
+UP      jtest  thin  14.0-RELEASE  -      -
+.No # Nm appjail cmd Cm chroot Ar jtest Ar pwd
+/
+.No # Nm appjail cmd Cm jaildir Ar pwd
+/usr/local/appjail/jails
+.No # Nm appjail cmd Cm jexec Ar jtest Ar pwd
+/root
+.No # Nm appjail cmd Cm local Ar jtest Ar pwd
+/usr/local/appjail/jails/jtest/jail
+.No # Nm appjail cmd Cm local Ar jtest Fl r Ar pwd
+/usr/local/appjail/jails/jtest
+.Ed
+.Sh SEE ALSO
+.Xr sh 1
+.Xr sysexits 3
+.Xr environ 7
+.Xr jexec 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
