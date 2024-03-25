@@ -23,7 +23,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-cmd.1 \
 	 man1/appjail-rstop.1 \
 	 man1/appjail-startup.1 \
-	 man1/appjail-restart.1
+	 man1/appjail-restart.1 \
+	 man8/appjail-user.8
 
 APPJAIL_VERSION?=3.2.0
 

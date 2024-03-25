@@ -1,0 +1,141 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 24, 2024
+.Dt APPJAIL-USER 1
+.Os
+.Sh NAME
+.Nm appjail-user
+.Nd Hints and parameters for trusted users
+.Sh DESCRIPTION
+.Xr appjail 1
+is designed to be run by the
+.Sy root
+user, but this doesn't mean you can't run it as an unprivileged user.
+.Xr appjail 1
+wraps an external tool to run itself with the appropriate privileges.
+.Pp
+The idea is to create the illusion that
+.Xr appjail 1
+runs the same for both an unprivileged user and a privileged user, but in reality
+it runs as a privileged user, i.e. the
+.Sy root
+user. Of course, to create this illusion the external tool must be installed and
+configured properly.
+.Pp
+We recommend
+.Em security/doas
+because it is lightweight, simple and secure.
+.Em security/sudo
+has not yet been widely tested, but the same process can be achieved with it.
+.Pp
+.Ss Trusted User Group
+This only makes sense if you want to allow multiple users to run
+.Xr appjail 1
+as
+.Sy root
+because you can configure your external tool to have a single user run it.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm pw Cm groupadd Fl n Ar appjail Fl M Ar $USER
+.Ed
+.Ss External Tool Configuration
+.Em security/doas
+is used in this example, so
+.Xr doas.conf 5
+is the file we need to edit, that is, we need to put some options to allow
+.Xr appjail 1
+and
+.Xr appjail-config 1
+to run using the group we configured earlier in
+.Sx Trusted User Group
+or a single user.
+.Pp
+.Bd -literal -compact -offset Ds
+# appjail(1)
+permit nopass :appjail as root cmd appjail
+# Some applications, specifically x11 applications, require 'keepenv'
+# to be set.
+#permit nopass keepenv :appjail as root cmd appjail
+# appjail-config(1)
+permit nopass :appjail as root cmd appjail-config
+.Ed
+.Ss Unprivileged User
+After configuring the external tool as specified in
+.Sx External Tool Configuration
+we should call
+.Sy appjail
+and
+.Sy appjail-config-user
+without problems.
+.Pp
+In the case of
+.Xr appjail-config 1 ","
+we must explicitly call it
+.Sy appjail-config-user
+instead of simply
+.Sy appjail-config "."
+This is a design decision since the version with the
+.Sy -user
+suffix introduces a bit of overhead.
+.Pp
+.Bd -literal -compact -offset Ds
+.No $ Nm appjail jail Cm list
+STATUS  NAME   TYPE  VERSION       PORTS  NETWORK_IP4
+UP      jtest  thin  14.0-RELEASE  -      -
+.No $ Nm appjail-config-user Cm set Fl j Ar jtest Ar devfs_ruleset=15
+.Ed
+.Sh SEE ALSO
+.Xr appjail 1
+.Xr doas 1
+.Xr appjail.conf 5
+.Xr doas.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh CAVEATS
+.Ss Legacy Tool
+There is a legacy and deprecated tool on your system called
+.Sy appjail-user "."
+This is for backward-compatibility and should no be used.
+.Ss Filesystem Permissions
+Some Makejail's instructions operate with a file and those instructions don't perform
+any modification, so if you create a file as an unprivileged user and the Makejail
+file calls some instruction such as
+.Sy COPY ","
+the file is copied as is and this may not make sense for the application running
+inside the jail.
+.Sh SECURITY CONSIDERATIONS
+This document assumes that the reader has the appropriate privileges to be
+.Sy root ","
+so granting unprivileged users to run
+.Xr appjail 1
+effectively grants those users
+the privilege to become
+.Sy root "."
+If you only want to run certain
+.Xr appjail 1
+subcommands, configure your external tool to do so.
