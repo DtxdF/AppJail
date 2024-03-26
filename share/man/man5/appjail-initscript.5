@@ -1,0 +1,308 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 25, 2024
+.Dt APPJAIL-INITSCRIPT 5
+.Os
+.Sh NAME
+.Nm appjail-initscript
+.Nd Jail automation script
+.Sh DESCRIPTION
+An
+.Sy InitScript
+is an
+.Xr sh 1
+script that has functions with a special meaning that are executed in specific
+operations.
+.Sy InitScripts
+are the core of the Makejails files, since the latter generate the former.
+.Sh FUNCTIONS
+The following functions are formerly known as stages.
+.Bl -tag -width xxxxx
+.It create
+Stage executed by
+.Xr appjail-start 1
+before the jail is started.
+.It start
+Stage executed by
+.Xr appjail-start 1
+after the jail is started.
+.It stop
+Stage executed by
+.Xr appjail-stop 1
+before the jail is stopped.
+.It cmd
+Stage executed by
+.Xr appjail-run 1 "."
+.It custom:<arbitrary string>
+Stage executed by
+.Xr appjail-run 1 "."
+The difference between
+.Sy cmd
+and this stage is that the latter can be defined using a valid arbitrary string.
+A valid arbitrary string is
+.Sy "^[a-zA-Z0-9_][a-zA-Z0-9_-]*$"
+.It apply
+Stage executed by
+.Xr appjail-apply 1 "."
+.El
+.Sh PRE- AND POST- FUNCTIONS
+Each stage has a
+.Sy pre-
+and
+.Sy post-
+function that are executed before the main function is executed and after the main function is executed, e.g.
+.Sy create
+can have
+.Sy precreate
+and
+.Sy postcreate "."
+.Sh ARGUMENTS
+Without user input an
+.Sy InitScript
+is meaningless, but the way external commands like
+.Xr appjail-start 1 ","
+.Xr appjail-stop 1 ","
+.Xr appjail-run 1
+and
+.Xr appjail-apply 1
+pass arguments is a bit different than an
+.Xr sh 1
+script.
+.Pp
+Each parameter begins with a double dash followed by an arbitrary string followed by the value. For example, the parameter
+.Sy foo=bar
+will be expressed internally as
+.Cm --foo
+.Qq Ar bar
+.Ns .
+.Pp
+Each
+.Sy pre-
+and
+.Sy post-
+stage will receive the same parameters as the main stage.
+.Pp
+See
+.Sx EXAMPLES
+for more details.
+.Sh ENVIRONMENT
+.Bl -tag -width xxxx
+.It APPJAIL_CONFIG
+AppJail configuration file.
+.It APPJAIL_JAILDIR
+Jail directory.
+.It APPJAIL_JAILNAME
+Jail name.
+.It APPJAIL_ROOTDIR
+Root directory of the jail.
+.It APPJAIL_SCRIPT
+Pathname to the AppJail script.
+.El
+.Sh EXAMPLES
+.Ss Arguments
+The following
+.Sy InitScript
+is used to show how parameters and arguments are passed.
+.Pp
+.Pa $PWD/initscript.sh
+.Ns :
+.Bd -literal -compact -offset Ds
+_parse_args()
+{
+	local arg
+	for arg in "$@"; do
+		printf "<%s> " "${arg}"
+	done
+	echo
+}
+
+precreate()
+{
+	echo -n "precreate args: "
+	_parse_args "$@"
+}
+
+create()
+{
+	echo -n "create args: "
+	_parse_args "$@"
+}
+
+postcreate()
+{
+	echo -n "postcreate args: "
+	_parse_args "$@"
+}
+
+prestart()
+{
+	echo -n "prestart args: "
+	_parse_args "$@"
+}
+
+start()
+{
+	echo -n "start args: "
+	_parse_args "$@"
+}
+
+poststart()
+{
+	echo -n "poststart args: "
+	_parse_args "$@"
+}
+
+precmd()
+{
+	echo -n "precmd args: "
+	_parse_args "$@"
+}
+
+cmd()
+{
+	echo -n "cmd args: "
+	_parse_args "$@"
+}
+
+postcmd()
+{
+	echo -n "postcmd args: "
+	_parse_args "$@"
+}
+
+prestop()
+{
+	echo -n "prestop args: "
+	_parse_args "$@"
+}
+
+stop()
+{
+	echo -n "stop args: "
+	_parse_args "$@"
+}
+
+poststop()
+{
+	echo -n "poststop args: "
+	_parse_args "$@"
+}
+.Ed
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail quick Ar jtest Cm overwrite Cm initscript Ns = Ns Ar $PWD/initscript.sh
+...
+.No # Nm appjail start No \e
+.No "    " Fl c Ar 'parameter1=I am the <create> parameter #1' No \e
+.No "    " Fl c Ar 'parameter2=I am the <create> parameter #2' No \e
+.No "    " Fl s Ar 'parameter1=I am the <start> parameter #1' No \e
+.No "    " Fl s Ar 'parameter2=I am the <start> parameter #2' No \e
+.No "    " Ar jtest
+.No "..."
+[00:00:01] [ debug ] [jtest] Running initscript `/usr/local/appjail/jails/jtest/init` ...
+[00:00:01] [ debug ] [jtest] Running precreate() ...
+precreate args: <--parameter1> <I am the <create> parameter #1> <--parameter2> <I am the <create> parameter #2>
+[00:00:01] [ debug ] [jtest] precreate() exits with status code 0
+create args: <--parameter1> <I am the <create> parameter #1> <--parameter2> <I am the <create> parameter #2>
+[00:00:01] [ debug ] [jtest] create() exits with status code 0
+postcreate args: <--parameter1> <I am the <create> parameter #1> <--parameter2> <I am the <create> parameter #2>
+[00:00:01] [ debug ] [jtest] postcreate() exits with status code 0
+[00:00:01] [ debug ] [jtest] `/usr/local/appjail/jails/jtest/init` exits with status code 0
+[00:00:01] [ debug ] [jtest] Creating...
+jtest: created
+[00:00:01] [ debug ] [jtest] Running initscript `/usr/local/appjail/jails/jtest/init` ...
+[00:00:01] [ debug ] [jtest] Running prestart() ...
+prestart args: <--parameter1> <I am the <start> parameter #1> <--parameter2> <I am the <start> parameter #2>
+[00:00:01] [ debug ] [jtest] prestart() exits with status code 0
+start args: <--parameter1> <I am the <start> parameter #1> <--parameter2> <I am the <start> parameter #2>
+[00:00:01] [ debug ] [jtest] start() exits with status code 0
+poststart args: <--parameter1> <I am the <start> parameter #1> <--parameter2> <I am the <start> parameter #2>
+[00:00:01] [ debug ] [jtest] poststart() exits with status code 0
+[00:00:01] [ debug ] [jtest] `/usr/local/appjail/jails/jtest/init` exits with status code 0
+.No "..."
+.No # Nm appjail run Fl p Ar 'msg=Hello, world!' Ar jtest
+[00:00:01] [ debug ] [jtest] Running initscript `/usr/local/appjail/jails/jtest/init` ...
+[00:00:01] [ debug ] [jtest] Running precmd() ...
+precmd args: <--msg> <Hello, world!>
+[00:00:01] [ debug ] [jtest] precmd() exits with status code 0
+cmd args: <--msg> <Hello, world!>
+[00:00:01] [ debug ] [jtest] cmd() exits with status code 0
+postcmd args: <--msg> <Hello, world!>
+[00:00:01] [ debug ] [jtest] postcmd() exits with status code 0
+[00:00:01] [ debug ] [jtest] `/usr/local/appjail/jails/jtest/init` exits with status code 0
+.No # Nm appjail stop Fl p Ar 'msg=Bye ...' jtest
+[00:00:01] [ debug ] [jtest] Running initscript `/usr/local/appjail/jails/jtest/init` ...
+[00:00:01] [ debug ] [jtest] Running prestop() ...
+prestop args: <--msg> <Bye ...>
+[00:00:01] [ debug ] [jtest] prestop() exits with status code 0
+stop args: <--msg> <Bye ...>
+[00:00:01] [ debug ] [jtest] stop() exits with status code 0
+poststop args: <--msg> <Bye ...>
+[00:00:01] [ debug ] [jtest] poststop() exits with status code 0
+[00:00:01] [ debug ] [jtest] `/usr/local/appjail/jails/jtest/init` exits with status code 0
+[00:00:01] [ warn  ] [jtest] Stopping jtest...
+jtest: removed
+[00:00:01] [ debug ] [jtest] unmounting: umount "/usr/local/appjail/jails/jtest/jail/.appjail"
+.Ed
+.Ss Environment Variables
+.Xr appjail 1
+runs the
+.Sy InitScript
+from the host instead of in the jail, so it needs to explicitly call
+.Xr jexec 8 "."
+The reason is that this allows you to perform some tasks for both the host and the
+jail much more easily, e.g. mount a filesystem dynamically. The problem is that
+you should not call
+.Xy jexec 8
+with a fixed string, such as the jail name, as this can cause the jail name to be
+changed to any other arbitrary string. The solution is not really difficult: use
+environment variables that are best described in
+.Sx ENVIRONMENT
+.Ns .
+.Bd -literal -compact -offset Ds
+cmd()
+{
+	jexec -l "${APPJAIL_JAILNAME}" sh -c 'echo "Hello, world!"'
+}
+.Ed
+.Sh SEE ALSO
+.Xr appjail-makejail 1
+.Xr appjail-quick 1
+.Xr appjail-makejail 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh CAVEATS
+An
+.Sy InitScript
+can't be used in a
+.Sy Makejail
+using the
+.Sy initscript
+option that is passed later to
+.Xr appjail-quick 1
+because the latter will overwrite the former.

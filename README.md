@@ -110,7 +110,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-healthcheck(1)**
   * [X] **appjail-help(1)**
   * [ ] **appjail-image(1)**
-  * [ ] **appjail-initscript(5)**
+  * [X] **appjail-initscript(5)**
   * [ ] **appjail-jail(1)**
   * [ ] **appjail-limits(1)**
   * [X] **appjail-login(1)**
