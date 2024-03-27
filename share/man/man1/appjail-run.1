@@ -94,8 +94,11 @@ and validated with a regular expression such as
 .Sy "^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$"
 .Ns .
 .It Fl s Ar name
-Run custom stage
-.Ar name "."
+By default, the
+.Sy cmd
+stage is executed; this parameter runs
+.Ar name
+instead.
 .El
 .Sh EXIT STATUS
 .Ex -std "appjail run"
