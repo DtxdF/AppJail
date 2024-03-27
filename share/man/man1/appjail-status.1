@@ -38,10 +38,8 @@
 .Sh DESCRIPTION
 The
 .Sy appjail status
-utility shows you whether a given jail specified in
-.Ar jail
-is started or stopped. For a jail to be considered started, it must have been
-created and started using the appropriate AppJail commands.
+utility shows whether a given jail is started or stopped. For a jail to be considered
+started, it must have been created and started using the appropriate AppJail commands.
 .Pp
 If
 .Fl q
@@ -51,7 +49,7 @@ The
 .Sy appjail status
 utility returns
 .Sy 0
-if the jail specified in
+if
 .Ar jail
 is started; otherwise, a non-zero value is returned.
 .Sh EXIT STATUS
@@ -64,12 +62,10 @@ It may fail for one of the following reasons:
 The command was used incorrectly.
 .It
 .Em EX_NOINPUT ":"
-The jail specified in
 .Ar jail
 cannot be found.
 .It
 .Em EX_DATAERR ":"
-The jail name specified in
 .Ar jail
 is invalid.
 .El

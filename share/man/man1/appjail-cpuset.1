@@ -42,9 +42,9 @@ The
 .Sy appjail cpuset
 command uses
 .Xr cpuset 1
-to configure processor sets specified in
+to set
 .Ar cpu-list
-for the jail specified in
+as processor sets for
 .Ar jail "."
 If
 .Ar cpu-list
@@ -53,7 +53,7 @@ is not specified, the
 command will show you the CPU sets assigned for the given jail.
 .Pp
 If you want to use this command to assign a processor sets, you must place this
-command in the template for the jail specified in
+command in the template of
 .Ar jail ","
 although it is much easier and recommended to use
 .Xr appjail-quick 1
