@@ -114,7 +114,7 @@ run_cmd()
 	fi
 
 	if [ ! -x "${__appjail_script__}" ]; then
-		lib_err ${EX_NOPERM} "Cannot execute \`${__appjail_script__}\`: No such file exists or it does not have the execution bit."
+		lib_err ${EX_NOPERM} "Cannot execute \`${__appjail_script__}\`: No such file exists or it does not have the execute bit."
 	fi
 
 	lib_debug "Running initscript \`${__appjail_script__}\` ..."

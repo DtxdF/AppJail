@@ -993,7 +993,7 @@ quick_run_jng()
 	fi
 
 	if ! which -s "jng"; then
-		lib_err ${EX_UNAVAILABLE} "jng is not installed or does not have the execution bit. Use \`install -m 555 /usr/share/examples/jails/jng /usr/local/bin/jng\` to install it."
+		lib_err ${EX_UNAVAILABLE} "jng is not installed or does not have the execute bit. Use \`install -m 555 /usr/share/examples/jails/jng /usr/local/bin/jng\` to install it."
 	fi
 
 	# required by jng

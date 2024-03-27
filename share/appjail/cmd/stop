@@ -166,7 +166,7 @@ stop_main()
 		if [ -n "${initscript}" ]; then
 			if [ ! -x "${initscript}" ]; then
 				# The -i option has higher precedence.
-				lib_err ${EX_NOPERM} "Cannot execute \`${initscript}\`: No such file exists or it does not have the execution bit."
+				lib_err ${EX_NOPERM} "Cannot execute \`${initscript}\`: No such file exists or it does not have the execute bit."
 			fi
 		else
 			initscript="${jail_path}/init"
@@ -176,7 +176,7 @@ stop_main()
 			fi
 
 			if [ -f "${initscript}" -a ! -x "${initscript}" ]; then
-				lib_warn "Cannot execute \`${initscript}\`: it does not have the execution bit."
+				lib_warn "Cannot execute \`${initscript}\`: it does not have the execute bit."
 			fi
 		fi
 	fi
