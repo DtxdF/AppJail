@@ -1,0 +1,119 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 27, 2024
+.Dt APPJAIL-ENABLE 1
+.Os
+.Sh NAME
+.Nm appjail-enable
+.Nd Set default parameters for stages.
+.Sh SYNOPSIS
+.Nm appjail enable
+.Ar jail
+.Cm start
+.Op Fl I
+.Oo
+.Op Fl c Ar parameter=value
+.Ns "..."
+.Oc
+.Op Fl i Ar initscript
+.Oo
+.Op Fl s Ar parameter=value
+.Ns "..."
+.Oc
+.Op Fl t Ar template
+.Oo
+.Op Fl V Ar name=value
+.Ns "..."
+.Oc
+.Nm appjail enable
+.Ar jail
+.Cm stop
+.Op Fl I
+.Op Fl i Ar initscript
+.Op Fl p Ar parameter=value
+.Op Fl V Ar name=value
+.Nm appjail enable
+.Ar jail
+.Cm run
+.Op Fl i Ar initscript
+.Oo
+.Op Fl p Ar parameter=value
+.Ns "..."
+.Oc
+.Oo
+.Op Fl V Ar name=value
+.Ns "..."
+.Oc
+.Sh DESCRIPTION
+The
+.Sy appjail enable
+utility sets default parameters for the stages used by the
+.Xr appjail-start 1 ","
+.Xr appjail-stop 1
+and
+.Xr appjail-run 1
+commands. These parameters are used when the user does not specify one explicitly from the
+command-line and are more relevant when the stages are executed without user intervention,
+e.g. at startup. These commands mimic the command-line arguments used by those commands.
+.Sh EXIT STATUS
+.Ex -std "appjail enable"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It EX_NOINPUT ":"
+.Ar jail
+cannot be found.
+.It
+.Em EX_SOFTWARE ":"
+Error creating the directory where files used by this command are stored.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+An invalid option was specified.
+.It
+.Ar jail
+is invalid.
+.El
+.It
+.Em EX_IOERR ":"
+Error writing the contents of a file used by the specified parameter.
+.Em 
+.El
+.Sh SEE ALSO
+.Xr appjail-disable 1
+.Xr appjail-enabled 1
+.Xr appjail-run 1
+.Xr appjail-start 1
+.Xr appjail-stop 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

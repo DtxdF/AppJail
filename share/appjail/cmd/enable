@@ -33,7 +33,7 @@ lib_load "${LIBDIR}/colors"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 
-enable_desc="Enable a parameter."
+enable_desc="Set default parameters for stages."
 
 enable_main()
 {
@@ -266,42 +266,15 @@ enable_run()
 
 enable_help()
 {
-	cat << EOF
-`enable_usage`
-
-${enable_desc}
-
-Parameters:
-    start                     -- Enable parameters for the start command.
-    stop                      -- Enable parameters for the stop command.
-    run                       -- Enable parameters for the run command.
-
-Options for start:
-    -c parameter=value        -- Parameters for *create functions.
-    -s parameter=value        -- Parameters for *start functions.
-    -t template               -- Use a custom template.
-
-Options for stop:
-    -p parameter=value        -- Parameters for *stop functions.
-
-Options for run:
-    -p parameter=value        -- Parameters for *cmd functions.
-
-Options for start, stop and run:
-    -i initscript             -- Use a custom initscript.
-    -V env=value              -- Environment variables.
-
-Options for start and stop:
-    -I                        -- Don't run the initscript.
-EOF
+	man 1 appjail-enable
 }
 
 enable_usage()
 {
 	cat << EOF
-usage: enable jail start [-I | [[-c parameter=value ...]] [-i initscript] [[-s parameter=value ...]]]
-                         [-t template] [[-V env=value] ...]
-       enable jail stop [-I | [-i initscript] [[-p parameter=value ...]]] [[-V env=value] ...]
-       enable jail run [-i initscript] [[-p parameter=value ...]] [[-V env=value] ...]
+usage: enable <jail> start [-I] [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...]
+                           [-t template] [[-V name=value] ...]
+       enable <jail> stop [-I] [-i initscript] [[-p parameter=value] ...] [[-V name=value] ...]
+       enable <jail> run [-i initscript] [[-p parameter=value] ...] [[-V name=value] ...]
 EOF
 }
