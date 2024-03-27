@@ -1,0 +1,92 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 27, 2024
+.Dt APPJAIL-ENABLED 1
+.Os
+.Sh NAME
+.Nm appjail-enabled
+.Nd Get the value for a given enabled parameter
+.Sh SYNOPSIS
+.Nm appjail enabled
+.Ar jail
+.Cm start
+.Op Cm Fl I Ns | Ns Cm Fl c Ns | Ns Cm Fl i Ns | Ns Cm Fl s Ns | Ns Cm Fl t Ns | Ns Cm Fl V
+.Nm appjail enabled
+.Ar jail
+.Cm stop
+.Op Cm Fl I Ns | Ns Cm Fl i Ns | Ns Cm Fl p Ns | Ns Cm Fl V
+.Nm appjail enabled
+.Ar jail
+.Cm run
+.Op Cm Fl i Ns | Ns Cm Fl p Ns | Ns Cm Fl V
+.Sh DESCRIPTION
+The
+.Sy appjail enabled
+utility retrieves the values of the parameters defined by
+.Xr appjail-enable 1 "."
+The
+.Fl I
+parameter does not have a value, but returns
+.Sy 1
+if the
+.Sy InitScript
+should not be executed in commands such as
+.Xr appjail-start 1
+and
+.Xr appjail-stop 1 "."
+.Sh EXIT STATUS
+.Ex -std "appjail enabled"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_NOINPUT ":"
+.Ar jail
+cannot be found.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+An invalid option was specified.
+.It
+.Ar jail
+is invalid.
+.El
+.El
+.Sh SEE ALSO
+.Xr appjail-disable 1
+.Xr appjail-enable 1
+.Xr appjail-run 1
+.Xr appjail-start 1
+.Xr appjail-stop 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

@@ -32,7 +32,7 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/colors"
 lib_load "${LIBDIR}/random"
 
-enabled_desc="Get value of a enabled parameter."
+enabled_desc="Get the value for a given enabled parameter."
 
 enabled_main()
 {
@@ -249,41 +249,14 @@ enabled_run()
 
 enabled_help()
 {
-	cat << EOF
-`enabled_usage`
-
-${enabled_desc}
-
-Parameters:
-    start        -- Get values for the start command.
-    stop         -- Get values for the stop command.
-    run          -- Get values for the run command.
-
-Options for start:
-    -c           -- Get parameters for the *create functions.
-    -s           -- Get parameters for the *start functions.
-    -t           -- Get path to the custom template.
-
-Options for stop:
-    -p           -- Get parameters for the *stop functions.
-
-Options for run:
-    -p           -- Get parameters for the *cmd functions.
-
-Options for start, stop and run:
-    -i           -- Get path to the custom initscript.
-    -V           -- Get environment variables.
-
-Options for start and stop:
-    -I           -- Print zero if the initscript will not be executed.
-EOF
+	man 1 appjail-enabled
 }
 
 enabled_usage()
 {
 	cat << EOF
-usage: enabled jail start [-I | -c | -i | -s | -t | -V]
-       enabled jail stop [-I | -i | -p | -V]
-       enabled jail run [-i | -p | -V]
+usage: enabled <jail> start [-I | -c | -i | -s | -t | -V]
+       enabled <jail> stop [-I | -i | -p | -V]
+       enabled <jail> run [-i | -p | -V]
 EOF
 }
