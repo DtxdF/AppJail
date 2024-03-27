@@ -1,0 +1,169 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 27, 2024
+.Dt APPJAIL-STOP 1
+.Os
+.Sh NAME
+.Nm appjail-stop
+.Nd Stop a running jail
+.Sh SYNOPSIS
+.Nm appjail stop
+.Op Fl fI
+.Ar jail
+.Nm appjail stop
+.Op Fl f
+.Op Cm Fl i Ar initscript
+.Oo
+.Op Fl p Ar parameter=value
+.Ns "..."
+.Oc
+.Oo
+.Op Fl V Ar name=value
+.Ns "..."
+.Oc
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail stop
+utility stops a jail and is responsible for performing some operations:
+.Pp
+.Bl -dash -compact
+.It
+Stop a given jail.
+.It
+Execute the
+.Sy stop
+stage.
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Fl f
+Forcibly stops the jail, meaning that the jail is simply removed regardless of
+the parameters defined in the template.
+.It Fl i Ar initscript
+Pathname to the
+.Sy InitScript "."
+If no
+.Sy InitScript
+is provided from the command-line, it will be obtained via
+.Xr appjail-enabled 1 "."
+If not defined there, the
+.Sy InitScript
+located in the root directory of the jail is used if it exists and has the execute
+bit permission.
+.It Fl I
+Avoid running the
+.Sy InitScript "."
+.Xr appjail-enable 1
+and
+.Xr appjail-disable 1
+affects this parameter when it is not specified explicitly from the command-line.
+.It Fl p Ar parameter=value Ns " " Ns "..."
+Parameters for
+.Sy pre- ","
+.Sy post-
+and
+.Sy stop
+functions passed with syntax such as
+.Ar parameter1=value1
+.Ns ,
+.Ar parameter2=value=2
+.Ns ,
+.Ns "...,"
+.Ar parameterN=valueN
+.Ns .
+If no parameters are provided from the command-line, they will be obtained via
+.Xr appjail-enabled 1 "."
+.It Fl V Ar name=value
+Environment variables. Environment variables are defined internally with a syntax such as
+.Sy __APPJAIL_RUN_ENVIRONMENT_VAR__<name>=<value>
+and validated with a regular expression such as
+.Sy "^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$"
+.Ns .
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail stop"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+An invalid environment variable was specified.
+.It
+.Ar jail
+is invalid.
+.El
+.It
+.Em EX_NOINPUT ":"
+.Ar jail
+cannot be found.
+.It
+.Em EX_SOFTWARE ":"
+.Bl -bullet -compact
+.It
+The jail configuration file cannot be found.
+.It
+The
+.Xr jail.conf 5
+file generated dynamically by
+.Xr appjail-start 1
+cannot be found.
+.It
+The jail is still running when it should not.
+.It
+The base directory of a
+.Sy thinjail
+does not exist when it should.
+.It
+An error ocurred while unmounting the base directory of a
+.Sy thinjail "."
+.El
+.It
+.Em EX_NOPERM ":"
+The
+.Sy InitScript
+specified with
+.Fl i
+does not have the execute bit permission or does not exist.
+.El
+.Sh SEE ALSO
+.Xr appjail-disable 1
+.Xr appjail-enable 1
+.Xr appjail-enabled 1
+.Xr appjail-rstop 1
+.Xr sysexits 3
+.Xr appjail-initscript 5
+.Xr appjail-template 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

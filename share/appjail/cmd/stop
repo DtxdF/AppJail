@@ -304,30 +304,13 @@ stop_jail()
 
 stop_help()
 {
-	cat << EOF
-`stop_usage`
-
-${stop_desc}
-
-Parameters:
-    -I                        -- Stop jail but don't run the initscript.
-    -i initscript             -- Use a custom initscript.
-
-Options:
-    -f                        -- removes an existing jail without using the configuration file.
-                                 No removal-related parameters for this jail will be used.
-				 The jail will simply be removed.
-
-Options for -i:
-    -p parameter=value        -- Parameters for *stop functions.
-    -V env=value              -- Environment variables.
-EOF
+	man 1 appjail-stop
 }
 
 stop_usage()
 {
 	cat << EOF
-usage: stop [-f] [-i initscript] [[-p parameter=value] ...] [[-V env=value] ...] jail
-       stop [-fI] jail
+usage: stop [-fI] <jail>
+       stop [-f] [-i initscript] [[-p parameter=value] ...] [[-V name=value] ...] <jail>
 EOF
 }
