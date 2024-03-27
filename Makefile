@@ -25,7 +25,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-startup.1 \
 	 man1/appjail-restart.1 \
 	 man8/appjail-user.8 \
-	 man5/appjail-initscript.5
+	 man5/appjail-initscript.5 \
+	 man1/appjail-start.1
 
 APPJAIL_VERSION?=3.2.0
 

@@ -621,30 +621,14 @@ start_jail()
 
 start_help()
 {
-	cat << EOF
-`start_usage`
-
-${start_desc}
-
-Parameters:
-    -I                        -- Start jail but don't run the initscript.
-    -i initscript             -- Use a custom initscript.
-
-Options:
-    -t template               -- Use a custom template.
-
-Options for -i:
-    -c parameter=value        -- Parameters for *create functions.
-    -s parameter=value        -- Parameters for *start functions.
-    -V env=value              -- Environment variables.
-EOF
+	man 1 appjail-start
 }
 
 start_usage()
 {
 	cat << EOF
-usage: start [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...]
-             [-t template] [[-V env=value] ...] jail
-       start [-I] [-t template] jail
+usage: start [-I] [-t template] <jail>
+       start [[-c parameter=value] ...] [-i iniscript] [[-s parameter=value] ...]
+             [-t template] [[-V name=value] ...] <jail>
 EOF
 }

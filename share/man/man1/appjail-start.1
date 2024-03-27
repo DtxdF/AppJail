@@ -1,0 +1,200 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 27, 2024
+.Dt APPJAIL-START 1
+.Os
+.Sh NAME
+.Nm appjail-start
+.Nd Start a stopped jail
+.Sh SYNOPSIS
+.Nm appjail start
+.Op Cm Fl I
+.Op Fl t Ar template
+.Ar jail
+.Nm appjail start
+.Op Cm Fl i Ar initscript
+.Oo
+.Op Fl c Ar parameter=value
+.Ns "..."
+.Oc
+.Oo
+.Op Fl s Ar parameter=value
+.Ns "..."
+.Oc
+.Op Fl t Ar template
+.Oo
+.Op Fl V Ar name=value
+.Ns "..."
+.Oc
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail start
+utility starts a jail and is responsible for performing many operations:
+.Pp
+.Bl -dash -compact
+.It
+Lock the jail to avoid starting it twice by a second process while doing this
+operation on the first.
+.It
+Start a given jail.
+.It
+Start other jails on which it depends.
+.It
+Execute the
+.Sy create
+and
+.Sy start
+stages.
+.It
+Check the template for syntax errors.
+.It
+Warns the user about required parameters that are not yet configured in the template.
+.It
+Load DEVFS rules that were created using
+.Xr appjail-devfs 1 "."
+.It
+Configure parameters that were not defined in the template file, such as
+.Sy exec.consolelog ","
+.Sy mount.fstab ","
+.Sy host.hostname.
+.It
+Stop a failed jail.
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Fl c Ar parameter=value Ns " " Ns "..."
+Parameters for
+.Sy pre- ","
+.Sy post-
+and
+.Sy create
+functions passed with syntax such as
+.Ar parameter1=value1
+.Ns ,
+.Ar parameter2=value=2
+.Ns ,
+.Ns "...,"
+.Ar parameterN=valueN
+.Ns .
+If no parameters are provided from the command-line, they will be obtained via
+.Xr appjail-enabled 1 "."
+.It Fl i Ar initscript
+Pathname to the
+.Sy InitScript "."
+If no
+.Sy InitScript
+is provided from the command-line, it will be obtained via
+.Xr appjail-enabled 1 "."
+If not defined there, the
+.Sy InitScript
+located in the root directory of the jail is used if it exists and has the execute
+bit permission.
+.It Fl I
+Avoid running the
+.Sy InitScript "."
+.Xr appjail-enable 1
+and
+.Xr appjail-disable 1
+affects this parameter when it is not specified explicitly from the command-line.
+.It Fl s Ar parameter=value Ns " " Ns "..."
+Parameters for
+.Sy pre- ","
+.Sy post-
+and
+.Sy start
+functions passed with syntax such as
+.Ar parameter1=value1
+.Ns ,
+.Ar parameter2=value=2
+.Ns ,
+.Ns "...,"
+.Ar parameterN=valueN
+.Ns .
+If no parameters are provided from the command-line, they will be obtained via
+.Xr appjail-enabled 1 "."
+.It Fl t Ar template
+Pathname to the template file. If not specified, the template is retrieved from
+.Xr appjail-enabled 1
+and if it does not have a pathname to the template, the default one found in the
+root directory of the jail is used, and if it does not exist, the default
+template specified in the
+.Sy DEFAULT_TEMPLATE
+parameter is used.
+.It Fl V Ar name=value
+Environment variables. Environment variables are defined internally with a syntax such as
+.Sy __APPJAIL_RUN_ENVIRONMENT_VAR__<name>=<value>
+and validated with a regular expression such as
+.Sy "^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$"
+.Ns .
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail start"
+It may fail for one of the following reasons:
+.Pp
+.Bl -dash -compact
+.It
+.Em EX_USAGE ":"
+The command was used incorrectly.
+.It
+.Em EX_DATAERR ":"
+.Bl -bullet -compact
+.It
+An invalid environment variable was specified.
+.It
+The jail name specified in
+.Ar jail
+is invalid.
+.It
+The log name specified in the
+.Sy CONSOLELOG_NAME
+parameter is invalid.
+.El
+.It
+.Em EX_NOINPUT ":"
+.Bl -bullet -compact
+.It
+The jail specified in
+.Ar jail
+cannot be found.
+.It
+The template file specified in
+.Fl t
+cannot be found.
+.El
+.El
+.Sh SEE ALSO
+.Xr appjail-disable 1
+.Xr appjail-enable 1
+.Xr appjail-enabled 1
+.Xr sysexits 3
+.Xr appjail-initscript 5
+.Xr appjail-template 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
