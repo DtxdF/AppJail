@@ -33,7 +33,7 @@ lib_load "${LIBDIR}/colors"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/random"
 
-run_desc="Execute the *cmd functions from an initscript of a jail."
+run_desc="Run user-defined stages."
 
 run_main()
 {
@@ -135,23 +135,13 @@ run_main()
 
 run_help()
 {
-	cat << EOF
-`run_usage`
-
-${run_desc}
-
-Options:
-    -i initscript             -- Use a custom initscript.
-    -p parameter=value        -- Parameters for *cmd or a custom stage.
-    -s custom_stage           -- Run a custom stage instead of *cmd.
-    -V env=value              -- Environment variables.
-EOF
+	man 1 appjail-run
 }
 
 run_usage()
 {
 	cat << EOF
-usage: run [-i initscript] [[-p parameter=value] ...] [-s custom_stage]
-           [[-V env=value] ...] jail"
+usage: run [-i initscript] [[-p parameter=value] ...] [-s name]
+           [[-V name=value] ...] <jail>"
 EOF
 }
