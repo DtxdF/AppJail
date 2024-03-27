@@ -28,7 +28,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-deleteOld_desc="Run \`make delete-old delete-old-libs\` on a given release or thickjail."
+deleteOld_desc="Run delete-old and delete-old-libs targets on a given release or thickjail."
 
 deleteOld_main()
 {
@@ -189,25 +189,13 @@ _deleteOld()
 
 deleteOld_help()
 {
-	cat << EOF
-`deleteOld_usage`
-
-${deleteOld_usage}
-
-Parameters:
-    jail                      -- Run delete-old and delete-old-libs in a given thickjail.
-    release                   -- Run delete-old and delete-old-libs in a given release.
-
-Options for release:
-    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
-    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
-EOF
+	man 1 appjail-deleteOld
 }
 
 deleteOld_usage()
 {
 	cat << EOF
-usage: deleteOld jail jail_name
-       deleteOld release [-a freebsd_arch] [-v freebsd_version] [release_name]
+usage: deleteOld jail <jail>
+       deleteOld release [-a arch] [-v version] [release]
 EOF
 }
