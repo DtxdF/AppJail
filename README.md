@@ -92,7 +92,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [X] **appjail(1)**
   * [ ] **appjail-ajspec(5)**
   * [X] **appjail-apply(1)**
-  * [ ] **appjail-checkOld(1)**
+  * [X] **appjail-checkOld(1)**
   * [X] **appjail-cmd(1)**
   * [X] **appjail-cpuset(1)**
   * [X] **appjail.conf(5)**
