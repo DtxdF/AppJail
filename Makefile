@@ -33,7 +33,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-deleteOld.1 \
 	 man1/appjail-enable.1 \
 	 man1/appjail-enabled.1 \
-	 man1/appjail-disable.1
+	 man1/appjail-disable.1 \
+	 man1/appjail-etcupdate.1
 
 APPJAIL_VERSION?=3.2.0
 

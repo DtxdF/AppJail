@@ -217,28 +217,14 @@ _etcupdate()
 
 etcupdate_help()
 {
-	cat << EOF
-`etcupdate_usage`
-
-${etcupdate_desc}
-
-Parameters:
-    jail                      -- Run etcupdate(8) in a given jail.
-    release                   -- Run etcupdate(8) in a given release.
-
-Options:
-    -m mode                   -- etcupdate(8) mode. Valid: update, diff, extract, resolve, revert and status.
-
-Options for release:
-    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
-    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
-EOF
+	man 1 appjail-etcupdate
 }
 
 etcupdate_usage()
 {
 	cat << EOF
-usage: etcupdate jail [-m mode] jail_name [etcupdate_args ...]
-       etcupdate release [-a freebsd_arch] [-m mode] [-v freebsd_version] [- | release_name] [etcupdate_args ...]
+usage: etcupdate jail [-m mode] <jail> [args ...]
+       etcupdate release [-a arch] [-m mode] [-v version] [-|release]
+               [args ...]
 EOF
 }
