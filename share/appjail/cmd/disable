@@ -32,7 +32,7 @@ lib_load "${LIBDIR}/check_func"
 lib_load "${LIBDIR}/colors"
 lib_load "${LIBDIR}/random"
 
-disable_desc="Disable a parameter."
+disable_desc="Remove default parameters for stages."
 
 disable_main()
 {
@@ -244,41 +244,14 @@ disable_run()
 
 disable_help()
 {
-	cat << EOF
-`disable_usage`
-
-${disable_desc}
-
-Parameters:
-    start        -- Disable parameters for the start command. 
-    stop         -- Disable parameters for the stop command.
-    run          -- Disable paraemters for the run command.
-
-Options for start:
-    -c           -- Disable parameters *create functions.
-    -s           -- Disable parameters for *start functions.
-    -t           -- Disable the custom template.
-
-Options for stop:
-    -p           -- Disable parameters for *stop functions.
-
-Options for run:
-    -p           -- Disable parameters for *cmd functions.
-
-options for start, stop and run:
-    -i           -- Disable the custom initscript.
-    -V           -- Disable the environment variables.
-
-Options for start and stop:
-    -I           -- Run the initscript.
-EOF
+	man 1 appjail-disable
 }
 
 disable_usage()
 {
 	cat << EOF
-usage: disable jail start [[-I | -cistV]]
-       disable jail stop [[-I | -ipV]]
-       disable jail run [[-ipV]]
+usage: disable <jail> start [-cIistV]
+       disable <jail> stop [-IipV]
+       disable <jail> run [-ipV]
 EOF
 }

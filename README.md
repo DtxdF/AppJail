@@ -99,7 +99,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-config(1)**
   * [X] **appjail-deleteOld(1)**
   * [ ] **appjail-devfs(1)**
-  * [ ] **appjail-disable(1)**
+  * [X] **appjail-disable(1)**
   * [ ] **appjail-dns(8)**
   * [X] **appjail-enable(1)**
   * [X] **appjail-enabled(1)**
