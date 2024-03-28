@@ -1,0 +1,163 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 28, 2024
+.Dt APPJAIL-TEMPLATE 5
+.Os
+.Sh NAME
+.Nm appjail-template
+.Nd Template file specification
+.Sh DESCRIPTION
+A
+.Sy Template
+is a file that contains the
+.Xr jail 8
+parameters used by a jail. Unlike
+.Xr jail.conf 5 ","
+this one is intended to be easily interpreted by both humans and computers.
+.Pp
+However, since the
+.Xr jail 8
+utility reads a
+.Xr jail.conf 5
+file,
+.Xr appjail-config 1
+has the ability to convert a
+.Sy Template
+to a valid
+.Xr jail.conf 5
+file.
+.Sh TOKENS
+One or more words are separated by spaces. To use spaces in words, the word can
+be enclosed in single or double quotes. Single and double quotes can be escaped
+using a backslash character
+.Pq Sq \e
+.Ns .
+The backslash character followed by a character other
+than the quotation mark
+.Pq depending on whether it is single or double
+will write without escaping.
+.Ss Example 1: 
+The string
+.So
+.Qq Hello, world
+.Qq Escaping \e\&"
+.Sc
+.Dc
+will be tokenized as follows:
+.Bd -literal -compact -offset Ds
+Hello, world
+Escaping \&"
+.Ed
+.Ss Example 2:
+To escape a quote within a token, you must use the escape character followed by the same type of quote
+.Pq i.e. single or double quotes
+.Ns .
+That's why the second token can't escape the quotes using a string such as
+.br
+.So
+.Ns \&'\e'\&'
+.Qq \e\&'
+.Sc
+.Ns :
+.Bd -literal -compact -offset Ds
+\&'
+\e\&\&'
+.Ed
+.Sh FORMAT
+.Bl -dash -compact
+.It
+The
+.Sy Template
+is parsed line by line.
+.It
+Comments and empty lines are ignored.
+.It
+A comment is a trimmed line starting with
+.Sy # "."
+You don't have to worry about trimming a line, AppJail will do it for you, internally
+of course.
+.It
+Each non-ignored line is a parameter.
+.It
+A parameter is made up of a key and a value separated by
+.Sy :
+or
+.Sy :+ "."
+.It
+Parameters starting with
+.Sy *
+are required parameters.
+.It
+How the required parameters are treated is entirely up to the consumer, but at
+least for
+.Xr appjail-start 1 ","
+it will not start the jail until the user sets values for the required parameters.
+.It
+A key is made up of
+.Sy - ","
+.Sy _ ","
+.Sy . ","
+alphanumeric characters and spaces.
+.It
+Spaces in keys are only valid for variables.
+.It
+A variable is a key that begins with
+.Sy $
+and can optionally be enclosed in curly braces.
+.It
+How variables are treated is entirely up to the consumer, but at least for
+.Xr jail 8
+they have special meaning. This is relevant when
+.Xr appjail-start 1
+generates the
+.Xr jail.conf 5
+file.
+.It
+The value is optional.
+.It
+The value will be tokenized following the rules specified in
+.Sx TOKENS
+.Ns .
+.It
+The tokens obtained from the value are formally called columns.
+.It
+More than one parameter can be specified and they are formally called rows.
+.It
+The first row should be specified with
+.Sy :
+and subsequent rows with
+.Sy :+ ","
+but the first row can also be specified with
+.Sy :+ "."
+.El
+.Sh SEE ALSO
+.Xr appjail-config 1
+.Xr jail.conf 5
+.Xr jail 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
