@@ -249,7 +249,7 @@ pkg_help()
 pkg_usage()
 {
 cat << EOF
-usage: pkg all [-e] [-i file] <target> [args ...] [--] [pkg-args ...]
+usage: pkg all [-e] [-i file] <target> [--] [args ...]
        pkg chroot <jail> [args ...]
        pkg jail <jail> [-j] [args ...]
 EOF

@@ -275,7 +275,8 @@ cmd_usage()
 usage: cmd all [-e] [-i file] <target> [args ...]
        cmd chroot <jail> [command [args ...]]
        cmd jaildir [command [args ...]]
-       cmd jexec <jail> [-l] [[-U username|-u username]] [command [args ...]]
+       cmd jexec <jail> [-l] [[-U username|-u username]]
+               [command [args ...]]
        cmd local <jail> [[-j|-r]] [command [args ...]]
 EOF
 }
