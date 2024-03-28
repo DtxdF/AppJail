@@ -1,0 +1,198 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 28, 2024
+.Dt APPJAIL-AJSPEC 5
+.Os
+.Sh NAME
+.Nm appjail-ajspec
+.Nd AJSPEC file specification
+.Sh DESCRIPTION
+An
+.Sy AJSPEC
+is a file that contains parameters that specify how and where one or more images
+are downloaded, verified, and described.
+.Pp
+The
+.Sy AJSPEC
+format is the same as described in
+.Xr appjail-template 5
+with a subtle difference: required parameters are treated the same as normal parameters.
+.Pp
+Although
+.Sy AJSPEC
+files have the same format as a
+.Sy Template ","
+you should not use
+.Xr appjail-config 1 ","
+but rather
+.Xr appjail-image 1 ","
+which is more capable of editing which parameter and how.
+.Sh PARAMETERS
+The following are the parameters that made up the
+.Sy AJSPEC
+file. If
+.Sy Multiple
+is
+.Sy Yes ","
+the parameter can be specified more than once. If
+.Sy Optional
+is
+.Sy Yes ","
+the parameter is optional for the
+.Sy import
+and
+.Sy update
+subcommands in
+.Xr appjail-image 1 "."
+.Ss <tag>.name
+Image name. Although it is optional it is highly recommended to have it set as it
+is not, the user will have to specify one when importing.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.timestamp.<arch>
+Timestamp specifiying when the image was last updated.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.maintainer
+In charge of maintaining the image and everything related to it.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy Yes
+.Ss <tag>.comment
+One-line description
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.url
+Home page project or a website that provides more information about the image for
+the specific tag.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.description
+Long description.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy Yes
+.Ss <tag>.sum.<arch>
+Checksum.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.source.<arch>
+Sites where the image can be downloaded. If the first one fails,
+.Xr appjail-image 1
+will try the second one and if it fails, it will try the third one, and so on.
+.Pp
+Thought this as a list and each source is an element.
+.Xr appjail-image 1
+simply makes an attempt sequentially, but the way the list is sorted resides in
+the
+.Sy IMAGE_DOWNLOAD_METHOD
+parameter.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy Yes
+.Ss <tag>.size.<arch>
+Compressed image size.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss entrypoint
+How
+.Xr appjail-image 1
+got the
+.Sy AJSPEC
+file the first time and how it can be retrieved again for update purposes.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss ajspec
+Name of the
+.Sy AJSPEC
+file.
+.Pp
+.Em Optional ":"
+.Sy Yes
+.br
+.Em Multiple ":"
+.Sy \&No
+.Ss <tag>.arch
+Architectures allowed by this image.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy Yes
+.Ss tags
+Image tags.
+.Pp
+.Em Optional ":"
+.Sy \&No
+.br
+.Em Multiple ":"
+.Sy Yes
+.Sh SEE ALSO
+.Xr appjail-image 1
+.Xr appjail-template 5
+.Xr appjail.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
