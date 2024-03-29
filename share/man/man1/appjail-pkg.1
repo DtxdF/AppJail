@@ -38,16 +38,16 @@
 .Op Fl i Ar file
 .Ar target
 .Op Fl -
-.Op Ar args "..."
+.Op Ar args Ns " " Ns "..."
 .Nm appjail pkg
 .Cm chroot
 .Ar jail
-.Op Ar args "..."
+.Op Ar args Ns " " Ns "..."
 .Nm appjail pkg
 .Cm jail
 .Ar jail
 .Op Fl j
-.Op Ar args "..."
+.Op Ar args Ns " " Ns "..."
 .Sh DESCRIPTION
 The
 .Sy appjail pkg
@@ -74,7 +74,7 @@ instead of
 If you want to specify a
 .Xr pkg 8
 parameter in
-.Ar args ...
+.Ar args
 and it starts with a dash, you must use
 .Fl -
 or
