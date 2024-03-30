@@ -72,7 +72,7 @@ Such as making changes to `rc.conf(5)`, `sysctl.conf(5)`, the firewall configura
 
 **AppJail tries not to automate everything**:
 
-Instead of using one command to do a lot of work, it is preferable to combine small commands. A perfect example is `appjail makejail` which leaves the responsability to the main commands.
+Instead of using one command to do a lot of work, it is preferable to combine small commands. A perfect example is `appjail makejail` which leaves the responsibility to the main commands.
 
 **AppJail is not focused on building software**:
 
