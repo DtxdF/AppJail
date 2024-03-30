@@ -1,0 +1,352 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 29, 2024
+.Dt APPJAIL-LOGS 1
+.Os
+.Sh NAME
+.Nm appjail-logs
+.Nd Log management for jails
+.Sh SYNOPSIS
+.Nm appjail logs
+.Nm appjail logs
+.Cm list
+.Op Fl eHp
+.Ar type Ns Op Ns / Ns Ar entity Ns Op Ns / Ns Ar subtype Ns Op Ns / Ns Ar log
+.Nm appjail logs
+.Cm read
+.Ar type Ns / Ns Ar entity Ns / Ns Ar subtype Ns / Ns Ar log
+.Op Ar args Ns " " Ns "..."
+.Nm appjail logs
+.Cm remove all
+.Nm appjail logs
+.Cm remove
+.Op Fl g
+.Ar type Ns Op Ns / Ns Ar entity Ns Op Ns / Ns Ar subtype Ns Op Ns / Ns Ar log
+.Nm appjail logs
+.Cm tail
+.Ar type Ns / Ns Ar entity Ns / Ns Ar subtype Ns / Ns Ar log
+.Op Ar args Ns " " Ns "..."
+.Sh DESCRIPTION
+The
+.Sy appjail logs
+utility lists, reads, or removes logs created by AppJail. The idea is to have a
+centralized form to manage static log files created by some AppJail subcommands
+or by AppJail itself.
+.Pp
+Having just files scattered around the filesystem doesn't make sense, since you
+probably want to know which part of AppJail generates them, when, and you also
+want to keep them for a long time until you don't really need them. AppJail
+solves this with a very simple approach:
+.Pp
+.Bl -dash -compact
+.It
+.Sy type ":"
+Fefers to a group of entities with the same meaning in a context.
+.It
+.Sy entity ":"
+Fefers to an individual in a group.
+.It
+.Sy subtype ":"
+Refers to a group of logs with the same meaning in a context.
+.It
+.Sy log ":"
+Log filename.
+.El
+.Pp
+.Sy types ":"
+.Pp
+.Bl -dash -compact
+.It
+.Sy commands ":"
+Logs created by commands.
+.It
+.Sy jails ":"
+Logs created by jails.
+.It
+.Sy nat ":"
+Logs created by commands that perform NAT or are related to this operation.
+.El
+.Pp
+.Sy entity ":"
+.Pp
+The entities can be a network, a jail or something similar. They are dynamic.
+.Pp
+.Sy subtype ":"
+.Pp
+.Bl -dash -compact
+.It
+.Sy jails/ Ns Em ENTITY Ns Sy /build
+.Ns :
+Logs created when building the FreeBSD source tree using the
+.Sy jail
+subcommand of
+.Xr appjail-update 1 "."
+.It
+.Sy jails/ Ns Em ENTITY Ns Sy /console
+.Ns :
+Logs created by the
+.Sy exec.consolelog
+parameter of
+.Xr jail 8
+and configured by
+.Xr appjail-start 8
+when not specified by the user in a
+.Sy Template "."
+.It
+.Sy jails/ Ns Em ENTITY Ns Sy /healthcheckers
+.Ns :
+Logs created by Healthcheckers.
+.It
+.Po Sy jails Ns | Ns Sy nat Ns Pc Ns Sy / Ns Em ENTITY Ns Sy / Ns Po Sy startup-start Ns | Ns Sy startup-stop Pc
+.Ns :
+Logs created by
+.Xr appjail-startup 1 "."
+.It
+.Sy releases/ Ns Em ENTITY Ns Sy /build
+.Ns :
+Same as
+.Sy jails/ Ns Em ENTITY Ns Sy /build
+but for releases.
+.It
+.Sy commands/ Ns Em ENTITY Ns Sy /output
+.Ns :
+If
+.Sy ENABLE_LOGGING_OUTPUT
+is enabled, an AppJail session is logged to this file.
+.It
+.Po Sy jails Ns | Ns Sy release Pc Ns / Ns Em ENTITY Ns Sy /etcupdate
+.Ns :
+An
+.Xr appjail-etcupdate(1)
+session is logged to this file.
+.El
+.Pp
+.Sy log ":"
+.Pp
+.Bl -dash -compact
+.It
+Log filename can be changed as desired. See
+.Xr appjail.conf 5
+for details.
+.El
+.Pp
+The options are as follows:
+.Pp
+.Bl -tag -width xx
+.It Cm list Oo Fl eHp Oc Ar type Ns Op Ns / Ns Ar entity Ns Op Ns / Ns Ar subtype Ns Op Ns / Ns Ar log
+List current logs. You can limit the list by specifying the type, entity, subtype, and log.
+.Bl -tag -width xxxx
+.It Fl e
+Don't escape tab
+.Po So \et Sc Pc
+characters.
+.It Fl H
+Don't display the colums.
+.It Fl p
+Don't print the table in pretty mode.
+.El
+.It Cm read Ar type Ns / Ns Ar entity Ns / Ns Ar subtype Ns / Ns Ar log Op Ar args Ns " " Ns "..."
+The program specified by the
+.Ev PAGER
+environment variable is open to read the log you specify.
+.Ar args
+are passed to this program.
+.It Cm remove all
+Removes all logs.
+.It Cm remove Oo Fl g Oc Ar type Ns Op Ns / Ns Ar entity Ns Op Ns / Ns Ar subtype Ns Op Ns / Ns Ar log
+Remove a specific recursively.
+.Bl -tag -width xxxx
+.It Fl g
+Use shell glob patterns. This is valid only for
+.Sy log.
+.El
+.It Cm tail Ar type Ns / Ns Ar entity Ns / Ns Ar subtype Ns / Ns Ar log Op Ar args Ns " " Ns "..."
+.Xr tail 1
+is open to read the log you specify.
+.Ar args
+are passed to this program.
+.El
+.Pp
+If no subcommand is specified,
+.Sy list
+is used by default.
+.Sh EXAMPLES
+.Ss Example 1: List current logs
+.Bd -literal -compact -offset Ds
+.No # Nm appjail logs
+TYPE   ENTITY     SUBTYPE        LOG
+jails  debian     console        2023-02-03.log
+jails  debian     console        2023-02-04.log
+jails  debian     startup-start  2023-02-03.log
+jails  debian     startup-start  2023-02-04.log
+jails  debian     startup-stop   2023-02-03.log
+jails  debian     startup-stop   2023-02-04.log
+jails  jalias     console        2023-02-03.log
+jails  jalias     console        2023-02-04.log
+jails  jalias     startup-start  2023-02-03.log
+jails  jalias     startup-start  2023-02-04.log
+jails  jalias     startup-stop   2023-02-03.log
+jails  jalias     startup-stop   2023-02-04.log
+jails  jalias46   console        2023-02-03.log
+jails  jalias46   console        2023-02-04.log
+jails  jalias46   startup-start  2023-02-03.log
+jails  jalias46   startup-start  2023-02-04.log
+jails  jalias46   startup-stop   2023-02-03.log
+jails  jalias46   startup-stop   2023-02-04.log
+jails  jalias6    console        2023-02-03.log
+jails  jalias6    console        2023-02-04.log
+jails  jalias6    startup-start  2023-02-03.log
+jails  jalias6    startup-start  2023-02-04.log
+jails  jalias6    startup-stop   2023-02-03.log
+jails  jalias6    startup-stop   2023-02-04.log
+jails  jbridge    console        2023-02-03.log
+jails  jbridge    console        2023-02-04.log
+jails  jbridge    startup-start  2023-02-04.log
+jails  jbridge    startup-stop   2023-02-04.log
+jails  jdb        console        2023-02-03.log
+jails  jdb        console        2023-02-04.log
+jails  jdb        startup-start  2023-02-04.log
+jails  jdb        startup-stop   2023-02-03.log
+jails  jdb        startup-stop   2023-02-04.log
+jails  jdev       console        2023-02-03.log
+jails  jdev       console        2023-02-04.log
+jails  jdev       startup-start  2023-02-04.log
+jails  jdev       startup-stop   2023-02-04.log
+jails  jdhcp      console        2023-02-03.log
+jails  jdhcp      startup-start  2023-02-04.log
+jails  jdhcp      startup-stop   2023-02-03.log
+jails  jdisable   console        2023-02-03.log
+jails  jdisable   console        2023-02-04.log
+jails  jdisable   startup-start  2023-02-04.log
+jails  jdisable   startup-stop   2023-02-03.log
+jails  jdisable   startup-stop   2023-02-04.log
+jails  jds        console        2023-02-03.log
+jails  jds        startup-start  2023-02-04.log
+jails  jinherit   console        2023-02-03.log
+jails  jinherit   console        2023-02-04.log
+jails  jinherit   startup-start  2023-02-04.log
+jails  jinherit   startup-stop   2023-02-03.log
+jails  jinherit   startup-stop   2023-02-04.log
+jails  jmultinet  console        2023-02-03.log
+jails  jmultinet  startup-stop   2023-02-03.log
+jails  jnat       console        2023-02-04.log
+jails  jnat       startup-start  2023-02-04.log
+jails  jnat       startup-stop   2023-02-04.log
+jails  jng        console        2023-02-03.log
+jails  jng        startup-start  2023-02-04.log
+jails  jnonat     console        2023-02-04.log
+jails  jpriv      console        2023-02-04.log
+jails  jpub       console        2023-02-04.log
+jails  jslaac     console        2023-02-03.log
+jails  jslaac     console        2023-02-04.log
+jails  jslaac     startup-start  2023-02-04.log
+jails  jslaac     startup-stop   2023-02-04.log
+jails  jtest      console        2023-02-03.log
+jails  jtest      console        2023-02-04.log
+jails  jtest      startup-start  2023-02-03.log
+jails  jtest      startup-stop   2023-02-03.log
+jails  jvirtnet   console        2023-02-03.log
+jails  jvnet      console        2023-02-03.log
+jails  jvnet      startup-start  2023-02-04.log
+jails  jweb       console        2023-02-03.log
+jails  jweb       console        2023-02-04.log
+jails  jweb       startup-start  2023-02-04.log
+jails  jweb       startup-stop   2023-02-03.log
+jails  jweb       startup-stop   2023-02-04.log
+jails  myjail     console        2023-02-03.log
+jails  myjail     console        2023-02-04.log
+jails  myjail     startup-start  2023-02-03.log
+jails  myjail     startup-start  2023-02-04.log
+jails  myjail     startup-stop   2023-02-03.log
+jails  myjail     startup-stop   2023-02-04.log
+jails  nginx      console        2023-02-04.log
+jails  otherjail  console        2023-02-03.log
+jails  otherjail  console        2023-02-04.log
+jails  otherjail  startup-start  2023-02-03.log
+jails  otherjail  startup-start  2023-02-04.log
+jails  otherjail  startup-stop   2023-02-03.log
+jails  otherjail  startup-stop   2023-02-04.log
+jails  php        console        2023-02-04.log
+jails  php        console        2023-02-04.log
+jails  php        startup-start  2023-02-04.log
+jails  php        startup-stop   2023-02-04.log
+nat    db         startup-start  2023-02-03.log
+nat    db         startup-stop   2023-02-03.log
+nat    web        startup-start  2023-02-03.log
+nat    web        startup-stop   2023-02-03.log
+.Ed
+.Ss Example 2: Read a log
+The following example reads a log file, but the
+.Ev PAGER
+environment variable is modified to pass the
+.Fl R
+parameter since the log we will read has ANSI colors.
+.Bd -literal -compact -offset Ds
+.No # Ic export Ev PAGER Ns = Ns Qo less Fl R Ns Qc Ns " " Ns Nm appjail logs Cm read Ar jails/php/startup-start/2023-02-04.log
+[00:00:05] [ debug ] [php] Locking php ...
+[00:00:05] [ info  ] [php] Starting php...
+[00:00:10] [ debug ] [php] Using `/usr/local/appjail/jails/php/conf/template.conf` as the template.
+[00:00:12] [ debug ] [php] Checking for invalid parameters...
+[00:00:14] [ debug ] [php] Writing `/usr/local/appjail/jails/php/conf/template.conf` content to `/usr/local/appjail/cache/tmp/.appjail/appjail.wkX25nfm` ...
+[00:00:14] [ debug ] [php] Checking for parameters marked as required...
+...
+.Ed
+.Ss Example 3: Remove a log
+.Bd -literal -compact -offset Ds
+.No # Nm appjail logs Cm remove Ar jails/jpriv
+.Ed
+.Ss Example 4: Remove a log using shell glob patterns
+.Bd -literal -compact -offset Ds
+.No # Nm appjail logs Cm remove Fl g Ar jails/otherjail/startup-start/2023-02-0[34].log
+.Ed
+.Ss Example 5: Read the last part of a log and wait for new changes
+.Bd -literal -compact -offset Ds
+.No # Nm appjail logs Cm tail Ar jails/jalias6/startup-stop/2023-02-04.log Fl f
+.Ed
+.Sh FILES
+.Bl -tag -width xxxx
+.It Pa /var/log/appjail.log
+Log file used by the
+.Xr rc 8
+script.
+.El
+.Sh SEE ALSO
+.Xr appjail-fetch 1
+.Xr appjail-healthcheck 1
+.Xr appjail-startup 1
+.Xr appjail-update 1
+.Xr tail 1
+.Xr sysexits 3
+.Xr appjail.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh CAVEATS
+.Ss Remove logs in ZFS
+When using ZFS as the backend file system appjail logs remove will recursively
+remove all datasets including all references, such as clones.
+.Sy Be careful "."
