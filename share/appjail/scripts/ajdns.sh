@@ -61,6 +61,7 @@ main()
 				;;
 		esac
 	done
+	shift $((OPTIND-1))
 
 	if [ -z "${hosts}" -o -z "${hook}" ]; then
 		usage
@@ -91,7 +92,7 @@ main()
 	local current_hosts current_hosts_sum
 
 	while true; do
-		current_hosts=`appjail-dns` || exit $?
+		current_hosts=`appjail-dns "$@"` || exit $?
 		current_hosts_sum=`printf "%s\n" "${current_hosts}" | "${algo}"` || exit $?
 
 		if [ `${algo} -q "${hosts}"` != ${current_hosts_sum} ]; then

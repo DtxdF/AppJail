@@ -12,6 +12,7 @@
 # appjail_dns_interval (str):    Interval to check if the hosts have been changed before executing the hook. (default=60)
 # appjail_dns_hosts (str):       Full path to the hosts file. (default=/var/tmp/appjail-hosts)
 # appjail_dns_hook (str):        Full path to the DNS hook. (default=%%PREFIX%%/share/appjail/scripts/dnsmasq-hook.sh)
+# appjail_dns_extra (str):       List of files to concatenate. (optional)
 #
 
 . /etc/rc.subr
@@ -35,7 +36,7 @@ appjail_dns_env="PATH=${appjail_dns_path}"
 pidfile="/var/run/${name}.pid"
 procname="%%PREFIX%%/share/appjail/scripts/ajdns.sh"
 command="/usr/sbin/daemon"
-command_args="-c -p ${pidfile} -o ${appjail_dns_logfile} ${procname} -i ${appjail_dns_interval} -h ${appjail_dns_hosts} -H ${appjail_dns_hook}"
+command_args="-c -p ${pidfile} -o ${appjail_dns_logfile} ${procname} -i ${appjail_dns_interval} -h ${appjail_dns_hosts} -H ${appjail_dns_hook} -- ${appjail_dns_extra}"
 command_interpreter="/bin/sh"
 
 appjail_dns_precmd()
