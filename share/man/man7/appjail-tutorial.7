@@ -351,7 +351,7 @@ enable, configure and start some RC scripts.
 .Bd -literal -offset indent
 # sysrc appjail_dns_enable="YES"
 # sysrc dnsmasq_enable="YES"
-# sysrc dnsmasq_conf="/usr/local/share/appjail/files/dnsmasq.conf"
+# sysrc dnsmasq_conf="%%PREFIX%%/share/appjail/files/dnsmasq.conf"
 # touch /var/tmp/appjail-hosts
 # service dnsmasq start
 # service appjail-dns start
