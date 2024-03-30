@@ -1,0 +1,185 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 30, 2024
+.Dt APPJAIL-DNS 8
+.Os
+.Sh NAME
+.Nm appjail-dns
+.Nd DNS information for AppJail users
+.Sh SYNOPSIS
+.Nm appjail-dns
+.Op Ar files Ns " " Ns "..."
+.Sh DESCRIPTION
+The
+.Nm
+utility is a command to generate a
+.Xr hosts 5 Ns -like
+file to be used by scripts and services, such as a DNS server.
+.Pp
+.Nm
+can read one or more
+.Xr hosts 5 Ns -like
+files by removing any comments. After reading and displaying all the specified
+files,
+.Nm
+will generate a list of DNS hostnames for each jail in each virtual network.
+.Pp
+The syntax of each line is exactly as specified in
+.Xr hosts 5 Ns -like Ns ","
+but the jail's hostname follows a particular syntax:
+.Do < Ns Sy Jail Name Ns >.< Ns Sy Virtual Network Ns > Ns Sy HOST_DOMAIN Dc
+.Ns "."
+The virtual network host name syntax is
+.Do < Ns Sy Virtual Network Ns > Ns Sy HOST_DOMAIN Dc
+.Ns "."
+See
+.Xr appjail.conf 5
+for a description of the
+.Sy HOST_DOMAIN
+parameter, but as you can see, it is used exactly as is, assuming it is prefixed
+with a dot.
+.Pp
+This document also explains how to use the
+.Xr rc 8
+script to implement
+.Nm
+with a DNS server, in this case DNSMasq.
+.Pp
+The
+.Xr rc 8
+script checks the current
+.Xr hosts 5 Ns -like
+.Po Em appjail_dns_hosts Ns : Ns " " Ns /var/tmp/appjail-hosts Pc
+file against the output of
+.Nm
+at intervals
+.Po Em appjail_dns_interval Ns : Ns " " Ns 60 Pc
+using a checksum; if it detects a change it will execute the hook
+.Po Em appjail_dns_hook Ns : Ns " " Ns %%PREFIX%%/share/appjail/scripts/dnsmasq-hook.sh Pc
+.Ns "."
+.Pp
+A hook is simply an external program that has two responsibilities: filtering the
+.Xr hosts 5 Ns -like
+file and restarting the DNS server. These responsibilities depend entirely on the
+DNS server, as it may not need to be restarted, or even the hook may not need to
+modify the
+.Xr hosts 5 Ns -like
+file for the DNS server to interpret it correctly.
+.Pp
+For example, if we use the following file for DNSMasq:
+.Pp
+.Pa %%PREFIX%%/share/appjail/files/dnsmasq.conf
+.Ns :
+.Pp
+.Bd -literal -compact -offset Ds
+addn-hosts=/var/tmp/appjail-hosts
+no-resolv
+server=208.67.222.222
+server=208.67.220.220
+.Ed
+.Pp
+With the necessary parameters in our
+.Xr rc.conf 5 ":"
+.Pp
+.Bd -literal -compact -offset Ds
+dnsmasq_enable="YES"
+dnsmasq_conf="%%PREFIX%%/share/appjail/files/dnsmasq.conf"
+.Ed
+.Pp
+We are configuring DNSMasq to use
+.Pa /var/tmp/appjail-hosts
+as our
+.Xr hosts 5 "."
+Since it can perfectly interpret a
+.Xr hosts 5
+file, it is not necessary to modify it.
+.Pp
+The
+.Xr hosts 5 Ns -like
+file is passed to the hook as the first argument, but we don't need it, since the
+only thing our hook needs to do is restart DNSMasq.
+.Pp
+.Pa %%PREFIX%%/share/appjail/scripts/dnsmasq-hook.sh
+.Ns :
+.Pp
+.Bd -literal -compact -offset Ds
+#!/bin/sh
+
+service dnsmasq reload
+.Ed
+.Pp
+AppJail uses the above hook in its
+.Xr rc 8
+script, but you can change to any other hook by changing the value of the
+.Sy appjail_dns_hook
+parameter in your
+.Xr rc.conf 5 ":"
+.Pp
+.Bd -literal -compact -offset Ds
+appjail_dns_enable="YES"
+appjail_dns_hook="%%PREFIX%%/share/appjail/scripts/dnsmasq-hook.sh"
+.Ed
+.Pp
+Once everything is done, we can start the
+.Xr rc 8
+scripts:
+.Pp
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm touch Ar /var/tmp/appjail-dns
+.No # Nm service Ar dnsmasq Cm start
+.No # Nm service Ar appjail-dns Cm start
+.Ed
+.Pp
+Since every time the
+.Xr rc 8
+script is restarted, it checks if there are any changes between the output of
+.Nm
+and the current
+.Xr hosts 5 Ns -like
+file, we should have the file with content, assuming that there are already jails
+created and that are in an existing virtual network.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm cat Ar /var/tmp/appjail-dns
+10.0.0.1        ajnet.appjail
+10.0.0.2        filebrowser filebrowser.ajnet.appjail
+10.0.0.3        jtest jtest.ajnet.appjail
+.Ed
+.Pp
+In my case, I have enabled
+.Sy SHORTEN_DOMAIN_NAMES ","
+so a shorter domain name is available in that file, as you can see.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr appjail-network 1
+.Xr hosts 5
+.Xr appjail-tutorial 7
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

@@ -37,7 +37,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-etcupdate.1 \
 	 man5/appjail-template.5 \
 	 man5/appjail-ajspec.5 \
-	 man1/appjail-logs.1
+	 man1/appjail-logs.1 \
+	 man8/appjail-dns.8
 
 APPJAIL_VERSION?=3.2.0
 
@@ -111,7 +112,7 @@ install: utils-strip
 	${FIND} share/appjail/scripts -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# Prefix.
-.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh share/appjail/scripts/ajuser.sh share/man/man7/appjail-tutorial.7 share/man/man5/appjail.conf.5
+.for f in bin/appjail bin/appjail-config bin/appjail-config-user bin/appjail-user share/appjail/files/config.conf share/appjail/files/default.conf share/appjail/scripts/runas.sh share/appjail/scripts/ajuser.sh share/man/man7/appjail-tutorial.7 share/man/man5/appjail.conf.5 share/man/man8/appjail-dns.8
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/${f}"
 .endfor
 
