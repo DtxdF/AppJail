@@ -34,7 +34,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 * Jail dependency support.
 * Initscripts - Make your jails interactive!
 * Backup your jails using tarballs or raw images (ZFS only) with a single command.
-* Modular structure - each command is a unique file that has its own responsability in AppJail. This makes AppJail maintenance much easier.
+* Modular structure - each command is a unique file that has its own responsibility in AppJail. This makes AppJail maintenance much easier.
 * Table interface - many commands have a table-like interface, which is very familiar to many sysadmin tools.
 * No databases - each configuration is separated in each entity (networks, jails, etc.) which makes maintenance much easier.
 * Healthcheckers - Monitor your jails and make sure they are healthy!
