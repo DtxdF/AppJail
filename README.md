@@ -120,7 +120,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-nat(1)**:
   * [ ] **appjail-network(1)**
   * [X] **appjail-pkg(1)**
-  * [ ] **appjail-quick(1)**
+  * [X] **appjail-quick(1)**
   * [X] **appjail-restart(1)**
   * [X] **appjail-rstop(1)**
   * [X] **appjail-run(1)**

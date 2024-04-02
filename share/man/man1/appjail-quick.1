@@ -1,0 +1,1923 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd March 30, 2024
+.Dt APPJAIL-QUICK 1
+.Os
+.Sh NAME
+.Nm appjail-quick
+.Nd Create a pre-configured jail
+.Sh SYNOPSIS
+.Nm appjail quick
+.Ar name
+.Op Ar options Ns " " Ns "..."
+.Sh DESCRIPTION
+The
+.Sy appjail quick
+utility creates and configures a jail. Basically, it configure the template that the jail uses with
+.Ar options
+that you specify after its
+.Ar name
+.Ns "."
+Each option has its own responsibility, but in a nutshell, it writes the template with other AppJail subcommands. Due to this flexibility,
+.Sy appjail quick
+provides a simple and fast approach to creating and recreating jails. The
+.Xr appjail-makejail 1 Ns "'s"
+.Fl o
+parameter and the
+.Xr appjail-makejail 5 Ns "'s"
+.Sy OPTION
+instruction are essentially a wrapper for this command.
+.Pp
+Each parameter has a data type, can conflict with other options, can be specified
+multiple times, and can even have dependencies, that is, it needs another
+parameter to work correctly or even to take effect.
+.Sh DATA TYPES
+.Bl -tag -width xx
+.It String
+Any character that is valid according to the option itself is valid.
+.It Integer
+Positive number, or in other words,
+.Sy [0-9]+ "."
+.It Boolean
+An option with no arguments is considered to be of type boolean.
+.It Options
+A parameter that contains subparameters.
+.El
+.Sh OPTIONS
+.Bl -tag -width xx
+.It Cm alias | Cm alias Ns = Ns Qo Ar interface Qc
+.Pp
+Interface assigned to the jail.
+.Ar interface
+is used as the default interface for other options specified in
+.Em Requires ";"
+If not defined, each option must define the interface to use, but is not a requirement.
+It is recommended to configure an interface using this option or at least one for each
+option listed in Requires, as the
+.Xr jail 8
+framework may not perform any action.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy bridge
+.It
+.Sy jng
+.It
+.Sy vnet
+.El
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy ip4
+.It
+.Sy ip4_inherit
+.It
+.Sy ip4_disable
+.It
+.Sy ip6
+.It
+.Sy ip6_inherit
+.It
+.Sy ip6_disable
+.It
+.Sy virtualnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm alias
+.It
+.Cm alias Ns = Ns Qo appjail0 Qc
+.Ed
+.El
+.It Cm boot
+.Pp
+Set the
+.Sy boot
+flag to the jail, so that
+.Xr appjail-startup 1
+can start it, typically at startup.
+.Pp
+See also
+.Xr appjail-jail 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc
+.Pp
+Create a bridge if it does not exist and attach one or more interfaces.
+.Pp
+See also
+.Xr appjail-bridge 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar type Ns :
+Interface type. Can be either
+.Cm epair
+or
+.Cm iface
+.Ns "."
+If
+.Cm epair
+is used, two
+.Xr if_epair 4
+interfaces,
+.Sy sa_ Ns Ar interface
+that should be used by the host, and
+.Sy sb_ Ns Ar interface
+that should be used by the jail, are created. If
+.Cm iface
+is used, an existing
+.Ar interface
+will be added as a member of
+.Ar bridge
+.Ns "."
+.Pp
+Note that the MTU is obtained from
+the first
+.Ar interface
+.Pq regardless of type
+you specify, but you should first specify the
+.Cm iface
+type first, so that the bridge and other interfaces use the same MTU, a requirement of the
+.Xr if_bridge 4
+driver. If an
+.Cm epair
+type is specified first, then the MTU specified by the
+.Sy DEFAULT_MTU
+parameter is used.
+.Sy epair
+is the default.
+.It
+.Cm bridge Ns :
+Use a different
+.Ar bridge
+than the one specified by the
+.Sy SHARED_BRIDGE
+parameter.
+.El
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm bridge Ns = Ns Qo iface:em0 nginx Qc
+.It
+.Cm bridge Ns = Ns Qo nginx Qc
+.It
+.Cm bridge Ns = Ns Qo iface:em0 epair:nginx bridge:public Qc
+.El
+.It Cm clone+jail Ns = Ns Qo Ar jail Ns @ Ns Ar snapshot Qc
+.Pp
+Create a new jail by cloning a ZFS
+.Ar snapshot
+of
+.Ar jail
+.Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar jail Ns :
+Jail to create a ZFS snapshot for cloning.
+.It
+.Ar snapshot Ns :
+ZFS snapshot name.
+.El
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+release
+.It
+.Sy copy
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs+import+jail
+.It
+.Sy zfs+import+root
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm clone+jail Ns = Ns Qo jdb@snap1 Qc
+.El
+.It Cm clone+release Ns = Ns Qo Ar snapshot Qc
+.Pp
+Create a new jail by cloning a ZFS
+.Ar snapshot
+of a release.
+.Pp
+With this option only the
+.Em linux+debootstrap
+and
+.Em thick
+jail types can be used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar snapshot Ns :
+ZFS snapshot name.
+.El
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy copy
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs+import+jail
+.It
+.Sy zfs+import+root
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm clone+release Ns = Ns Qo 140release Qc
+.El
+.It Cm copy Ns = Ns Qo Ar jail Qc
+.Pp
+Create a new jail by copying another existing
+.Ar jail
+.Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy clone+release
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs-import+jail
+.It
+.Sy zfs+import+root
+.El
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm copy Ns = Ns Qo mysql Qc
+.El
+.It Cm copydir Ns = Ns Qo Ar directory Qc
+.Pp
+Root directory used by the
+.Sy file
+and
+.Sy files
+options. If this option is not set, the directory specified by the
+.Sy DEFAULT_COPYDIR
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm copydir Ns = Ns Qo Pa /tmp/copydir-files Qc
+.El
+.It Cm cpuset Ns = Ns Qo Ar cpu-list Qc
+.Pp
+Configure processor sets.
+.Pp
+See also
+.Xr appjail-cpuset 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm cpuset Ns = Ns Qo 0-2 Qc
+.It
+.Cm cpuset Ns = Ns Qo 1,2,6-9 Qc
+.El
+.It Cm create_args Ns = Ns Qo parameter=value Qc
+.Pp
+Set default parameters for the
+.Sy create
+stage.
+.Pp
+See also
+.Xr appjail-enable 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm create_args Ns = Ns Qo nginx_conf=/app/nginx.conf Qc
+.El
+.It Cm device Ns = Ns Qo Ar rulespec Qc
+.Pp
+Add a DEVFS rule.
+.Pp
+See also
+.Xr appjail-devfs 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm device Ns = Ns Qo path bpf unhide Qc
+.It
+.Cm device Ns = Ns Qo path "'mixer*'" unhide Qc
+.El
+.It Cm devfs_ruleset Ns = Ns Ar ruleset
+.Pp
+devfs ruleset number that is enforced for mounting
+.Xr devfs 5
+in this jail.
+.Pp
+We recommend using the
+.Sy device
+option to dynamically assign a devfs ruleset number.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Number
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy mount_devfs
+.It
+.Sy linuxfs
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm devfs_ruleset Ns = Ns 10
+.El
+.It Cm dhcp Ns = Ns Qo Ar interface Qc
+.Pp
+Configure
+.Ar interface
+using DHCP.
+.Pp
+You must unhide the
+.Sy bpf
+device for this jail for
+.Xr dhclient 8
+to work without problems.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy bridge
+.It
+.Sy jng
+.It
+.Sy vnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm dhcp Ns = Ns Qo sb_nginx Qc
+.It
+.Cm dhcp Ns = Ns Qo ng0_nginx Qc
+.El
+.It Cm empty
+.Pp
+Create an empty jail.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy clone+release
+.It
+.Sy copy
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs+import+jail
+.It
+.Sy zfs+import+root
+.El
+.It Cm expose Ns = Ns Qo Ar hport Ns Oo : Ns Ar jport Oc Oo Cm descr Ns : Ns Ar description Oc Oo Cm ext_if Ns : Ns interface Oc Oo Cm logopts Ns Oo Ns : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Oo Cm proto Ns : Ns Ar protocol Oc Qc
+.Pp
+Perform port forwarding.
+.Pp
+See also
+.Xr appjail-expose 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar hport Ns :
+Host or external port.
+.It
+.Ar jport Ns :
+Port currently listening to the application within the jail. If not set,
+.Ar hport
+is used.
+.It
+.Cm descr Ns :
+Service description.
+.It
+.Cm ext_if Ns :
+Interface to obtain the external IPv4 address. If not set, the interface specified by the
+.Sy EXT_IF
+parameter is used.
+.It
+.Cm logopts Ns :
+Firewall-specific logging options. Logging can be enabled without providing any arguments.
+.It
+.Cm network Ns :
+Network to obtain the jail's IPv4 address. If not set, the default network defined by the
+.Sy default
+subparameter of the
+.Sy virtualnet
+option is used. If you don't specify a network using this subparameter or even
+none is marked as default, an error will be raised.
+.It
+.Cm on_if Ns :
+Apply rules to packets coming in on, or going out through, this interface. If not
+set, the interface specified by the
+.Sy ON_IF
+parameter is used.
+.It
+.Cm proto Ns :
+Protocol, that is,
+.Sy tcp
+or
+.Sy udp "."
+The default is
+.Sy tcp "."
+.El
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy virtualnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm expose Ns = Ns Qo 80 Qc
+.It
+.Cm expose Ns = Ns Qo 8080:80 \e Ns Qo descr:NGINX service\e Ns Qc logopts Qc
+.El
+.It Cm file Ns = Ns Qo Ar file Qc
+.Pp
+File to copy to jail.
+.Pp
+.Sy copydir
+affects this parameter: if
+.Sy copydir
+is
+.Pa /tmp/copydir-files
+and you specify
+.Sy file
+to be
+.Pa /etc/rc.conf
+.Ns ,
+the real path is
+.Pa /tmp/copydir-files/etc/rc.conf
+.Ns "."
+.Pp
+This option copies
+.Ar file
+as is, that is, with metadata such as permissions, owner and group, and will even
+create the necessary directories before the file, e.g. if
+.Sy file
+is set to
+.Pa /etc/rc.conf
+.Ns ,
+.Pa /etc
+is created before
+.Pa rc.conf
+is copied.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm file Ns = Ns Qo /etc/rc.conf Qc
+.El
+.It Cm files Ns = Ns Qo file Qc
+.Pp
+Reads
+.Ar file
+assuming each line is a file to be copied. See
+.Sy file
+for more details.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm files Ns = Ns Qo /tmp/files.lst Qc
+.El
+.It Cm fstab Ns = Ns Qo Ar device Ar mountpoint Oo type Oc Oo Ar options Oc Oo Ar dump Oc Oo Ar pass Oc Qc
+.Pp
+Creates an
+.Xr appjail-fstab 1 Ns 's
+entry.
+.Pp
+See also
+.Xr appjail-fstab 1
+and
+.Xr fstab 5 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar device Ns :
+Describes the special device or remote file system to be mounted.
+.It
+.Ar mountpoint Ns :
+Describes the mount point for the file system.
+.It
+.Ar type Ns :
+Describes the type of the file system.
+.It
+.Ar options Ns :
+Describes the mount point options associated with the file system.
+.It
+.Ar dump Ns :
+This field is used for these file systems by the
+.Xr dump 8
+command to determine which file systems need to be dumped.
+.It
+.Ar pass Ns :
+This field is used by the
+.Xr fsck 8
+and
+.Xr quotacheck 8
+programs to determine the order in which file system and quota checks are done
+at reboot time.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm fstab Ns = Ns Qo /tmp /tmp Qc
+.It
+.Cm fstab Ns = Ns Qo /usr/local/www /usr/local/www Qc
+.It
+.Cm fstab Ns = Ns Qo /dev/da0s1 /mnt msdosfs Qc
+.El
+.It Cm healthcheck Oo Cm health_cmd Ns : Ns Ar command Oc Oo Cm interval Ns : Ns Ar seconds Oc Oo Cm kill_after Ns : Ns Ar seconds Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm recover_cmd Ns : Ns Ar command Oc Oo Cm recover_kill_after Ns : Ns Ar seconds Oc Oo Cm recover_timeout Ns : Ns Ar seconds Oc Oo Cm recover_timeout_signal Ns : Ns Ar signal Oc Oo Cm recover_total Ns : Ns Ar number Oc Oo Cm retries Ns : Ns Ar number Oc Oo Cm start_period Ns : Ns Ar seconds Oc Oo Cm timeout Ns : Ns Ar seconds Oc Oo Cm timeout_signal Ns : Ns Ar signal Oc
+.Pp
+Creates a healthchecker.
+.Pp
+See also
+.Xr appjail-healthcheck 1
+and
+.Xr appjail.conf 5 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm health_cmd Ns :
+Command to evaluate the jail's health. Prefix
+.Ar command
+with
+.Sy host:
+to run the command from the host or with
+.Sy jail:
+to run the command from the jail.
+.It
+.Cm interval Ns :
+Interval to check the jail's health.
+.It
+.Cm kill_after Ns :
+Send a
+.Sy SIGKILL
+signal to the process created by
+.Sy health_cmd
+command after
+.Ar seconds
+has been reached only if it is still running.
+.It
+.Cm name Ns :
+Healthchecker name.
+.It
+.Cm recover_cmd Ns :
+Command to heal the jail if it is considered to be failing.
+.It
+.Cm recover_kill_after Ns :
+Send a
+.Sy SIGKILL
+signal to the process created by
+.Sy recover_cmd
+command after
+.Ar seconds
+has been reached only if it is still running.
+.It
+.Cm recover_timeout Ns :
+Send the signal specified by
+.Sy recover_timeout_signal
+to the process created by
+.Sy recover_cmd
+command after
+.Ar seconds
+has been reached only if it is still running.
+.It
+.Cm recover_timeout_signal Ns :
+Signal to send on timeout.
+.It
+.Cm recover_total Ns :
+The maximum number of attempts reached before the jail is considered unhealthy.
+.It
+.Cm retries Ns :
+Number of attempts to heal the jail when it is failing and to start the
+.Sy recover_cmd
+command.
+.It
+.Cm start_period Ns :
+Delay before running the healthchecker.
+.It
+.Cm timeout Ns :
+Send the signal specified by
+.Sy timeout_signal
+to the process created by
+.Sy health_cmd
+command after
+.Ar seconds
+has been reached only if it is still running.
+.It
+.Cm timeout_signal Ns :
+Signal to send on timeout.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm healthcheck
+.It
+.Cm healthcheck Ns = Ns \&' Ns Qo health_cmd:jail:service nginx status Qc Qo recover_cmd:jail:service nginx restart Qc Ns \&'
+.El
+.It Cm import+jail Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a tarball file into the jail directory.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+Tarball file.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy import+root "."
+.It
+.Cm compress Ns :
+Ignored, but used by
+.Sy zfs+import+jail
+and
+.Sy zfs+import+root "."
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm import+jail Ns = Ns Qo input:/tmp/web3.txz Qc
+.El
+.It Cm import+root Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a tarball file into the root directory of the jail.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+Tarball file.
+.It
+.Cm portable Ns :
+Include only portable files. These are the jail directory, the configuration file
+describing the jail, the initscript and volumes. This is used by
+.Xr appjail-image 1 "."
+.It
+.Cm compress Ns :
+Ignored, but used by
+.Sy zfs+import+root
+and
+.Sy zfs+import+root "."
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm import+root Ns = Ns Qo input:/tmp/web3.tgz Qc
+.El
+.It Cm initscript Ns = Ns Ar file
+.Pp
+Custom
+.Sy InitScript.
+.Pp
+Note that this option is meaningless in a Makejail, as the
+.Sy InitScript
+is overwritten when generating one.
+.Pp
+See also
+.Xr appjail-initscript 5 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm initscript Ns = Ns Qo /tmp/initscript Qc
+.El
+.It Cm ip4 Ns = Ns Qo Ar ip4-address Qc | Cm ip4 Ns = Ns Qo Ar interface Ns | Ns Ar ip4-address Qc
+.Pp
+IPv4 address assigned to the jail. The IPv4 address is assigned to the interface or to the interface specified by the
+.Sy alias
+option.
+.Pp
+See also the
+.Sy alias
+option for more details.
+.Pp
+See also
+.Xr jail 8 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy ip4_inherit
+.It
+.Sy ip4_disable
+.El
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.It Cm ip4_disable
+.Pp
+Stop the jail from using IPv4 entirely.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy ip4
+.It
+.Sy ip4_inherit
+.It
+.Sy virtualnet
+.El
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.It Cm ip4_inherit
+.Pp
+Allow unrestricted access to all addresses on the system.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy ip4
+.It
+.Sy ip4_disable
+.It
+.Sy virtualnet
+.El
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.It Cm ip6 Ns , Cm ip6_disable Ns , Cm ip6_inherit
+.Pp
+Counterpart of
+.Sy ip4,
+.Sy ip4_disable
+and
+.Sy ip4_inherit "."
+.Pp
+.It Cm jng Ns = Ns Qo Ar name Oo Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc
+.Pp
+Use Netgraph with the
+.Sy jng
+script. This script will create Netgraph nodes such as
+.Xr ng_bridge 4
+and
+.Xr ng_eiface 4 "."
+The bridge will be named
+.Ar interface Ns Sy bridge
+.Ns and the nodes Sy ng0_ Ns Ar name Ns , Ns " " Ns Sy ng1_ Ns Ar name Ns " " Ns "..." Ns " " Ns Sy ngN_ Ns Ar name Ns "."
+.Pp
+You need to install the
+.Sy jng
+script before using this option. Run
+.Ns So install -m 555 /usr/share/examples/jails/jng /usr/local/bin/jng Sc to install it.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar name Ns ":"
+Name of links.
+.It
+.Cm iface Ns ":"
+An existing interface to use.
+.It
+.Cm bridge Ns ":"
+A secondary bridge is created when the bridge name is different from
+.Sy bridge "."
+.El
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm jng Ns = Ns Qo myjail jext Qc
+.El
+.It Cm limits Ns = Ns Qo Ar rule Cm descr Ns : Ns Ar description Qc
+.Pp
+Add a resource limit rule to the jail.
+.Pp
+See also
+.Xr appjail-limits 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar rule Ns :
+.Xr rctl 8 Ns 's Ns " " Ns rule.
+.It
+.Cm descr Ns :
+Rule description.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm limits Ns = Ns Qo vmemoryuse:deny=1g Qc
+.El
+.It Cm linuxfs
+.Pp
+Mount filesystems required by many Linux distributions to work correctly. You probably want to set the
+.Sy devfs_ruleset
+option
+.Po unless you specify the devices by option with Sy device Pc
+to another value because LinuxJail will not work with the default value specified by the
+.Sy DEFAULT_DEVFS_RULESET
+parameter. The following mount points are used:
+.Sy /dev Ns , Sy /dev/shm Ns , Sy /dev/fd Ns , Sy /proc Ns " " Ns and Sy /sys Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy mount_devfs
+.El
+.It Cm login
+.Pp
+Log in to the jail after starting it with the
+.Sy start
+option.
+.Pp
+See also
+.Xr appjail-login 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy start
+.El
+.It Cm login_user Ns = Ns Qo Ar username Qc
+.Pp
+Log in as
+.Ar username
+with the
+.Sy login
+option. If not specified, the user specified by the
+.Sy DEFAULT_LOGIN_USER
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.It Cm macaddr Ns = Ns Qo Ar interface Ns : Ns Ar addr Qc
+.Pp
+Changes the MAC address of a given interface.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar interface Ns :
+Target interface to change MAC address.
+.It
+.Ar addr Ns :
+Mac Address.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy bridge
+.It
+.Sy jng
+.It
+.Sy vnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm macaddr Ns = Ns Qo sb_nginx:aa-bb-cc-dd-ee-ff Qc
+.It
+.Cm macaddr Ns = Ns Qo sb_apache:aa:bb:cc:aa:10:fe Qc
+.It
+.Cm macaddr Ns = Ns Qo sb_jtest:random Qc
+.El
+.It Cm mount_devfs
+.Pp
+Mount a
+.Xr devfs 5
+filesystem on the chrooted
+.Sy /dev
+directory, and apply the ruleset specified by
+.Sy devfs_ruleset
+option to restrict the devices visible inside the jail.
+.Pp
+If you don't specify
+.Sy devfs_ruleset ","
+but do specify the
+.Sy device
+option,
+.Sy appjail quick
+will assign a ruleset number automatically.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy linuxfs
+.El
+.It Cm nat | Cm nat Ns = Ns Qo Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm logopts Ns Oo : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.Pp
+Mask the jail's IPv4 address using the
+.Ar ext_if Ns 's
+interface on the
+.Ar on_if Ns 's
+interface.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm ext_if Ns :
+Interface to obtain the external IPv4 address. If not set, the interface specified by the
+.Sy EXT_IF
+parameter is used.
+.It
+.Cm logopts Ns :
+Firewall-specific logging options. Logging can be enabled without providing any arguments.
+.It
+.Cm network Ns :
+Network to obtain the jail's IPv4 address. If not set, the default network defined by the
+.Sy default
+subparameter of the
+.Sy virtualnet
+option is used. If you don't specify a network using this subparameter or even
+none is marked as default, an error will be raised.
+.It
+.Cm on_if Ns :
+Apply rules to packets coming in on, or going out through, this interface. If not
+set, the interface specified by the
+.Sy ON_IF
+parameter is used.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy virtualnet
+.El
+.It Cm network Ns = Ns Qo Ar name Ar address Oo Ar description Oc Qc
+.Pp
+Create a new network if it does not exist.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar name Ns :
+Network name.
+.It
+.Ar address Ns :
+Network address.
+.It
+.Ar description
+Description of the network.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm network Ns = Ns Qo dns 172.0.0.0/10 \e\&" Ns DNS network Ns \e\&" Qc
+.El
+.It Cm noboot
+.Pp
+Don't use the
+.Sy boot
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm nomount_devfs
+.Pp
+Don't use the
+.Sy mount_devfs
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm nonat | Cm nonat Ns = Ns Qo Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.Pp
+Don't perform NAT on the jail with the given parameters.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm ext_if Ns :
+Interface to obtain the external IPv4 address. If not set, the interface specified by the
+.Sy EXT_IF
+parameter is used.
+.It
+.Cm network Ns :
+Network to obtain the jail's IPv4 address. If not set, the default network defined by the
+.Sy default
+subparameter of the
+.Sy virtualnet
+option is used. If you don't specify a network using this subparameter or even
+none is marked as default, an error will be raised.
+.It
+.Cm on_if Ns :
+Apply rules to packets coming in on, or going out through, this interface. If not
+set, the interface specified by the
+.Sy ON_IF
+parameter is used.
+.El
+.It Cm nologin
+.Pp
+Don't use the
+.Sy login
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm nooverwrite
+.Pp
+Don't use the
+.Sy overwrite
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm noresolv_conf
+.Pp
+Don't use the
+.Sy resolv_conf
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm norestart
+.Pp
+Don't use the
+.Sy restart
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm norun
+.Pp
+Don't use the
+.Sy run
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm nostart
+.Pp
+Don't use the
+.Sy start
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm notzdata
+.Pp
+Don't use the
+.Sy tzdata
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm osarch Ns = Ns Qo Ar architecture Qc
+.Pp
+Specify the architecture to use in the jail. If this option is not set, the architecture
+specified by the
+.Sy FREEBSD_ARCH
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm osversion Ns = Ns Qo Ar version Qc
+.Pp
+Specify the version of the operating system to use in the jail. If this option is not set, the version
+specified by the
+.Sy FREEBSD_VERSION
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm overwrite | Cm overwrite Ns = Ns Qo Cm force Ns | Ns Cm recursive Ns | Ns Cm force+recursive Qc
+.Pp
+Stop and destroy the jail if it exists. With
+.Cm force
+.Ns ,
+.Sy appjail quick
+will forcibly unmount datasets and with
+.Cm recursive
+.Ns ,
+.Sy appjail quick
+will recursively destroy all dependents, including cloned file systems outside
+the target hierarchy. To use both options, use
+.Cm force+recursive
+.Ns "."
+.Pp
+.Sy force ","
+.Sy recursive
+and
+.Sy force+recursive
+do nothing when ZFS is not enabled.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm pkg Ns = Ns Qo Ar package Qc
+.Pp
+Install a package.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm priority Ns = Ns Qo Ar priority Qc
+.Pp
+Priority number. If this option is not set, the priority specified by the
+.Sy DEFAULT_PRIORITY
+parameter is used.
+.Pp
+See also
+.Xr appjail-startup 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm release Ns = Ns Qo Ar release Qc
+.Pp
+Specify the release to use in the jail. If this option is not set, the release specified by the
+.Sy DEFAULT_RELEASE
+parameter is used.
+.Pp
+See also
+.Xr appjail-fetch 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm resolv_conf | Cm resolv_conf Ns = Ns Qo Ar file Qc
+.Pp
+Copy a
+.Xr resolv.conf 5
+file to the jail. If this option is used without arguments, the
+.Xr resolv.conf 5
+file specified by the
+.Sy DEFAULT_RESOLV_CONF
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm restart
+.Pp
+Restart the jail after starting it with the
+.Sy start
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm run
+.Pp
+Run the
+.Sy cmd
+stage after starting the jail with the
+.Sy start
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm run_args
+.Pp
+Set default parameters for the
+.Sy cmd
+stage.
+.Pp
+See also
+.Xr appjail-enable 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.It slaac
+Configure
+.Ar interface
+using SLAAC.
+.br
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy bridge
+.It
+.Sy jng
+.It
+.Sy vnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm slaac Ns = Ns Qo sb_mariadb Qc
+.It
+.Cm slaac Ns = Ns Qo ng1_httpd Qc
+.El
+.It Cm start
+.Pp
+Start the jail after its creation.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm start_args
+.Pp
+Set default parameters for the
+.Sy start
+stage.
+.Pp
+See also
+.Xr appjail-enable 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm stop_args
+.Pp
+Set default parameters for the
+.Sy stop
+stage.
+.Pp
+See also
+.Xr appjail-enable 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm template Ns = Ns Qo Ar template Qc
+.Pp
+Template file. If not specified, the template file specified by the
+.Sy DEFAULT_TEMPLATE
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm tiny+import Ns = Ns Qo Ar file Qc
+.Pp
+Create a new jail by importing a TinyJail.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy clone+release
+.It
+.Sy copy
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy zfs+import+jail
+.It
+.Sy zfs+import+root
+.El
+.It Cm tmpdir
+.Pp
+Create a directory and an
+.Xr appjail-fstab 5 Ns 's
+entry to mount
+.Pa /tmp
+within the jail. The directory is created with permissions
+.So 1777 Sc Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy x11
+.El
+.It Cm type
+.Pp
+Type on which the jail is based. The default is
+.Sy thin "."
+.Pp
+See also
+.Xr appjail-jail 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm type Ns = Ns Qo thin Qc
+.It
+.Cm type Ns = Ns Qo thick Qc
+.It
+.Cm type Ns = Ns Qo linux+debootstrap Qc
+.El
+.It Cm tzdata | Cm tzdata Ns = Ns Qo zoneinfo-name Qc
+.Pp
+Copy a
+.Xr tzfile 5
+file to the jail. If this option is used without arguments,
+.Pa /etc/localtime
+is used. If set, a symlink is created inside the jail as
+.Pa /etc/localtime
+.Ns "."
+If this option is not set, the
+.Xr tzfile 5
+specified by the
+.Sy DEFAULT_TIMEZONE
+parameter is used.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm tzdata Ns = Ns Qo America/Caracas Qc
+.El
+.It Cm virtualnet Ns = Ns Qo Oo Ar network Oc Ns : Ns Ar interface Oo Cm default Oc Oo Cm address Ns : Ns Ar ipv4-address Oc Oo Cm interface_desc Ns : Ns Ar description Oc Qc
+.Pp
+Create a bridge called
+.Ar network
+and attach
+.Ar interface
+to it. Additionally, assign an IPv4 address from the network address pool.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar network Ns :
+Network to use.
+.Pp
+If specified,
+.Ar network
+must exist previously created using the
+.Sy network
+option or using the
+.Xr appjail-network 1
+command. If not set,
+.Sy appjail quick
+will create a network using parameters such as
+.Sy AUTO_NETWORK_ADDR ","
+.Sy AUTO_NETWORK_NAME ","
+and
+.Sy AUTO_NETWORK_DESC "."
+We recommend leaving this responsibility to
+.Sy appjail quick
+to automatically create the network, but check if the AUTO_* parameters are okay
+for your environment and change them if necessary.
+.It
+.Ar interface Ns :
+.Xr if_epair 4
+interface to create.
+.Pp
+There are two special names for the interface name,
+.Sy <name> ","
+to use the jail name,
+and
+.Sy <random>
+to use a random hexadecimal string. We recommend
+.Sy <random>
+instead of
+.Sy <name>
+as the latter can cause problems when the jail name and interface name are incompatible.
+.It
+.Cm default Ns :
+Mark this network as default, so options like
+.Sy expose
+and
+.Sy nat
+can use it without explicitly specifying it.
+.It
+.Cm address Ns :
+Static IPv4
+.Ar address
+that must be valid for
+.Ar network
+.Ns "."
+If not set, an address is assigned automatically.
+.It
+.Cm interface_desc Ns :
+Interface description.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm virtualnet Ns = Ns Qo web:nginx default \e\&" Ns interface_desc:Interface used by the nginx jail. Ns \e\&" Qc
+.It
+.Cm virtualnet Ns = Ns Qo db:mariadb address:10.42.0.17 Qc
+.It
+.Cm virtualnet Ns = Ns Qo :<random> default Qc
+.It
+.Cm virtualnet Ns = Ns Qo :<name> default Qc
+.El
+.It Cm vnet Ns = Ns Qo Ar interface Qc
+.Pp
+A network interface to give to a vnet-enabled jail after is it created. The interface
+will automatically be released when the jail is removed.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy alias
+.El
+.It Cm volume Ns = Ns Qo Ar volume Oo Cm group Ns : NS Ar gid Oc Oo Cm mountpoint Ns : Ns Ar mountpoint Oc Oo Cm owner Ns : Ns Ar uid Oc Oo Cm perm Ns : Ns Ar mode Oc Oo Cm type Ns : Ns Ar type Oc Qc
+.Pp
+Create a new volume.
+.Pp
+See also
+.Xr appjail-volume 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar volume Ns :
+Volume name.
+.It
+.Cm group Ns :
+.Ar volume Ns 's
+group ID.
+.It
+.Cm mountpoint Ns :
+Path within the jail to mount the volume.
+.It
+.Cm owner Ns :
+.Ar volume Ns 's
+user ID.
+.It
+.Cm perm Ns :
+.Ar volume Ns 's
+file mode.
+.It
+.Cm type Ns :
+File system type.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm x11
+.Pp
+Create a directory and an
+.Xr appjail-fstab 5 Ns 's
+entry to mount
+.Pa /tmp/.X11-unix
+within the jail. The directory is created with permissions
+.So 1777 Sc Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy tmpdir
+.El
+.It Cm zfs+import+jail Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a ZFS image into the jail directory.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+ZFS image.
+.It
+.Cm compress Ns :
+Change the compression algorithm. Automatic detection of the algorithm used by the
+ZFS image is performed, but if it fails or you need to change for some reason, you
+do so using this subparameter.
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy clone+release
+.It
+.Sy copy
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs+import+root
+.El
+.It Cm zfs+import+root Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a ZFS image into the root directory of the jail.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+ZFS image.
+.It
+.Cm compress Ns :
+Change the compression algorithm. Automatic detection of the algorithm used by the
+ZFS image is performed, but if it fails or you need to change for some reason, you
+do so using this subparameter.
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Conflicts
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy clone+jail
+.It
+.Sy clone+release
+.It
+.Sy copy
+.It
+.Sy empty
+.It
+.Sy import+jail
+.It
+.Sy import+root
+.It
+.Sy tiny+import
+.It
+.Sy zfs+import+jail
+.El
+.El
+.Sh DIRTY JAIL
+If you create a jail with
+.Sy appjail quick ","
+the jail is marked as dirty until you finish creating it. Creation implies that
+all options used implicitly or explicitly are done. Keep this in mind when using
+options like
+.Sy login ","
+as the jail is dirty until the session ends. See
+.Xr appjail-jail 1
+for more details, but basically this means that
+.Sy appjail quick
+considers that this jail failed in some way and can proceed to remove it without
+the user's permission.
+.Sh EXAMPLES
+The following examples show how to use
+.Sy appjail quick
+and assume that you have some things like the loopback interface used by LinuxJails
+or that you already have the components downloaded by
+.Xr appjail-fetch 1
+to create jails. See
+.Xr appjail-tutorial 7
+if you want more information on how to configure these things.
+.Ss Example 1: Basic Usage
+.Bd -literal -compact -offset Ds
+.No # Nm appjail quick Ar jtest Cm start Cm overwrite Ns = Ns Ar force
+.Ed
+.Ss Example 2: Virtual Networks
+.Bd -literal -compact -offset Ds
+.No # Nm appjail quick Ar jtest Cm overwrite Ns = Ns Ar force Cm start Cm virtualnet Ns = Ns Qo Ar :<random> default Qc Cm nat
+.Ed
+.Ss Example 3: LinuxJails
+.Bd -literal -compact -offset Ds
+.No # Nm appjail quick Ar ubuntu No \e
+.No "    " Cm start No \e
+.No "    " Cm overwrite Ns = Ns Ar force No \e
+.No "    " Cm osversion Ns = Ns Ar jammy No \e
+.No "    " Cm type Ns = Ns Ar linux+debootstrap No \e
+.No "    " Cm linuxfs No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_hide_all Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_unhide_basic Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_unhide_login Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar path shm unhide Ns \&' No \e
+.No "    " Cm device Ns = Ns Qo path \&'shm/\&*\&' unhide Qc No \e
+.No "    " Cm template Ns = Ns Pa /usr/local/share/examples/appjail/templates/linux.conf
+.Ed
+.Ss Example 4: LinuxJails & Virtual Networks
+.Bd -literal -compact -offset Ds
+.No # Nm appjail quick Ar ubuntu No \e
+.No "    " Cm start No \e
+.No "    " Cm overwrite Ns = Ns Ar force No \e
+.No "    " Cm osversion Ns = Ns Ar jammy No \e
+.No "    " Cm type Ns = Ns Ar linux+debootstrap No \e
+.No "    " Cm linuxfs No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_hide_all Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_unhide_basic Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar include $devfsrules_unhide_login Ns \&' No \e
+.No "    " Cm device Ns = Ns \&' Ns Ar path shm unhide Ns \&' No \e
+.No "    " Cm device Ns = Ns Qo path \&'shm/\&*\&' unhide Qc No \e
+.No "    " Cm template Ns = Ns Pa /usr/local/share/examples/appjail/templates/linux.conf
+.No "    " Cm virtualnet Ns = Ns Qo Ar :appjail0 default Qc No \e
+.No "    " Cm nat No \e
+.No "    " Cm alias
+.Ed
+.Sh EXIT STATUS
+.Ex -std "appjail quick"
+.Sh SEE ALSO
+.Xr appjail 1
+.Xr appjail-jail 1
+.Xr appjail-makejail 1
+.Xr appjail.conf 5
+.Xr appjail-template 5
+.Xr appjail-makejail 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
+.Sh CAVEATS
+Most of the options described in this document are executed after the jail performs
+some specific operation, e.g. start or stop it.

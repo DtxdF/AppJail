@@ -38,7 +38,8 @@ MANPAGES=man1/appjail.1 \
 	 man5/appjail-template.5 \
 	 man5/appjail-ajspec.5 \
 	 man1/appjail-logs.1 \
-	 man8/appjail-dns.8
+	 man8/appjail-dns.8 \
+	 man1/appjail-quick.1
 
 APPJAIL_VERSION?=3.2.0
 
