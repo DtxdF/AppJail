@@ -1,0 +1,581 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 4, 2024
+.Dt APPJAIL-jail 1
+.Os
+.Sh NAME
+.Nm appjail-jail
+.Nd Creates, removes, lists and configures jails
+.Sh SYNOPSIS
+.Nm appjail jail
+.Cm boot
+.Op Cm off Ns | Ns Cm on
+.Ar jail
+.Nm appjail jail
+.Cm clean
+.Nm appjail jail
+.Cm create
+.Op Fl a Ar architecture
+.Op Fl I Ar install-method
+.Op Fl i Ar initscript
+.Op Fl r Ar release
+.Op Fl T Ar type
+.Op Fl t Ar template
+.Op Fl v Ar version
+.Ar jail
+.Nm appjail jail
+.Cm destroy
+.Op Fl fR
+.Ar jail
+.Nm appjail jail
+.Cm get
+.Op Fl eHIpt
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail jail
+.Cm list
+.Op Fl eHIpt
+.Op Fl j Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail jail
+.Cm mark
+.Op Cm clean Ns | Ns Cm dirty
+.Ar jail
+.Nm appjail jail
+.Cm mark
+.Op Cm locked Ns | Ns Cm unlocked
+.Ar jail
+.Nm appjail jail
+.Cm priority
+.Fl p Ar priority
+.Ar jail
+.Nm appjail jail
+.Cm rename
+.Ar jail
+.Ar new-name
+.Sh DESCRIPTION
+The
+.Sy appjail jail
+utility creates, removes, lists, configures or basically can manage many things
+related to jails and their properties.
+.Xr appjail-quick 1
+uses it to create, remove, and mark them as dirty.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm boot Oo Cm off Ns | Ns Cm on Oc Ar jail
+Enable
+.Pq Cm on
+or disable
+.Pq Cm off
+the boot flag for
+.Ar jail
+.Ns "."
+If the boot flag is enabled,
+.Xr appjail-startup 1
+will start and/or stop
+.Ar jail
+.Ns ,
+a process commonly performed by the
+.Xr rc 8
+script.
+.It Cm clean
+Remove dirty jails.
+.It Cm create Oo Fl a Ar architecture Oc Oo Fl I Ar install-method Oc Oo Fl i Ar initscript Oc Oo Fl T Ar type Oc Oo Fl t Ar template Oc Oo Fl v Ar version Oc Ar jail
+Create a new jail. This subcommand only has the responsibility of creating a jail;
+It is highly recommended to use
+.Xr appjail-quick 1
+unless you know what you are doing.
+.Pp
+.Bl -tag -width xx
+.It Fl a Ar architecture
+Specify the architecture to use in the jail. If this option is not set, the architecture
+specified by the
+.Sy FREEBSD_ARCH
+parameter is used.
+.It Fl I Ar install-method
+Specify the installation method that affects the jail type and how you should use
+this subcommand. If this option is not set, the installation method
+specified by the
+.Sy DEFAULT_INSTALL_METHOD
+parameter is used.
+.Pp
+See
+.Sx INSTALLATION METHODS
+for a list of available installation methods.
+.It Fl i Ar initscript
+.Sy InitScript
+to make the jail interactive.
+.It Fl T Ar type
+Type on which the jail is based. The default is
+.Sy thin "."
+.It Fl t Ar template
+Template file. If not specified, the template file specified by the
+.Sy DEFAULT_TEMPLATE
+parameter is used.
+.It Fl v Ar version
+Specify the version of the operating system to use in the jail. If this option is not set, the version
+specified by the
+.Sy FREEBSD_VERSION
+parameter is used.
+.El
+.It Cm destroy Oo Fl fR Oc Ar jail
+Destroy
+.Ar jail
+.Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl f
+Forcibly unmount file system. Ignored when ZFS is not enabled.
+.It Fl R
+Recursively destroy all dependents, including cloned file systems outside the target
+hierarchy. Ignored when ZFS is not enabled.
+.El
+.It Cm get Oo Fl eHIpt Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+Get information about
+.Ar jail
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy status Ns , Sy name Ns , Sy type Ns , Sy version Ns , Sy ports No and Sy network_ip4 Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.El
+.It Cm list Oo Fl eHIpt Oc Oo Fl j Ar jail Oc Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each jail in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl j
+.No Only show information for Ar jail Ns "."
+.El
+.It Cm mark Oo Cm clean Ns | Ns Cm dirty Oc Ar jail
+.Ar jail
+can be marked as
+.Cm dirty
+.Ns , which is something like an atomic operation. When a jail is marked
+.Cm dirty
+.Ns ,
+.Xr appjail 1
+and its subcommands are free to treat the target jail as incomplete and error-prone, so the behavior is typically to destroy it and start over, an operation commonly performed by
+.Xr appjail-jail 1 ","
+.Xr appjail-quick 1 ","
+the
+.Cm clean
+subcommand, and so on.
+.It Cm mark Oo Cm locked Ns | Ns Cm unlocked Oc Ar jail
+Used by
+.Xr appjail-start 1
+to prevent another process from executing it
+.Po e.g.: the user spawns a new shell and executes
+.Xr appjail-start 1
+.Pc
+while the first one is still running.
+.Pp
+Marking
+.Ar jail
+as
+.Cm locked
+locks it, but if you try to lock it again it fails unless it is marked as
+.Cm unlocked
+.Ns "."
+.It Cm priority Fl p Ar priority Ar jail
+Change the
+.Ar priority
+for
+.Ar jail
+.Ns "."
+.It Cm rename Ar jail Ar new-name
+Rename
+.Ar jail
+with a new name.
+.El
+.Sh INSTALLATION METHODS
+.Bl -tag -width xx
+.It Cm clone+jail Ns = Ns Qo Ar jail Ns @ Ns Ar snapshot Qc
+.Pp
+Create a new jail by cloning a ZFS
+.Ar snapshot
+of
+.Ar jail
+.Ns "."
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar jail Ns :
+Jail to create a ZFS snapshot for cloning.
+.It
+.Ar snapshot Ns :
+ZFS snapshot name.
+.El
+.It Cm clone+release Ns = Ns Qo Ar snapshot Qc
+.Pp
+Create a new jail by cloning a ZFS
+.Ar snapshot
+of a release.
+.Pp
+With this option only the
+.Em linux+debootstrap
+and
+.Em thick
+jail types can be used.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar snapshot Ns :
+ZFS snapshot name.
+.El
+.It Cm copy Ns = Ns Qo Ar jail Qc
+.Pp
+Create a new jail by copying another existing
+.Ar jail
+.Ns "."
+.It Cm empty
+.Pp
+Create an empty jail.
+.It Cm export+jail Ns = Ns Qo Cm output Ns : Ns Ar outname Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Export the jail directory to a tarball file.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm output Ns :
+Output name.
+.It
+.Cm portable
+Ignored, but used by
+.Sy export+root "."
+.It
+.Cm compress Ns :
+If specified, the file will be compressed.
+.Pp
+See
+.Sx COMPRESSION ALGORITHMS
+for a list of available compression algorithms.
+.El
+.It Cm export+root Ns = Ns Qo Cm output Ns : Ns Ar outname Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Export the root directory of the jail to a tarball file.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm output Ns :
+Output name.
+.It
+.Cm portable
+Include only portable files, that is, the jail directory, the
+.Sy InitScript
+script, the configuration file that describes the jail, and the specifications of
+volumes used by the jail. This is used by
+.Xr appjail-image 1 "."
+.It
+.Cm compress Ns :
+If specified, the file will be compressed.
+.Pp
+See
+.Sx COMPRESSION ALGORITHMS
+for a list of available compression algorithms.
+.El
+.It Cm import+jail Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a tarball file into the jail directory.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+Tarball file.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy import+root "."
+.It
+.Cm compress Ns :
+Ignored, but used by
+.Sy zfs+import+jail
+and
+.Sy zfs+import+root "."
+.El
+.It Cm import+root Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a tarball file into the root directory of the jail.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+Tarball file.
+.It
+.Cm portable Ns :
+Include only portable files, that is, the jail directory, the
+.Sy InitScript
+script, the configuration file that describes the jail, and the specifications of
+volumes used by the jail. This is used by
+.Xr appjail-image 1 "."
+.It
+.Cm compress Ns :
+Ignored, but used by
+.Sy zfs+import+root
+and
+.Sy zfs+import+root "."
+.El
+.It Cm standard
+.Pp
+Create a
+.Sy thin ","
+.Sy thick
+or
+.Sy linux+debootstrap jail "."
+.It Cm tiny+export Ns = Ns Qo Cm files Ns : Ns file Cm output Ns : Ns outname Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Export a jail directory with only the files needed to run a program.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm files Ns :
+A file that contains a list of files to export.
+.It
+.Cm output Ns :
+Output name.
+.It
+.Cm compress Ns :
+If specified, the file will be compressed.
+.Pp
+See
+.Sx COMPRESSION ALGORITHMS
+for a list of available compression algorithms.
+.El
+.It Cm tiny+import Ns = Ns Qo Ar file Qc
+.Pp
+Create a new jail by importing a TinyJail.
+.It Cm zfs+export+jail Ns = Ns Qo Cm output Ns : Ns Ar outname Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Recursively export the jail dataset to a ZFS image file.
+.Pp
+.Bl -dash -compact
+.It
+.Cm output Ns :
+Output name.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy export+root "."
+.It
+.Cm compress Ns :
+If specified, the file will be compressed.
+.Pp
+See
+.Sx COMPRESSION ALGORITHMS
+for a list of available compression algorithms.
+.El
+.It Cm zfs+export+root Ns = Ns Qo Cm output Ns : Ns Ar outname Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Recursively export the root jail dataset to a ZFS image file.
+.Pp
+.Bl -dash -compact
+.It
+.Cm output Ns :
+Output name.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy export+root "."
+.It
+.Cm compress Ns :
+If specified, the file will be compressed.
+.Pp
+See
+.Sx COMPRESSION ALGORITHMS
+for a list of available compression algorithms.
+.El
+.It Cm zfs+import+jail Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a ZFS image into the jail directory.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+ZFS image.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy import+root "."
+.It
+.Cm compress Ns :
+Change the compression algorithm. Automatic detection of the algorithm used by the
+ZFS image is performed, but if it fails or you need to change for some reason, you
+do so using this subparameter.
+.El
+.It Cm zfs+import+root Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
+.Pp
+Create a new jail by importing a ZFS image into the root directory of the jail.
+.Pp
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm input Ns :
+ZFS image.
+.It
+.Cm portable Ns :
+Ignored, but used by
+.Sy import+root "."
+.It
+.Cm compress Ns :
+Change the compression algorithm. Automatic detection of the algorithm used by the
+ZFS image is performed, but if it fails or you need to change for some reason, you
+do so using this subparameter.
+.El
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy appjail_version
+AppJail version that was used to first create the jail.
+.It Sy arch
+Architecture that was used at the creation time.
+.It Sy boot
+Shows
+.Sy 1
+if the boot flag is enabled,
+.Sy 0
+if it is not.
+.It Sy created
+Creation date. The
+.Sy CREATED_FORMAT
+parameter specifies the format to display this value.
+.It Sy devfs_ruleset
+Shows the ruleset assigned by
+.Xr appjail-devfs 1 "."
+.It Sy dirty
+Shows
+.Sy 1
+if the jail is dirty,
+.Sy 0
+if it is not.
+.It Sy hostname
+Shows the hostname assigned by the
+.Sy host.hostname
+parameter in a template.
+.It Sy ip4
+Shows the IPv4 addresses assigned by the
+.Sy ip4.addr
+parameter in a template.
+.It Sy ip6
+Same as
+.Sy ip4
+but for IPv6.
+.It Sy locked
+Shows
+.Sy 1
+if the jail is locked,
+.Sy 0
+if it is not.
+.It Sy name
+Shows the jail name.
+.It Sy network_ip4
+Shows all current IPv4 addresses assigned to the jail for all virtual networks it is on.
+.It Sy networks
+Shows all virtual networks the jail is on.
+.It Sy path
+Jail directory.
+.It Sy priority
+Jail priority.
+.It Sy ports
+Exposed ports. Note that this does not mean that port forwarding is performed,
+it only shows the ports that are marked to be exposed and may or may not be
+currently forwarded.
+.It Sy release_name
+Release that was or is currently being used by the jail.
+.It Sy status
+Shows
+.Sy UP
+if the jail is currently started,
+.Sy DOWN
+if not.
+.It Sy type
+Jail type.
+.It Sy version
+Operating system version that was used at the creation time.
+.It Sy version_extra
+String commonly used when the jail was created using a build from the FreeBSD source tree.
+.El
+.Sh COMPRESSION ALGORITHMS
+.Bl -tag -width xx -compact
+.It Sy bzip
+.It Sy gzip
+.It Sy lrzip
+.No Requires Em archivers/lrzip Ns "."
+.It Sy lz4
+.It Sy lzma
+.It Sy lzop
+.No Requires Em archivers/lzop Ns "."
+.It Sy xz
+.It Sy zstd
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail jail"
+.Sh SEE ALSO
+.Xr appjail-expose 1
+.Xr appjail-fetch 1
+.Xr sysexits 3
+.Xr appjail-initscript 5
+.Xr appjail-template 5
+.Xr appjail.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

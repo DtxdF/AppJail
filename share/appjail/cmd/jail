@@ -42,7 +42,7 @@ lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
 lib_load "${LIBDIR}/zfs"
 
-jail_desc="Create a new thin or thick jail."
+jail_desc="Creates, removes, lists and configures jails."
 
 jail_main()
 {
@@ -2590,179 +2590,22 @@ _warn_dirty_release()
 
 jail_help()
 {
-	cat << EOF
-`jail_usage`
-
-${jail_desc}
-
-Parameters:
-    boot                      -- Start and stop the jail with the \`appjail startup\` command.
-    clean                     -- Remove dirty jails.
-    create                    -- Create a new jail.
-    destroy                   -- Destroy a jail.
-    get                       -- Get information about a jail.
-    list                      -- Like \`get\` but for all jails.
-    mark                      -- Mark a jail as clean or dirty.
-    priority                  -- Set the order in which the jail will start and stop using the \`appjail startup\` command.
-    rename                    -- Rename a jail.
-
-Parameters for boot:
-    off                       -- Removes the boot flag.
-    on                        -- Creates the boot flag.
-
-Options for create:
-    -a osarch                 -- OS architecture. Default: ${FREEBSD_ARCH}
-    -I install_method         -- Method to install the jail. Default: ${DEFAULT_INSTALL_METHOD}
-    -i initscript             -- initscript to make the jail interactive.
-    -r release_name           -- Release name to use as the new jail or base for thinjails. Default: ${DEFAULT_RELEASE}
-    -T jail_type              -- Specify which jail type to use. Default: ${JAIL_TYPE_THIN}
-    -t template               -- Template to start and stop the jail.
-    -v osversion              -- OS version. Default: ${FREEBSD_VERSION}
-
-Installation methods:
-    clone+jail                -- Syntax: clone+jail=jail2clone@snapname
-                                 Parameters:
-				     - jail2clone: Jail name to clone.
-				     - snapname: Snapshot name to be created if it does not exist.
-                                 Descr: Clones a jail and uses it to create another jail.
-
-    clone+release             -- Syntax: clone+release=snapname
-                                 Parameters: 
-				     - snapname: Snapshot name to be created if it does not exist.
-                                 Descr: Clones a release and uses it to create another jail.
-					Valid types: \`thick\`, \`linux+debootstrap\`
-
-    copy                      -- Syntax: copy=jail2copy
-                                 Parameters:
-				     - jail2copy: Jail name to copy.
-                                 Descr: Copy an entire jail.
-
-    empty                     -- Syntax: empty
-                                 Descr: Create an empty jail. The jail type will be set to \`${JAIL_TYPE_GENERIC}\`.
-
-    export+jail               -- Syntax: export+jail="output:out_name [compress:algo]"
-                                 Parameters:
-				     - output: Tarball name.
-				     - compress: Compress the tarball using the following methods:
-						 bzip, gzip, lrzip (requires archivers/lrzip), lz4,
-						 lzma, lzop (requires archivers/lzop), xz, zstd.
-						 If not defined, compression is not used.
-				 Descr: Export the jail directory (\`{JAILDIR}/{JAIL_NAME}/jail\`).
-
-    export+root               -- Syntax: export+root="output:out_name [compress:algo]"
-				 Descr: Export the root directory of the jail (\`{JAILDIR}/{JAIL_NAME}\`).
-
-    import+jail               -- Syntax: import+jail="input:in_file [compress:algo]"
-                                 Parameters:
-				     - input: Tarball to import.
-				     - compress: Ignored, but used by \`zfs+import+jail\` and \`zfs+import+root\`.
-				 Descr: Import the tarball to the jail directory (\`{JAILDIR}/{JAIL_NAME}/jail\`).
-
-    import+root               -- Syntax: import+root="input:in_file [compress:algo]"
-			      -- Descr: Import the tarball to the root directory of the jail (\`{JAILDIR}/{JAIL_NAME}\`).
-
-    standard                  -- Syntax: standard
-                              -- Descr: Create a ${JAIL_TYPE_THIN}, ${JAIL_TYPE_THICK} or ${JAIL_TYPE_DEBOOTSTRAP} jail.
-
-    tiny+export               -- Syntax: tiny+export="files:file_list output:out_name [compress:algo]"
-                                 Parameters:
-				     - files: A file containing the list of files to copy.
-				     - output: Tarball name.
-				     - compress: See \`export+jail\`.
-                              -- Descr: Export a jail with only the files needed to run a program.
-
-    tiny+import               -- Syntax: tiny+import="path/to/appjail_file"
-                                 Descr: Import a TinyJail.
-
-    zfs+export+jail           -- Syntax: zfs+export+jail="output:out_name [compress:algo]"
-                                 Parameters:
-				     - output: Output name.
-				     - compress: It has the same meaning as \`export+jail\` but does not use tar(1).
-				 Descr: Recursively export the dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}/jail\`).
-
-    zfs+export+root           -- Syntax: zfs+export+jail="output:out_name [compress:algo]"
-				 Descr: Recursively export the root dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}\`).
-
-    zfs+import+jail           -- Syntax: zfs+import+jail="input:in_file [compress:algo]"
-                                 Parameters:
-				     - input: The file to import.
-				     - compress: AppJail can auto-detect the compression used, but you can force any other
-						 compression if you wish.
-				 Descr: Import the file to the dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}/jail\`).
-					The root dataset will be created.
-
-    zfs+import+root           -- Syntax: zfs+import+root="input:in_file [compress:algo]"
-				 Descr: Import the file to the root dataset of the jail (\`{ZPOOL}/{ZROOTFS}/{JAIL_NAME}\`).
-
-Options for destroy:
-    -f                        -- See -f in zfs-destroy(8).
-    -R                        -- See -R in zfs-destroy(8).
-
-Options for get:
-    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                 in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                        -- Display the name of the columns.
-    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -p                        -- Columnate the list.
-    -t                        -- Tabulate columns and values.
-
-Options for list:
-    -e                        -- This option is the opposite in \`Options for get\`.
-    -H                        -- This option is the opposite in \`Options for get\`.
-    -I                        -- This option is the same as in \`Options for get\`.
-    -p                        -- This option is the opposite in \`Options for get\`.
-    -t                        -- This option is the opposite in \`Options for get\`.
-    -j jail_name              -- Operate in this jail. If not set operate in all jails.
-
-Keywords for get and list:
-    appjail_version           -- AppJail version used by the jail.
-    arch                      -- OS architecture
-    boot                      -- If 1, the jail will be started using the \`appjail startup\` command.
-    created                   -- Jail creation date. See \`{CREATED_FORMAT}\` in the AppJail configuration file.
-    devfs_ruleset             -- Shows the ruleset assigned using \`devfs ruleset assign\`.
-    dirty                     -- If 1, AppJail will remove the jail using the \`appjail jail clean\` command or by
-                                 creating a new jail with the same name. See \`appjail jail mark\`.
-    hostname                  -- Jail host name.
-    ip4                       -- Jail IPv4 address (ip4.addr). AppJail will get all columns and rows.
-    ip6                       -- Counterpart of \`ip4\`.
-    locked                    -- If 1, the jail is locked. See \`appjail jail mark locked\` for more details.
-    name                      -- Jail name.
-    network_ip4               -- All IP addresses that the jail is using in its networks. See \`appjail network hosts -R\`.
-    networks                  -- Networks to which the jail belongs.
-    path                      -- Jail directory.
-    priority                  -- Jail priority used by the \`appjail startup\` command.
-    ports                     -- Exposed jail ports.
-    release_name              -- Release name that was used to create the jail or that is used as the base jail. \`appjail fetch\`.
-    status                    -- Shows whether the jail is running or stopped.
-    type                      -- Jail type.
-    version                   -- OS version.
-    version_extra             -- Version Extra.
-
-Parameters for mark:
-    clean                     -- Mark a jail as clean. This is used by some commands, especially for those who take some responsability
-                                 for making a jail.
-    dirty                     -- Mark a jail as dirty.
-    locked                    -- Mark a jail as locked. This is used by the \`appjail start\` command to avoid starting the same jail
-                                 at the same time when using a command like \`appjail startup\` or manually.
-    unlocked                  -- Mark a jail as unlocked.
-
-Options for priority:
-    -p priority               -- The priority affecting the order in which the jail will be started.
-EOF
+	man 1 appjail-jail
 }
 
 jail_usage()
 {
 	cat << EOF
-usage: jail boot [off | on] jail_name
+usage: jail boot [off|on] <jail>
        jail clean
-       jail create [-a osarch] [-I install_method] [-i initscript] [-T jail_type] [-t template] [-v osversion] jail_name
-       jail destroy [-fR] jail_name
-       jail get [-eHIpt] jail_name [keyword ...]
-       jail list [-eHIpt] [-j jail_name] [keyword ...]
-       jail mark [clean | dirty] jail_name
-       jail mark [locked | unlocked] jail_name
-       jail priority -p priority jail_name
-       jail rename old new
+       jail create [-a architecture] [-I install-method] [-i initscript]
+               [-r release] [-T type] [-t template] [-v version] <jail>
+       jail destroy [-fR] <jail>
+       jail get [-eHIpt] <jail> [keyword ...]
+       jail list [-eHIpt] [-j jail] [keyword ...]
+       jail mark [clean|dirty] <jail>
+       jail mark [locked|unlocked] <jail>
+       jail priority -p priority <jail>
+       jail rename <jail> <new-name>
 EOF
 }
