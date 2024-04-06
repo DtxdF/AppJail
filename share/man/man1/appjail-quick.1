@@ -385,7 +385,7 @@ See also
 .It
 .Cm cpuset Ns = Ns Qo 1,2,6-9 Qc
 .El
-.It Cm create_args Ns = Ns Qo parameter=value Qc
+.It Cm create_args Ns = Ns Qo Ar parameter=value Qc
 .Pp
 Set default parameters for the
 .Sy create
@@ -691,7 +691,7 @@ at reboot time.
 .It
 .Cm fstab Ns = Ns Qo /dev/da0s1 /mnt msdosfs Qc
 .El
-.It Cm healthcheck Oo Cm health_cmd Ns : Ns Ar command Oc Oo Cm interval Ns : Ns Ar seconds Oc Oo Cm kill_after Ns : Ns Ar seconds Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm recover_cmd Ns : Ns Ar command Oc Oo Cm recover_kill_after Ns : Ns Ar seconds Oc Oo Cm recover_timeout Ns : Ns Ar seconds Oc Oo Cm recover_timeout_signal Ns : Ns Ar signal Oc Oo Cm recover_total Ns : Ns Ar number Oc Oo Cm retries Ns : Ns Ar number Oc Oo Cm start_period Ns : Ns Ar seconds Oc Oo Cm timeout Ns : Ns Ar seconds Oc Oo Cm timeout_signal Ns : Ns Ar signal Oc
+.It Cm healthcheck Ns = Ns Qo Oo Cm health_cmd Ns : Ns Ar command Oc Oo Cm interval Ns : Ns Ar seconds Oc Oo Cm kill_after Ns : Ns Ar seconds Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm recover_cmd Ns : Ns Ar command Oc Oo Cm recover_kill_after Ns : Ns Ar seconds Oc Oo Cm recover_timeout Ns : Ns Ar seconds Oc Oo Cm recover_timeout_signal Ns : Ns Ar signal Oc Oo Cm recover_total Ns : Ns Ar number Oc Oo Cm retries Ns : Ns Ar number Oc Oo Cm start_period Ns : Ns Ar seconds Oc Oo Cm timeout Ns : Ns Ar seconds Oc Oo Cm timeout_signal Ns : Ns Ar signal Oc Qc
 .Pp
 Creates a healthchecker.
 .Pp
@@ -844,7 +844,7 @@ and
 .It
 .Cm import+root Ns = Ns Qo input:/tmp/web3.tgz Qc
 .El
-.It Cm initscript Ns = Ns Ar file
+.It Cm initscript Ns = Ns Qo Ar file Qc
 .Pp
 Custom
 .Sy InitScript.
@@ -1440,7 +1440,7 @@ option.
 .Em Type Ns : Ns " " Ns Sy Boolean
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
-.It Cm run_args
+.It Cm run_args Ns = Ns Qo Ar parameter=value Qc
 .Pp
 Set default parameters for the
 .Sy cmd
@@ -1486,7 +1486,7 @@ Start the jail after its creation.
 .Em Type Ns : Ns " " Ns Sy Boolean
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
-.It Cm start_args
+.It Cm start_args Ns = Ns Qo Ar parameter=value Qc
 .Pp
 Set default parameters for the
 .Sy start
@@ -1498,7 +1498,7 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy Yes
-.It Cm stop_args
+.It Cm stop_args Ns = Ns Qo Ar parameter=value Qc
 .Pp
 Set default parameters for the
 .Sy stop
