@@ -106,7 +106,7 @@ a process commonly performed by the
 script.
 .It Cm clean
 Remove dirty jails.
-.It Cm create Oo Fl a Ar architecture Oc Oo Fl I Ar install-method Oc Oo Fl i Ar initscript Oc Oo Fl T Ar type Oc Oo Fl t Ar template Oc Oo Fl v Ar version Oc Ar jail
+.It Cm create Oo Fl a Ar architecture Oc Oo Fl I Ar install-method Oc Oo Fl i Ar initscript Oc Oo Fl r Ar release Oc Oo Fl T Ar type Oc Oo Fl t Ar template Oc Oo Fl v Ar version Oc Ar jail
 Create a new jail. This subcommand only has the responsibility of creating a jail;
 It is highly recommended to use
 .Xr appjail-quick 1
@@ -131,6 +131,11 @@ for a list of available installation methods.
 .It Fl i Ar initscript
 .Sy InitScript
 to make the jail interactive.
+.It Fl r Ar release
+Specify the release to use in the jail. If this option is not set, the release
+specified by the
+.Sy DEFAULT_RELEASE
+parameter is used.
 .It Fl T Ar type
 Type on which the jail is based. The default is
 .Sy thin "."
