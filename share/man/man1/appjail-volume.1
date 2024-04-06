@@ -1,0 +1,165 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 6, 2024
+.Dt APPJAIL-VOLUME 1
+.Os
+.Sh NAME
+.Nm appjail-volume
+.Nd Volume management for jails
+.Sh SYNOPSIS
+.Nm appjail volume
+.Cm add
+.Op Fl g Ar gid
+.Op Fl m Ar mountpoint
+.Op Fl o Ar uid
+.Op Fl p Ar mode
+.Op Fl t Ar type
+.Ar jail
+.Ar volume
+.Nm appjail volume
+.Cm get
+.Op Fl eHIpt
+.Fl v Ar volume
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail volume
+.Cm list
+.Op Fl eHIpt
+.Op Fl v Ar volume
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail volume
+.Cm remove
+.Ar jail
+.Ar volume
+.Sh DESCRIPTION
+The
+.Sy appjail volume
+utility implements together with appjail-fstab(1) the pseudo-filesystem
+.Sy VolumeFS "."
+See
+.Xr appjail-fstab 1
+for more details.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm add Oo Fl g Ar gid Oc Oo Fl m Ar mountpoint Oc Oo Fl o Ar uid Oc Oo Fl p Ar mode Oc Oo Fl t Ar type Oc Ar jail Ar volume
+Add a new
+.Ar volume
+to
+.Ar jail
+.Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl g Ar gid
+.Ar volume Ns 's
+group ID.
+.It Fl m Ar mountpoint
+Path within the jail to mount the volume.
+.It Fl o Ar uid
+.Ar volume Ns 's
+user ID.
+.It Fl p Ar mode
+.Ar volume Ns 's
+file mode.
+.It Fl t Ar type
+File system type.
+.El
+.It Cm get Oo Fl eHIpt Oc Fl v Ar volume Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+Get information about
+.Ar jail Ns 's Ar volume
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy name Ns , Sy mountpoint Ns , Sy type Ns , Sy uid Ns , Sy gid No and Sy perm Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.El
+.It Cm list Oo Fl eHIpt Oc Oo Fl v Ar volume Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each volume in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl v Ar volume
+.No Only show information for Ar volume Ns "."
+.El
+.It Cm remove Ar jail Ar volume
+Remove
+.Ar jail Ns 's Ar volume Ns "."
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy name
+Volume name.
+.It Sy mountpoint
+Path within the jail to mount the volume.
+.It Sy type
+File system type.
+.It Sy uid
+.Ar volume Ns 's
+user ID.
+.It Sy gid
+.Ar volume Ns 's
+group ID.
+.It Sy perm
+.Ar volume Ns 's
+file mode.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail volume"
+.Sh SEE ALSO
+.Xr appjail-fstab 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

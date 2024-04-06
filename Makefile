@@ -40,7 +40,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-logs.1 \
 	 man8/appjail-dns.8 \
 	 man1/appjail-quick.1 \
-	 man1/appjail-jail.1
+	 man1/appjail-jail.1 \
+	 man1/appjail-volume.1
 
 APPJAIL_VERSION?=3.2.0
 

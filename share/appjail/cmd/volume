@@ -414,47 +414,16 @@ _volume_chk_jail()
 
 volume_help()
 {
-	cat << EOF
-`volume_usage`
-
-Parameters:
-    add                   -- Add a new volume.
-    get                   -- Get information about a volume.
-    list                  -- Like \`get\` but for all targets.
-    remove                -- Remove a volume.
-
-Options for add:
-    -g gid                -- Changes the group ID of the specified volume.
-    -m mountpoint         -- Path within the jail to mount the specified volume. Default: ${VOLUMESDIR}/{volume_name}
-    -o uid                -- Changes the user ID of the specified volume.
-    -p mode               -- Changes the file mode of the specified volume.
-    -t type               -- File system type. Valid are \`nullfs\` and \`<pseudofs>\`.
-
-Options for get:
-    -e                    -- This option is not required when using -p. The \\t character is used to delimit columns,
-                             in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                    -- Display the name of the columns.
-    -I                    -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -p                    -- Columnate the list.
-    -t                    -- Tabulate columns and values.
-    -v volume_name        -- Operate in this volume.
-
-Options for list:
-    -e                    -- This option is the opposite in \`Options for get\`.
-    -H                    -- This option is the opposite in \`Options for get\`.
-    -I                    -- This option is the same as in \`Options for get\`.
-    -p                    -- This option is the opposite in \`Options for get\`.
-    -t                    -- This option is the opposite in \`Options for get\`.
-    -v volume_name        -- Operate in this volume. If not defined, operate in all volumes.
-EOF
+	man 1 appjail-volume
 }
 
 volume_usage()
 {
 	cat << EOF
-usage: volume add [-g gid] [-m mountpoint] [-o uid] [-p mode] [-t type] jail_name volume_name
-       volume get [-eHIpt] -v volume_name jail_name [keyword ...]
-       volume list [-eHIpt] [-v volume_name] jail_name [keyword ...]
-       volume remove jail_name volume_name
+usage: volume add [-g gid] [-m mountpoint] [-o uid] [-p mode] [-t type]
+               <jail> <volume>
+       volume get [-eHIpt] -v volume <jail> [keyword ...]
+       volume list [-eHIpt] [-v volume] <jail> [keyword ...]
+       volume remove <jail> <volume>
 EOF
 }
