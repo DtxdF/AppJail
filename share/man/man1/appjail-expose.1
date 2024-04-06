@@ -1,0 +1,247 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 6, 2024
+.Dt APPJAIL-EXPOSE 1
+.Os
+.Sh NAME
+.Nm appjail-expose
+.Nd Port forwarding from host port to jail port
+.Sh SYNOPSIS
+.Nm appjail expose
+.Cm get
+.Op Fl eHIipt
+.Fl n Ar nro
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail expose
+.Cm list
+.Op Fl eHIipt
+.Op Fl n Ar nro
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail expose
+.Cm off
+.Ar jail
+.Nm appjail expose
+.Cm on
+.Ar jail
+.Nm appjail expose
+.Cm remove
+.Op Cm all Ns | Ns Cm nro Ar nro
+.Ar jail
+.Nm appjail expose
+.Cm set
+.Fl k Ar network
+.Fl p Ar hport Ns Op : Ns Ar jport
+.Op Op Fl E Ns | Ns Fl e
+.Op Op Fl t Ns | Ns Fl u
+.Op Fl i Ar interface
+.Op Fl l Op - Ns | Ns Ar options
+.Op Fl N Ar name
+.Op Fl n Op Cm auto Ns | Ns Ar nro
+.Op Fl o Ar interface
+.Ar jail
+.Nm appjail expose
+.Cm status
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail expose
+utility configures, lists, enables, and disables rules to perform port forwarding
+from a host port to a jail port.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm get Oo Fl eHIipt Oc Fl n Ar nro Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+Get information about current rules
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy nro Ns , Sy enabled Ns , Sy name Ns , Sy ports Ns , Sy protocol No and Sy network_name Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl i
+Don't complain when
+.Ar nro
+doesn't exist.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.It Fl n Ar nro
+Identifier.
+.El
+.It Cm list Oo Fl eHIipt Oc Oo Fl n Ar nro Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each rule in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl i
+Perform the same task as described in
+.Cm get
+.Ns "."
+.It Fl n Ar nro
+.No Only show information for Ar nro Ns "."
+.El
+.It Cm off Ar jail
+Flush the rules currently in use.
+.It Cm on Ar jail
+Load enabled rules configured by
+.Cm set
+.Ns "."
+.It Cm remove Oo Cm all Ns | Ns Cm nro Ar nro Oc Ar jail
+Remove a given rule.
+.Pp
+.Bl -tag -width xx
+.It Cm all
+Remove all rules.
+.It Cm nro Ar nro
+Remove the rule specified by
+.Ar nro
+.Ns "."
+.El
+.It Cm set Fl k Ar network Fl p Ar hport Ns Oo : Ns Ar jport Oc Oo Oo Fl E Ns | Ns Fl e Oc Oc Oo Fl t Ns | Ns Fl u Oc Oo Fl i Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Oo Fl o Ar interface Oc Oc Ar jail
+Configure a new or existing rule.
+.Pp
+.Bl -tag -width xx
+.It Fl k Ar network
+Get the jail's IPv4 address from
+.Ar network
+.Ns , required for the rule.
+.Pp
+If you are configuring a rule that already has this value,
+it becomes optional, so you can ignore it if you wish.
+.It Fl p Ar hport Ns Oo : Ns Ar jport Oc
+Forward the
+.Ar hport
+port to the
+.Ar jport
+port.
+.Pp
+.Ar hport
+is the host or external port and
+.Ar jport
+if the port currently listening to the application within the jail. If not set,
+.Ar hport
+is used.
+.Pp
+Both
+.Ar hport
+and
+.Ar jport
+can be specified using symbolic names as described in
+.Xr services 5 "."
+.Pp
+If you are configuring a rule that already has this value,
+it becomes optional, so you can ignore it if you wish.
+.It Oo Fl E Ns | Ns Fl e Oc
+Enable
+.Pq Fl E
+or disable
+.Pq Fl e
+this rule.
+.It Fl t Ns | Ns Fl u
+Use TCP
+.Pq Fl t
+or UDP
+.Pq Fl u
+.Ns "."
+By default is TCP
+.It Fl i Ar interface
+Interface to obtain the external IPv4 address. If not set, the interface specified
+by the
+.Sy EXT_IF
+parameter is used.
+.It Fl l Oo - Ns | Ns Ar options Oc
+Firewall-specific logging options. Use a minus sign to enable logging, but without
+options.
+.It Fl N Ar name Oc
+Service description.
+.It Fl n Oo Cm auto Ns | Ns Ar nro Oc
+Identifier. An identifier is composed of a positive number. Use
+.Cm auto
+to get the lowest identifier value.
+.It Fl o Ar interface
+Apply rules to packets coming in on, or going out through, this interface. If not
+set, the interface specified by the
+.Sy ON_IF
+parameter is used.
+.El
+.It Cm status Ar jail
+Shows the rule that is currently in use or an error if it is not yet applied.
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy enabled
+Shows
+.Sy 1
+if the rule is enabled,
+.Sy 0
+if it is not.
+.It Sy name
+Service description.
+.It Sy network_name
+Network used to obtain the jail's IPv4 address.
+.It Sy nro
+Identifier.
+.It Sy ports
+Exposed ports.
+.It Sy protocol
+Protocol, i.e. TCP or UDP in lowercase.
+.It Sy rule
+The rule that will be applied.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail expose"
+.Sh SEE ALSO
+.Xr appjail-quick 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

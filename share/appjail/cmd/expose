@@ -759,81 +759,20 @@ _expose_chk_jail()
 
 expose_help()
 {
-	cat << EOF
-`expose_usage`
-
-${expose_desc}
-
-Parameters:
-    get                       -- Get information about the current port forwarding configuration for a given target.
-    list                      -- Like \`get\` but for all NROes.
-    off                       -- Disables the current port forwarding rules.
-    on                        -- Enables the current port forwarding rules.
-    remove                    -- Remove all NROes or just a single NRO.
-    set                       -- Set parameters to an existing NRO or create it if it does not exist.
-    status                    -- Show loaded expose rules.
-
-Options for get:
-    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                 in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                        -- Display the name of the columns.
-    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -i                        -- Do not complain when the NRO does not exist.
-    -p                        -- Columnate the list.
-    -t                        -- Tabulate columns and values.
-    -n nro                    -- Operate in this NRO.
-
-Options for list:
-    -e                        -- This option is the opposite in \`Options for get\`.
-    -H                        -- This option is the opposite in \`Options for get\`.
-    -I                        -- This option is the same as in \`Options for get\`.
-    -i                        -- This option is the same as in \`Options for get\`.
-    -p                        -- This option is the opposite in \`Options for get\`.
-    -t                        -- This option is the opposite in \`Options for get\`.
-    -n nro                    -- Operate in this NRO. If not set, operate in all NROes.
-
-Keywords for get and list:
-    enabled                   -- See \`set -e\` and \`set -E\`.
-    name                      -- See \`set -N\`.
-    network_name              -- See \`set -k\`.
-    nro                       -- See \`set -n\`.
-    ports                     -- See \`set -p\`
-    protocol                  -- See \`set -t\` and \`set -u\`.
-    rule                      -- Firewall rule used by the entry.
-
-Parameters for remove:
-    all                       -- Remove all NROes.
-    nro                       -- Remove an NRO.
-
-Options for set:
-    -E                        -- Enable this NRO.
-    -e                        -- Disable this NRO.
-    -t                        -- Default. Use TCP.
-    -u                        -- Use UDP.
-    -i ext_if                 -- The external interface. If not defined, {EXT_IF} is used.
-    -k network_name           -- The network to obtain the IP address of the jail. This option and \`-p\` are not required unless
-				 the NRO (\`-n\`) has no such values.
-    -o on_if                  -- The name or group of the network interface to transmit packets on. If not defined, {ON_IF} is used.
-    -p hport[:jport]          -- The host port and jail port. If jport is not defined, hport will be used. You can
-                                 use the service name instead of a numeric port. See services(5) for details.
-    -N name                   -- The name of this NRO. It is not relevant, it is only for your
-                                 convenience.
-    -n auto|nro               -- The NRO. If set to auto, uses last NRO plus 1. Default: auto.
-    -l - | log_options        -- Enable logging. Not all firewalls support options. At the moment, pf(4) accepts
-                                 options like \`(option1, option2, optionN)\`. Pass - to enable logging, but
-				 without use the options.
-EOF
+	man 1 appjail-expose
 }
 
 expose_usage()
 {
 	cat << EOF
-usage: expose get [-eHIipt] -n nro jail_name
-       expose list [-eHIipt] [-n nro] jail_name
-       expose off jail_name
-       expose on jail_name
-       expose remove [all | nro nro] jail_name
-       expose set -k network_name -p hport[:jport] [[-t | -u]] [-Ee] [-i ext_if] [-l [- | log_options]] [-N name] [-n auto | nro] [-o on_if] jail_name
-       expose status jail_name
+usage: expose get [-eHIipt] -n nro <jail> [keyword ...]
+       expose list [-eHIipt] [-n nro] <jail> [keyword ...]
+       expose off <jail>
+       expose on <jail>
+       expose remove [all|nro nro] <jail>
+       expose set -k network -p hport[:jport] [[-E|-e]] [[-t|-u]]
+               [-i interface] [-l [-|options]] [-N name] [-n [auto|nro]]
+	       [-o interface] <jail>
+       expose status <jail>
 EOF
 }
