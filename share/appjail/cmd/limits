@@ -756,104 +756,20 @@ _limits_chk_jail()
 
 limits_help()
 {
-	cat << EOF
-`limits_usage`
-
-${limits_desc}
-
-Parameters:
-    get                       -- Get information about the current limits configuration for a given target.
-    list                      -- Like \`get\` but for all NROes.
-    off                       -- Disables the current limits rules.
-    on                        -- Enables the current port forwarding rules.
-    remove                    -- Remove all NROes or just a single NRO.
-    set                       -- Set parameters to an existing NRO or create it if it does not exist.
-    stats                     -- Display resource utilization for a given target.
-
-Options for get:
-    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                 in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                        -- Display the name of the columns.
-    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -i                        -- Do not complain when the NRO does not exist.
-    -p                        -- Columnate the list.
-    -t                        -- Tabulate columns and values.
-    -n nro                    -- Operate in this NRO.
-
-Options for list and stats:
-    -e                        -- This option is the opposite in \`Options for get\`.
-    -H                        -- This option is the opposite in \`Options for get\`.
-    -I                        -- This option is the same as in \`Options for get\`.
-    -p                        -- This option is the opposite in \`Options for get\`.
-    -t                        -- This option is the opposite in \`Options for get\`.
-    -n nro                    -- Operate in this NRO. If not set, operate in all NROes.
-
-Options for list:
-    -i                        -- This option is the same as in \`Options for get\`.
-
-Keywords for get and list:
-    enabled                   -- See \`set -E\` and \`set -e\`.
-    loaded                    -- The currently loaded rctl rule.
-    name                      -- See \`set -N\`.
-    nro                       -- See \`set -n\`.
-    per                       -- See \`RULE SYNTAX\` in \`rctl(8)\`.
-    resource                  -- See \`RESOURCES\` in \`rctl((8)\`.
-    rule                      -- The rule to be loaded.
-    action                    -- See \`ACTIONS\` in \`rctl(8)\`.
-
-Keywords for stats:
-    cputime
-    datasize
-    stacksize
-    coredumpsize
-    memoryuse
-    memorylocked
-    maxproc
-    openfiles
-    vmemoryuse
-    pseudoterminals
-    swapuse
-    nthr
-    msgqqueued
-    msgqsize
-    nmsgq
-    nsem
-    nsemop
-    nshm
-    shmsize
-    wallclock
-    pcpu
-    readbps
-    writebps
-    readiops
-    writeiops
-
-    See \`RESOURCES\` in \`rctl(8)\` for more details.
-
-Parameters for remove:
-    all                       -- Remove all NROes.
-    nro                       -- Remove an NRO.
-
-Options for set:
-    -E                        -- Enable this NRO.
-    -e                        -- Disable this NRO.
-    -N name                   -- The name of this NRO. It is not relevant, it is only for your
-                                 convenience.
-    -n auto|nro               -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
-                                 {JAILDIR}/{jail_name}/conf/boot/limits.
-EOF
+	man 1 appjail-limits
 }
 
 limits_usage()
 {
 	cat << EOF
-usage: limits get [-eHIipt] -n nro jail_name [keyword ...]
-       limits list [-eHIipt] [-n nro] jail_name [keyword ...]
-       limits off jail_name
-       limits on jail_name
-       limits remove [all | nro nro] jail_name
-       limits remove keyword -n nro jtest keyword ...
-       limits set [-Ee] [-N name] [-n auto | nro] jail_name resource:action[=amount[/per]]
-       limits stats [-eHIpt] jail_name [keyword ...]
+usage: limits get [-eHIipt] -n <nro> <jail> [<keyword> ...]
+       limits list [-eHIipt] [-n <nro>] <jail> [<keyword> ...]
+       limits off <jail>
+       limits on <jail>
+       limits remove [all|nro <nro>] <jail>
+       limits remove keyword -n <nro> <jail> [<keyword> ...]
+       limits set [-Ee] [-N <name>] [-n [auto|<nro>]] <jail>
+               <resource>:<action>[=<amount>[/<per>]]
+       limits stats [-eHIpt] <jail> [<keyword> ...]
 EOF
 }
