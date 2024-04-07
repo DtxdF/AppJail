@@ -765,14 +765,14 @@ expose_help()
 expose_usage()
 {
 	cat << EOF
-usage: expose get [-eHIipt] -n nro <jail> [keyword ...]
-       expose list [-eHIipt] [-n nro] <jail> [keyword ...]
+usage: expose get [-eHIipt] -n <nro> <jail> [<keyword> ...]
+       expose list [-eHIipt] [-n <nro>] <jail> [<keyword> ...]
        expose off <jail>
        expose on <jail>
-       expose remove [all|nro nro] <jail>
-       expose set -k network -p hport[:jport] [[-E|-e]] [[-t|-u]]
-               [-i interface] [-l [-|options]] [-N name] [-n [auto|nro]]
-	       [-o interface] <jail>
+       expose remove [all|nro <nro>] <jail>
+       expose set -k <network> -p <hport>[:<jport>] [[-E|-e]] [[-t|-u]]
+               [-i <interface>] [-l [-|<options>]] [-N <name>] [-n [auto|<nro>]]
+	       [-o <interface>] <jail>
        expose status <jail>
 EOF
 }

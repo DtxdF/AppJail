@@ -91,16 +91,16 @@ zfs_help()
 zfs_usage()
 {
 	cat << EOF
-usage: zfs clone-dst <jail> <src> [args ...]
-       zfs clone-src <jail> <dst> [args ...]
-       zfs create <jail> [args ...]
-       zfs destroy <jail> [args ...]
-       zfs get <jail> [args ...]
-       zfs inherit <jail> [args ...]
-       zfs list <jail> [args ...]
-       zfs recv <jail> [args ...]
-       zfs send <jail> [args ...]
-       zfs set <jail> [args ...]
-       zfs snapshot <jail> [args ...]
+usage: zfs clone-dst <jail> <src> [<args> ...]
+       zfs clone-src <jail> <dst> [<args> ...]
+       zfs create <jail> [<args> ...]
+       zfs destroy <jail> [<args> ...]
+       zfs get <jail> [<args> ...]
+       zfs inherit <jail> [<args> ...]
+       zfs list <jail> [<args> ...]
+       zfs recv <jail> [<args> ...]
+       zfs send <jail> [<args> ...]
+       zfs set <jail> [<args> ...]
+       zfs snapshot <jail> [<args> ...]
 EOF
 }

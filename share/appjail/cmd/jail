@@ -2598,14 +2598,14 @@ jail_usage()
 	cat << EOF
 usage: jail boot [off|on] <jail>
        jail clean
-       jail create [-a architecture] [-I install-method] [-i initscript]
-               [-r release] [-T type] [-t template] [-v version] <jail>
+       jail create [-a <architecture>] [-I <install-method>] [-i <initscript>]
+               [-r <release>] [-T <type>] [-t <template>] [-v <version>] <jail>
        jail destroy [-fR] <jail>
-       jail get [-eHIpt] <jail> [keyword ...]
-       jail list [-eHIpt] [-j jail] [keyword ...]
+       jail get [-eHIpt] <jail> [<keyword> ...]
+       jail list [-eHIpt] [-j <jail>] [<keyword> ...]
        jail mark [clean|dirty] <jail>
        jail mark [locked|unlocked] <jail>
-       jail priority -p priority <jail>
+       jail priority -p <priority> <jail>
        jail rename <jail> <new-name>
 EOF
 }

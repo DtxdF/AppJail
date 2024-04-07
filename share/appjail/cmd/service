@@ -123,7 +123,7 @@ service_help()
 service_usage()
 {
 	cat << EOF
-usage: service all [-e] [-i file] [--] [args ...]
-       service jail <jail> [args ...]
+usage: service all [-e] [-i <file>] [--] [<args> ...]
+       service jail <jail> [<args> ...]
 EOF
 }

@@ -141,6 +141,6 @@ login_help()
 login_usage()
 {
 	cat << EOF
-usage: login [-u username] <jail>
+usage: login [-u <username>] <jail>
 EOF
 }

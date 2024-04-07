@@ -55,5 +55,5 @@ apply_help()
 
 apply_usage()
 {
-	echo "usage: apply <jail> [makejail] [args ...]"
+	echo "usage: apply <jail> [<makejail>] [<args> ...]"
 }

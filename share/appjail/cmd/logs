@@ -314,10 +314,10 @@ logs_usage()
 {
 	cat << EOF
 usage: logs
-       logs list [-eHp] type[/entity[/subtype[/log]]]
-       logs read type/entity/subtype/log [args ...]
+       logs list [-eHp] <type>[/<entity>[/<subtype>[/<log>]]]
+       logs read <type>/<entity>/<subtype>/<log> [<args> ...]
        logs remove all
-       logs remove [-g] type[/entity[/subtype[/log]]]
-       logs tail type/entity/subtype/log [args ...]
+       logs remove [-g] <type>[/<entity>[/<subtype>[/<log>]]]
+       logs tail <type>/<entity>/<subtype>/<log> [<args> ...]
 EOF
 }

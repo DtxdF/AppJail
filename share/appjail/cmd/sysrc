@@ -147,8 +147,8 @@ sysrc_help()
 sysrc_usage()
 {
 	cat << EOF
-usage: sysrc all [-e] <target> [args ...]
-       sysrc jail <jail> [args ...]
-       sysrc local <jail> [args ...]
+usage: sysrc all [-e] <target> [<args> ...]
+       sysrc jail <jail> [<args> ...]
+       sysrc local <jail> [<args> ...]
 EOF
 }

@@ -627,9 +627,9 @@ start_help()
 start_usage()
 {
 	cat << EOF
-usage: start [-I] [-t template] <jail>
-       start [-i initscript] [[-c parameter=value] ...]
-               [[-s parameter=value] ...] [-t template] [[-V name=value] ...]
+usage: start [-I] [-t <template>] <jail>
+       start [-i <initscript>] [[-c <parameter>=<value>] ...]
+               [[-s <parameter>=<value>] ...] [-t <template>] [[-V <name>=<value>] ...]
 	       <jail>
 EOF
 }

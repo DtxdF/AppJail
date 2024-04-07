@@ -3626,5 +3626,5 @@ quick_help()
 
 quick_usage()
 {
-	echo "usage: quick <name> [options ...]"
+	echo "usage: quick <name> [<options> ...]"
 }

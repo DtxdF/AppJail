@@ -196,6 +196,6 @@ deleteOld_usage()
 {
 	cat << EOF
 usage: deleteOld jail <jail>
-       deleteOld release [-a arch] [-v version] [release]
+       deleteOld release [-a <arch>] [-v <version>] [<release>]
 EOF
 }

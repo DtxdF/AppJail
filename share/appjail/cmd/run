@@ -141,7 +141,7 @@ run_help()
 run_usage()
 {
 	cat << EOF
-usage: run [-i initscript] [[-p parameter=value] ...] [[-V name=value]
-               ...] [-s name] <jail>
+usage: run [-i <initscript>] [[-p <parameter>=<value>] ...] [[-V <name>=<value>]
+               ...] [-s <name>] <jail>
 EOF
 }

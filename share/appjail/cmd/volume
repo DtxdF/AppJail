@@ -420,10 +420,10 @@ volume_help()
 volume_usage()
 {
 	cat << EOF
-usage: volume add [-g gid] [-m mountpoint] [-o uid] [-p mode] [-t type]
+usage: volume add [-g <gid>] [-m <mountpoint>] [-o <uid>] [-p <mode>] [-t <type>]
                <jail> <volume>
-       volume get [-eHIpt] -v volume <jail> [keyword ...]
-       volume list [-eHIpt] [-v volume] <jail> [keyword ...]
+       volume get [-eHIpt] -v <volume> <jail> [<keyword> ...]
+       volume list [-eHIpt] [-v <volume>] <jail> [<keyword> ...]
        volume remove <jail> <volume>
 EOF
 }

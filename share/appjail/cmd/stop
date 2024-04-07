@@ -311,7 +311,7 @@ stop_usage()
 {
 	cat << EOF
 usage: stop [-fI] <jail>
-       stop [-f] [-i initscript] [[-p parameter=value] ...]
-               [[-V name=value] ...] <jail>
+       stop [-f] [-i <initscript>] [[-p <parameter>=<value>] ...]
+               [[-V <name>=<value>] ...] <jail>
 EOF
 }

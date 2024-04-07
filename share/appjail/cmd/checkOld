@@ -189,6 +189,6 @@ checkOld_usage()
 {
 	cat << EOF
 usage: checkOld jail <jail>
-       checkOld release [-a arch] [-v version] [release]
+       checkOld release [-a <arch>] [-v <version>] [<release>]
 EOF
 }

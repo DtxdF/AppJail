@@ -223,8 +223,8 @@ etcupdate_help()
 etcupdate_usage()
 {
 	cat << EOF
-usage: etcupdate jail [-m mode] <jail> [args ...]
-       etcupdate release [-a arch] [-m mode] [-v version] [-|release]
-               [args ...]
+usage: etcupdate jail [-m <mode>] <jail> [<args> ...]
+       etcupdate release [-a <arch>] [-m <mode>] [-v <version>] [-|<release>]
+               [<args> ...]
 EOF
 }

@@ -123,7 +123,7 @@ main()
 
 usage()
 {
-	echo "usage: appjail <command> [args ...]" >&2
+	echo "usage: appjail <command> [<args> ...]" >&2
 	exit 64 # EX_USAGE
 }
 

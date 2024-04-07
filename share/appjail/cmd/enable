@@ -272,9 +272,9 @@ enable_help()
 enable_usage()
 {
 	cat << EOF
-usage: enable <jail> start [-I] [[-c parameter=value] ...] [-i initscript] [[-s parameter=value] ...]
-                           [-t template] [[-V name=value] ...]
-       enable <jail> stop [-I] [-i initscript] [[-p parameter=value] ...] [[-V name=value] ...]
-       enable <jail> run [-i initscript] [[-p parameter=value] ...] [[-V name=value] ...]
+usage: enable <jail> start [-I] [[-c <parameter>=<value>] ...] [-i <initscript>] [[-s <parameter>=<value>] ...]
+                           [-t <template>] [[-V <name>=<value>] ...]
+       enable <jail> stop [-I] [-i <initscript>] [[-p <parameter>=<value>] ...] [[-V <name>=<value>] ...]
+       enable <jail> run [-i <initscript>] [[-p <parameter>=<value>] ...] [[-V <name>=<value>] ...]
 EOF
 }
