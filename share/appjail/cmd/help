@@ -77,7 +77,7 @@ help_message()
 
 	echo "Commands:"
 	echo -e "${_help_information}"
-	echo "Use \`help cmd\` to display the help information for that command."
+	echo "Use \`help <command>\` to display the help information for that command."
 }
 
 help_for()
