@@ -239,22 +239,22 @@ command_help_getColumn(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options\n");
-    fprintf(stderr, "    -c                 -- Returns `0` if `parameter` and `column` exists,\n");
-    fprintf(stderr, "                          otherwise, a non-zero value is returned.\n");
-    fprintf(stderr, "    -i                 -- Ignore unknown parameters, as well as columns.\n");
-    fprintf(stderr, "    -P                 -- Dump all matching rows, not just one. The `-r`\n");
-    fprintf(stderr, "                          parameter is ignored.\n");
-    fprintf(stderr, "    -p                 -- Dump all matching columns, not just one. The `-c`\n");
-    fprintf(stderr, "                          parameter is ignored.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)` nor validate if `parameter` is\n");
-    fprintf(stderr, "                          a correct variable.\n");
-    fprintf(stderr, "    -c column          -- Dump the given column. Use `0` to dump all columns. Default: %llu\n",
+    fprintf(stderr, "    -C                   -- Returns 0 if parameter and column exists, otherwise, a\n");
+    fprintf(stderr, "                            non-zero value is returned.\n");
+    fprintf(stderr, "    -i                   -- Ignore unknown parameters, as well as columns.\n");
+    fprintf(stderr, "    -P                   -- Dump all matching rows, not just one. The -r parameter\n");
+    fprintf(stderr, "                            is ignored.\n");
+    fprintf(stderr, "    -p                   -- Dump all matching columns, not just one. The -c parameter\n");
+    fprintf(stderr, "                            is ignored.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                            extracted from jail(8) nor validate if parameter is a\n");
+    fprintf(stderr, "                            correct variable.\n");
+    fprintf(stderr, "    -c <column>          -- Limit matching with column. Default: %llu\n",
         CMD_GETCOLUMN_DEFCOL);
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -r row             -- Dump columns with the row `row`. Default: %llu.\n",
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -r <row>             -- Limit matching with row. Default: %llu.\n",
         CMD_GETCOLUMN_DEFROW);
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -275,5 +275,6 @@ usage(void)
 void
 command_usage_getColumn(void)
 {
-    fprintf(stderr, "usage: getColumn [-cilPV] [-c column] [-r row] [-j jail | -t template] parameter\n");
+	fprintf(stderr, "usage: getColumn [-CiPpV] [-c <column>] [-r <row>]\n");
+	fprintf(stderr, "               [-j <jail>|-t <template>] <parameter>\n");
 }

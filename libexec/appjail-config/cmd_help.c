@@ -81,11 +81,11 @@ command_help_help(void)
         fprintf(stderr, "%s\n", commands[i].desc);
     }
     fprintf(stderr, "\n");
-    fprintf(stderr, "Use `help [cmd]` to display the help information for that command.\n");
+    fprintf(stderr, "Use `help <command>` to display the help information for that command.\n");
 }
 
 void
 command_usage_help(void)
 {
-    fprintf(stderr, "usage: help [cmd]\n");
+    fprintf(stderr, "usage: help [command]\n");
 }

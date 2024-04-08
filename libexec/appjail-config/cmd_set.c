@@ -245,18 +245,17 @@ command_help_set(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -I                 -- Insert `parameter` as a new row ignoring the `-r`\n");
-    fprintf(stderr, "                          parameter.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)` nor validate if `parameter` is\n");
-    fprintf(stderr, "                          a correct variable.\n");
-    fprintf(stderr, "    -A [0|1]           -- If `1`, mark `parameter` as an append parameter,\n");
-    fprintf(stderr, "                          otherwise `parameter` is unmarked.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -R [0|1]           -- If `1`, mark `parameter` as a required parameter,\n");
-    fprintf(stderr, "                          otherwise `parameter` is unmarked.\n");
-    fprintf(stderr, "    -r row             -- Set the parameter's value with the row `row`.\n");
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -I                   -- Insert parameter as a new row ignoring the -r parameter.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                            extracted from jail(8) nor validate if parameter is a\n");
+    fprintf(stderr, "                            correct variable.\n");
+    fprintf(stderr, "    -A [0|1]             -- If 1, mark parameter as an append parameter (+:), otherwise\n");
+    fprintf(stderr, "                            parameter is unmarked.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -R [0|1]             -- If 1, mark parameter as a required parameter, otherwise\n");
+    fprintf(stderr, "                            parameter is unmarked.\n");
+    fprintf(stderr, "    -r <row>             -- Limit matching with row.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -277,5 +276,6 @@ usage(void)
 void
 command_usage_set(void)
 {
-    fprintf(stderr, "usage: set [-IV] [-A [0|1]] [-R [0|1]] [-r row] [-j jail | -t template] parameter[=value]\n");
+	fprintf(stderr, "usage: set [-IV] [-A [0|1]] [-R [0|1]] [-r <row>]\n");
+	fprintf(stderr, "               [-j <jail>|-t <template>] <parameter>[=<value>]\n");
 }

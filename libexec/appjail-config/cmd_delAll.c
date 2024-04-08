@@ -167,8 +167,8 @@ command_help_delAll(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -189,5 +189,5 @@ usage(void)
 void
 command_usage_delAll(void)
 {
-    fprintf(stderr, "usage: delAll [-j jail | -t template]\n");
+    fprintf(stderr, "usage: delAll [-j <jail>|-t <template>]\n");
 }

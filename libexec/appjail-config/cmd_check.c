@@ -187,11 +187,11 @@ command_help_check(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -q                 -- If there is an error, a non-zero value is returned.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if a parameter is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)`.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -q                   -- If there is an error, a non-zero value is returned.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if the template's parameters are valid\n");
+    fprintf(stderr, "                            against a list extracted from jail(8).\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -212,5 +212,5 @@ usage(void)
 void
 command_usage_check(void)
 {
-    fprintf(stderr, "usage: check [-qV] [-j jail | -t template]\n");
+    fprintf(stderr, "usage: check [-qV] [-j <jail>|-t <template>]\n");
 }

@@ -216,16 +216,15 @@ command_help_setColumn(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -A                 -- Append `value` as a new column in `parameter` with row\n");
-    fprintf(stderr, "                          `row`.\n");
-    fprintf(stderr, "                          The `-c` parameter is ignored.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)` nor validate if `parameter` is\n");
-    fprintf(stderr, "                          a correct variable.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -c column          -- Edit the column in the `column` position.\n");
-    fprintf(stderr, "    -r row             -- Edit columns in the `row` position.\n");
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -A                 -- Append value as a new column in parameter with row. The\n");
+    fprintf(stderr, "                          -c parameter is ignored.\n");
+    fprintf(stderr, "    -V                 -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                          extracted from jail(8) nor validate if parameter is a\n");
+    fprintf(stderr, "                          correct variable.\n");
+    fprintf(stderr, "    -j jail            -- Use the jail's template.\n");
+    fprintf(stderr, "    -c column          -- Limit matching with column.\n");
+    fprintf(stderr, "    -r row             -- Limit matching with row.\n");
+    fprintf(stderr, "    -t template        -- Use the specified template.\n");
 }
 
 static void
@@ -246,5 +245,6 @@ usage(void)
 void
 command_usage_setColumn(void)
 {
-    fprintf(stderr, "usage: setColumn [-AV] [-c column] [-r row] [-j jail | -t template] parameter[=value]\n");
+	fprintf(stderr, "usage: setColumn [-AV] [-c <column>] [-r <row>] [-j <jail>|-t <template>]\n");
+	fprintf(stderr, "               <parameter>[=<value>]\n");
 }

@@ -76,5 +76,5 @@ usage(void)
 void
 command_usage_usage(void)
 {
-    fprintf(stderr, "usage: usage [cmd]\n");
+    fprintf(stderr, "usage: usage <command>\n");
 }

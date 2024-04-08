@@ -249,20 +249,20 @@ command_help_get(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options\n");
-    fprintf(stderr, "    -C                 -- Returns `0` if `parameter` exists, otherwise, a\n");
-    fprintf(stderr, "                          non-zero value is returned.\n");
-    fprintf(stderr, "    -i                 -- Ignore unknown parameters.\n");
-    fprintf(stderr, "    -N                 -- Dump only the parameters.\n");
-    fprintf(stderr, "    -n                 -- Dump only the values.\n");
-    fprintf(stderr, "    -P                 -- Dump all matching rows, not just one. The `-r`\n");
-    fprintf(stderr, "                          parameter is ignored.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)` nor validate if `parameter` is\n");
-    fprintf(stderr, "                          a correct variable.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -r row             -- Dump the parameter with the row `row`. Default: %llu.\n",
+    fprintf(stderr, "    -C                   -- Returns 0 if parameter exists, otherwise, a non-zero\n");
+    fprintf(stderr, "                            value is returned.\n");
+    fprintf(stderr, "    -i                   -- Ignore unknown parameters.\n");
+    fprintf(stderr, "    -N                   -- Dump only the parameters.\n");
+    fprintf(stderr, "    -n                   -- Dump only the values.\n");
+    fprintf(stderr, "    -P                   -- Dump all matching rows, not just one. The -r parameter\n");
+    fprintf(stderr, "                            is ignored.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                            extracted from jail(8) nor validate if parameter is a\n");
+    fprintf(stderr, "                            correct variable.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -r <row>             -- Limit matching with row. Default: %llu.\n",
         CMD_GET_DEFROW);
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -275,5 +275,6 @@ usage(void)
 void
 command_usage_get(void)
 {
-    fprintf(stderr, "usage: get [-CiPV] [-N | -n] [-r row] [-j jail | -t template] parameter\n");
+	fprintf(stderr, "usage: get [-CiPV] [-N|-n] [-r <row>] [-j <jail>|-t <template>]\n");
+	fprintf(stderr, "               <parameter>\n");
 }

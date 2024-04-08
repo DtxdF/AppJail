@@ -231,16 +231,18 @@ command_help_delColumn(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -i                 -- Ignore unknown parameters, as well as columns.\n");
-    fprintf(stderr, "    -P                 -- Delete all matching rows, not just one. The `-r` parameter is ignored.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list extracted from\n");
-    fprintf(stderr, "                          `jail(8)` nor validate if `parameter` is a correct variable.\n");
-    fprintf(stderr, "    -c column          -- Delete the given column. Default: %llu\n",
+    fprintf(stderr, "    -i                   -- Ignore unknown parameters, as well as columns.\n");
+    fprintf(stderr, "    -P                   -- Delete all matching rows, not just one. The -r parameter\n");
+    fprintf(stderr, "                            is ignored.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                            extracted from jail(8) nor validate if parameter is\n");
+    fprintf(stderr, "                            a correct variable.\n");
+    fprintf(stderr, "    -c <column>          -- Limit matching with column. Default: %llu\n",
         CMD_DELCOLUMN_DEFCOL);
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -r row             -- Delete the parameter with the row `row`. Default: %llu.\n",
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template as the template file.\n");
+    fprintf(stderr, "    -r <row>             -- Limit matching with row. Default: %llu.\n",
         CMD_DELCOLUMN_DEFROW);
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -261,5 +263,6 @@ usage(void)
 void
 command_usage_delColumn(void)
 {
-    fprintf(stderr, "usage: delColumn [-iPV] [-c column] [-r row] [-j jail | -t template] parameter\n");
+	fprintf(stderr, "usage: delColumn [-iPV] [-c <column>] [-r <row>]\n");
+	fprintf(stderr, "               [-j <jail>|-t <template>] <parameter>\n");
 }

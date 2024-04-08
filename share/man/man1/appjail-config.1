@@ -1,0 +1,506 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 7, 2024
+.Dt APPJAIL-CONFIG 1
+.Os
+.Sh NAME
+.Nm appjail-config
+.Nd Configuration utiliy for templates
+.Sh SYNOPSIS
+.Nm
+.Cm check
+.Op Fl qV
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Nm
+.Cm edit
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Nm
+.Cm del
+.Op Fl iPV
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter
+.Nm
+.Cm delAll
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Nm
+.Cm delColumn
+.Op Fl iPV
+.Op Fl c Ar column
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter
+.Nm
+.Cm get
+.Op Fl CiPV
+.Op Fl N Ns | Ns Fl n
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter
+.Nm
+.Cm getAll
+.Op Fl R Ns | Ns Fl r
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Nm
+.Cm getColumn
+.Op Fl CiPpV
+.Op Fl c Ar column
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter
+.Nm
+.Cm help
+.Op Ar command
+.Nm
+.Cm jailConf
+.Op Fl n Ar name
+.Op Fl o Ar output
+.Fl j Ar jail
+.Nm
+.Cm jailConf
+.Op Fl o Ar output
+.Fl n Ar name
+.Fl t Ar template
+.Nm
+.Cm set
+.Op Fl IV
+.Op Fl A Op 0 Ns | Ns 1
+.Op Fl R Op 0 Ns | Ns 1
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter Ns Op = Ns Ar value
+.Nm
+.Cm setColumn
+.Op Fl AV
+.Op Fl c Ar column
+.Op Fl r Ar row
+.Op Fl j Ar jail Ns | Ns Fl t Ar template
+.Ar parameter Ns Op = Ns Ar value
+.Nm
+.Cm usage
+.Ar command
+.Sh DESCRIPTION
+The
+.Nm
+utility adds, deletes, gets, checks parameters or columns, or basically manipulates
+a template from command-line, very useful for scripting.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm check Oo Fl qV Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Check for invalid parameters, template syntax and other related issues.
+.Pp
+.Bl -tag -width xx
+.It Fl q
+If there is an error, a non-zero value is returned.
+.It Fl V
+Do not validate if the template's parameters are valid against a list extracted
+from
+.Xr jail 8 "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm edit Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+The program specified by the
+.Ev EDITOR
+environment variable is open to edit the template.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm del Oo Fl iPV Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter
+Delete
+.Ar parameter
+.Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl i
+Ignore unknown parameters.
+.It Fl P
+Delete all matching rows, not just one. The
+.Fl r
+parameter is ignored.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Fl r Ar row
+Limit matching with
+.Ar row
+.Ns "."
+The default is
+.Sy 0 "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm delAll Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Delete all parameters.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm delColumn Oo Fl iPV Oc Oo Fl c Ar column Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter
+Delete the
+.Ar parameter Ns 's
+.Ar column
+.Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl i
+Ignore unknown parameters, as well as columns.
+.It Fl P
+Delete all matching rows, not just one. The
+.Fl r
+parameter is ignored.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Fl c Ar column
+Limit matching with
+.Ar column
+.Ns "."
+The default is
+.Sy 0 "."
+.It Fl r Ar row
+Limit matching with
+.Ar row
+.Ns "."
+The default is
+.Sy 0 "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm get Oo Fl CiPV Oc Oo Fl N Ns | Ns Fl n Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter
+Get the
+.Ar parameter Ns 's
+value
+.Pp
+.Bl -tag -width xx
+.It Fl C
+Returns
+.Sy 0
+if
+.Ar parameter
+exists, otherwise, a non-zero value is returned.
+.It Fl i
+Ignore unknown parameters.
+.It Fl P
+Dump all matching rows, not just one. The
+.Fl r
+parameter is ignored.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Oo Fl N Ns | Ns Fl n Oc
+Dump only the parameters
+.Pq Fl N
+or the values
+.Pq Fl n
+.Ns "."
+.It Oo Fl r Ar row Oc
+Limit matching with
+.Ar row
+.Ns "."
+The default is
+.Sy 0 "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm getAll Oo Fl R Ns | Ns Fl r Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Delete all parameters.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl R Ns | Ns Fl r Oc
+Show
+.Pq Fl r
+only the required parameters or return
+.Pq Fl R
+.Sy 0
+if
+.Ar template
+has required parameters.
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm getColumn Oo Fl CiPpV Oc Oo Fl c Ar column Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter
+Get
+.Ar column Ns 's
+value from
+.Ar parameter
+.Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl C
+Returns
+.Sy 0
+if
+.Ar parameter
+and
+.Ar column
+exists, otherwise, a non-zero value is returned.
+.It Fl i
+Ignore unknown parameters, as well as columns.
+.It Fl P
+Dump all matching rows, not just one. The
+.Fl r
+parameter is ignored.
+.It Fl p
+Dump all matching columns, not just one. The
+.Fl c
+parameter is ignored.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Fl c Ar column
+Limit matching with
+.Ar column
+.Ns "."
+The default is
+.Sy 0 "."
+.It Fl r Ar row
+Limit matching with
+.Ar row
+.Ns "."
+The default is
+.Sy 0 "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm help Oo Ar command Oc
+List commands with a brief description and, if
+.Ar command
+is specified, display help information.
+.It Cm jailConf Oo Fl n Ar name Oc Oo Fl o Ar output Oc Fl j Ar jail | Cm jailConf Oo Fl o Ar output Oc Fl n Ar name Fl t Ar template 
+Convert a template to a
+.Xr jail.conf 5
+file.
+.Pp
+.Bl -tag -width xx
+.It Fl n Ar name
+Jail name.
+.Pp
+Optional if
+.Fl j
+is specified.
+.It Fl o Ar output
+Output file.
+.Sy stdout
+.Pq default
+is used if
+.Ar output
+is
+.Sy - "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm set Oo Fl IV Oc Oo Fl A Oo 0 Ns | Ns 1 Oc Oc Oo Fl R Oo 0 Ns | Ns 1 Oc Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter Ns Oo = Ns Ar value Oc
+Update a value of an existing parameter or create a new one.
+.Pp
+.Bl -tag -width xx
+.It Fl I
+Insert
+.Ar parameter
+as a new row ignoring the
+.Fl r
+parameter.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Fl A Oo 0 Ns | Ns 1 Oc
+If
+.Sy 1 ","
+mark
+.Ar parameter
+as an append parameter
+.Pq Sy +:
+.Ns , otherwise
+.Ar parameter
+is unmarked.
+.It Fl R Oo 0 Ns | Ns 1 Oc
+If
+.Sy 1 ","
+mark
+.Ar parameter
+as a required parameter, otherwise
+.Ar parameter
+is unmarked.
+.It Fl r Ar row
+Limit matching with
+.Ar row
+.Ns "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm setColumn Oo Fl AV Oc Oo Fl c Ar column Oc Oo Fl r Ar row Oc Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc Ar parameter Oo = Ns Ar value Oc
+Update a column's value in a parameter or create a new one.
+.Pp
+.Bl -tag -width xx
+.It Fl A
+Append
+.Ar value
+as a new column in
+.Ar parameter
+with
+.Ar row
+.Ns "."
+.br
+The
+.Fl c
+parameter is ignored.
+.It Fl V
+Do not validate if
+.Ar parameter
+is valid against a list extracted from
+.Xr jail 8
+nor validate if
+.Ar parameter
+is a correct variable.
+.It Fl c Ar column
+Limit matching with
+.Ar column
+.Ns "."
+.It Fl r Ar row
+Limit matching with
+.Ar row
+.Ns "."
+.It Oo Fl j Ar jail Ns | Ns Fl t Ar template Oc
+Use the
+.Ar jail Ns 's
+template
+.Pq Fl j
+or the specified
+.Ar template
+.Pq Fl t
+.Ns "."
+.El
+.It Cm usage Ar command
+Show the syntax of a given command.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr sysexits 3
+.Xr appjail-template 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

@@ -181,12 +181,10 @@ command_help_getAll(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -R                 -- Returns `0` if the template file has required\n");
-    fprintf(stderr, "                          parameters, otherwise a non-zero value is\n");
-    fprintf(stderr, "                          returned.\n");
-    fprintf(stderr, "    -r                 -- Show only required parameters.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -R                   -- Return 0 if template has required parameters.\n");
+    fprintf(stderr, "    -r                   -- Show only the required parameters.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -207,5 +205,5 @@ usage(void)
 void
 command_usage_getAll(void)
 {
-    fprintf(stderr, "usage: getAll [-R | -r] [-j jail | -t template]\n");
+    fprintf(stderr, "usage: getAll [-R|-r] [-j <jail>|-t <template>]\n");
 }

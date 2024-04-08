@@ -43,10 +43,7 @@
 #include "except.h"
 #include "util.h"
 
-#define CMD_JAILCONF_OUTPUT     "-"
-
 #define CMD_JAILCONF_STREAM         stdout
-#define CMD_JAILCONF_STREAM_S(s)    #s
 
 #define CMD_JAILCONF_TRBCK(trbck) \
     do { \
@@ -237,11 +234,10 @@ command_help_jailConf(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -n name            -- Jail name.\n");
-    fprintf(stderr, "    -o output          -- Output file. Use `-` to use `%s` (default).\n",
-        CMD_JAILCONF_STREAM_S(CMD_JAILCONF_STREAM));
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -n <name>            -- Jail name.\n");
+    fprintf(stderr, "    -o <output>          -- Output file. stdout (default) is used if output is `-`.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -262,6 +258,6 @@ usage(void)
 void
 command_usage_jailConf(void)
 {
-    fprintf(stderr, "usage: jailConf [-n name] -j jail\n");
-    fprintf(stderr, "       jailConf [-o output] -t template -n name\n");
+    fprintf(stderr, "usage: jailConf [-n <name>] [-o <output>] -j <jail>\n");
+    fprintf(stderr, "       jailConf [-o <output>] -n <name> -t <template>\n");
 }

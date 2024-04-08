@@ -223,16 +223,16 @@ command_help_del(void)
 
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
-    fprintf(stderr, "    -i                 -- Ignore unknown parameters.\n");
-    fprintf(stderr, "    -P                 -- Delete all matching rows, not just one. The `-r`\n");
-    fprintf(stderr, "                          parameter is ignored.\n");
-    fprintf(stderr, "    -V                 -- Do not validate if `parameter` is valid against a list\n");
-    fprintf(stderr, "                          extracted from `jail(8)` nor validate if `parameter` is\n");
-    fprintf(stderr, "                          a correct variable.\n");
-    fprintf(stderr, "    -j jail            -- Use jail's template as the template file.\n");
-    fprintf(stderr, "    -r row             -- Delete the parameter with the row `row`. Default: %llu.\n",
+    fprintf(stderr, "    -i                   -- Ignore unknown parameters.\n");
+    fprintf(stderr, "    -P                   -- Delete all matching rows, not just one. The -r parameter\n");
+    fprintf(stderr, "                            is ignored.\n");
+    fprintf(stderr, "    -V                   -- Do not validate if parameter is valid against a list\n");
+    fprintf(stderr, "                            extracted from jail(8) nor validate if parameter is a\n");
+    fprintf(stderr, "                            correct variable.\n");
+    fprintf(stderr, "    -j <jail>            -- Use the jail's template.\n");
+    fprintf(stderr, "    -r <row>             -- Limit matching with row. Default: %llu.\n",
         CMD_DEL_DEFROW);
-    fprintf(stderr, "    -t template        -- Use `template` as the template file.\n");
+    fprintf(stderr, "    -t <template>        -- Use the specified template.\n");
 }
 
 static void
@@ -253,5 +253,5 @@ usage(void)
 void
 command_usage_del(void)
 {
-    fprintf(stderr, "usage: del [-iPV] [-r row] [-j jail | -t template] parameter\n");
+    fprintf(stderr, "usage: del [-iPV] [-r <row>] [-j <jail>|-t <template>] <parameter>\n");
 }
