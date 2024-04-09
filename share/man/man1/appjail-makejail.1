@@ -185,7 +185,7 @@ Arguments used by the Makejail in the
 stage. Because arguments must be prefixed with a double dash
 .Po e.g. --arg1, --arg2 ... --argN Pc Ns ,
 you must use -- before specifying them so that
-.Xr appjail-makejail 1
+.Sy appjail makejail
 stops processing parameters.
 .El
 .It Fl A Fl j Ar name Oo Fl c Oc Oo Fl ev Oc Oo Fl a Ar makejail Oc Oo Fl B Ar makejail Oc Oo Oo Fl b Ar build-arg Ns Oo = Ns Ar value Oc Oc Ns " " Ns "..." Oc Oo Fl f Ar makejail Oc Oo Oo Fl o Ar option Oc Ns " " Ns "..." Oc Oo Oo Fl V Ar name Ns = Ns Ar value Oc Ns " " Ns "..." Oc Oo -- Ar runtime-args Ns " " Ns "..." Oc
@@ -228,7 +228,7 @@ repository ID.
 .Pp
 You can specify an incomplete ID
 .Po e.g. the first few characters Pc Ns ,
-.Xr appjail-makejail 1
+.Sy appjail makejail
 will update all matching repositories. Use
 .Cm *
 to update all repositories. If you specify
