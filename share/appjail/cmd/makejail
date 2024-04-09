@@ -1669,46 +1669,20 @@ _makejail_check_stages()
 
 makejail_help()
 {
-	cat << EOF
-`makejail_usage`
-
-${makejail_desc}
-
-Parameters:
-    -c                     -- Default. Create a jail using a Makejail.
-    -d id                  -- Delete a cloned repository. \`id\` is a hexadecimal number representing the repository to delete. It is
-                              possible to specify only the initial numbers to write less, but if two repositories match, you must add
-                              more numbers to match the exact repository. To make an exact match use \`-E\`.
-    -l                     -- List cloned repositories.
-    -u id                  -- Update cloned repositories. This parameter uses the same function to get a list of repositories as \`-d\`,
-                              but updates all matching repositories. Use \`*\` to update all cloned repositories.
-
-Options for -c:
-    -A                     -- Apply a Makejail to an existing jail. -e, -v and -o are ignored.
-    -e                     -- By default, \`set -e\` is used to stop running the buildscript when a command exits with a non-zero value.
-    -v                     -- Use \`set -vx\` to display the commands in the buildscript.
-    -a include_file        -- Include a Makejail before all instructions.
-    -B include_file        -- Include a Makejail after all instructions.
-    -b build_arg           -- Arguments that will be replaced when all Makejails are included in a single Makejail.
-    -f makejail            -- The name of the Makejail. Default: ${DEFAULT_MAKEJAIL_FILE}
-    -j jail_name           -- Jail name. If not defined, a random string is used.
-    -o option              -- Additional options to be used by the \`appjail quick\` command.
-    -V env                 -- Additional environment variables to be used by the Makejail in the \`build\` stage.
-
-Options for -d, -u:
-    -E                     -- Exact match.
-EOF
+	man 1 appjail-makejail
 }
 
 makejail_usage()
 {
 	cat << EOF
-usage: makejail [-c] [-ev] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
-		[-f makejail] [-j jail_name] [[-o option] ...] [[-V env=value] ...] -- [runtime_args ...]
-       makejail -A -j jail_name [-c] [-a include_file] [-B include_file] [[-b build_arg[=[value]]] ...]
-		[-f makejail] [[-V env=value] ...] -- [runtime_args ...]
-       makejail [-E] -d id
+usage: makejail [-c] [-ev] [-a <makejail>] [-B <makejail>]
+               [[-b <build-arg>[=<value>]] ...] [-f <makejail>] [-j <name>] [[-o <option>]
+	       ...] [[-V <name>=<value>] ...] [-- <runtime-args> ...]
+       makejail -A -j <name> [-c] [-a <makejail>] [-B <makejail>]
+               [[-b <build-arg>[=<value>]] ...] [-f <makejail>] [[-V <name>=<value>] ...]
+	       [-- <runtime-args> ...]
+       makejail [-E] -d <id>
        makejail -l
-       makejail [-E] -u [id|*]
+       makejail [-E] -u [<id>|*]
 EOF
 }

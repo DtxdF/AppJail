@@ -44,7 +44,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-volume.1 \
 	 man1/appjail-expose.1 \
 	 man1/appjail-limits.1 \
-	 man1/appjail-config.1
+	 man1/appjail-config.1 \
+	 man1/appjail-makejail.1
 
 APPJAIL_VERSION?=3.2.0
 

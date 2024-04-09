@@ -1,0 +1,247 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 8, 2024
+.Dt APPJAIL-MAKEJAIL 1
+.Os
+.Sh NAME
+.Nm appjail-makejail
+.Nd Build a jail using a Makejail file
+.Sh SYNOPSIS
+.Nm appjail makejail
+.Op Fl c
+.Op Fl ev
+.Op Fl a Ar makejail
+.Op Fl B Ar makejail
+.Op Oo Fl b Ar build-arg Ns Oo = Ns Ar value Oc Oc Ns " " Ns "..."
+.Op Fl f Ar makejail
+.Op Fl j Ar name
+.Op Oo Fl o Ar option Oc Ns " " Ns "..."
+.Op Oo Fl V Ar name Ns = Ns Ar value Oc Ns " " Ns "..."
+.Op -- Ar runtime-args Ns " " Ns "..."
+.Nm appjail makejail
+.Fl A
+.Fl j Ar name
+.Op Fl c
+.Op Fl a Ar makejail
+.Op Fl B Ar makejail
+.Op Oo Fl b Ar build-arg Ns Oo = Ns Ar value Oc Oc Ns " " Ns "..."
+.Op Fl f Ar makejail
+.Op Oo Fl V Ar name Ns = Ns Ar value Oc Ns " " Ns "..."
+.Op -- Ar runtime-args Ns " " Ns "..."
+.Nm appjail makejail
+.Op Fl E
+.Fl d Ar id
+.Nm appjail makejail
+.Fl l
+.Nm appjail makejail
+.Op Fl E
+.Fl u
+.Op Ar id Ns | Ns Cm *
+.Sh DESCRIPTION
+The
+.Sy appjail makejail
+utility can create a
+.Xr jail 8
+or apply a
+.Sy Makejail
+file to an existing one, whether obtained from a remote or local site. You can also maintain cloned
+.Xr git 1
+repositories, that is, list, delete or update them.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Oo Fl c Oc Oo Fl ev Oc Oo Fl a Ar makejail Oc Oo Fl B Ar makejail Oc Oo Oo Fl b Ar build-arg Ns Oo = Ns Ar value Oc Oc Ns " " Ns "..." Oc Oo Fl f Ar makejail Oc Oo Fl j Ar name Oc Oo Oo Fl o Ar option Oc Ns " " Ns "..." Oc Oo Oo Fl V Ar name Ns = Ns Ar value Oc Ns " " Ns "..." Oc Oo -- Ar runtime-args Ns " " Ns "..." Oc
+Build a jail using a Makejail file.
+.Pp
+This parameter is responsible for generating scripts using a Makejail file. Generates two types of scripts: a
+.Sy BuildScript
+and an
+.Sy InitScript "."
+Both are a
+.Xr sh 1
+script, but a
+.Sy BuildScript
+contains all the instructions specified in the
+.Sy build
+stage, which are executed using this parameter, and an
+.Sy InitScript
+is executed using other commands, such as
+.Xr appjail-start 1 ","
+.Xr appjail-stop 1 ","
+.Xr appjail-run 1 ","
+and so on. This parameter does not run the
+.Sy InitScript ","
+the exception is for the
+.Sy apply
+stage which is run with this command or with
+.Xr appjail-apply 1
+.Po which is just a wrapper for the Fl A No option Pc Ns "."
+.Pp
+Note that because this parameter generates an
+.Sy InitScript ","
+it overwrites any others that were specified by
+.Xr appjail-quick 1 Ns 's Sy initscript No option.
+.Pp
+Before generating the
+.Sy BuildScript ","
+a single Makejail is created with all
+.Sy INCLUDE
+instructions processed.
+.Pp
+You can't include a Makejail more than once to avoid possible loops, although the
+check is very basic: the path to the Makejail file.
+.Pp
+As a last note, the jail should be stopped if the
+.Sy start
+stage is specified in the Makejail file only if the instructions specified there are to be executed after the
+.Sy appjail makejail
+command finishes. The reason is that the
+.Sy start
+stage was executed before the
+.Sy InitScript
+was written and can't be executed because the
+.Sy InitScript
+is not written until the
+.Sy appjail makejail
+command finishes, so stopping the jail is the only way: the user will run
+.Xr appjail-start 1
+and the
+.Sy start
+stage runs without problems.
+.Pp
+.Bl -tag -width xx
+.It Fl c
+Create a jail. This is the default parameter when no other is specified.
+.It Fl e
+By default,
+.Sy appjail makejail
+will exit if it detects a command that returns a non-zero value; This parameter will
+continue even if such a thing happens.
+.It Fl v
+Shows each command to be executed before executing it.
+.It Fl a Ar makejail
+This parameter adds a new
+.Sy INCLUDE
+instruction after all instructions specified in the
+.Sy build
+stage.
+.Ar makejail
+is used as an argument to the
+.Sy INCLUDE
+instruction.
+.It Fl B Ar makejail
+Same as
+.Fl a
+but adds the
+.Sy INCLUDE
+instruction before all instructions specified in the
+.Sy build
+stage.
+.It Fl b Ar build-arg Ns Oo = Ns Ar value Oc
+If
+.Ar makejail
+contains build arguments, this parameter sets the argument value.
+.It Fl f Ar makejail
+This parameter performs the same task as the
+.Xr appjail-makejail 5 Ns 's Sy INCLUDE No instruction.
+.It Fl o Ar option
+Specify an
+.Xr appjail-quick 1 Ns 's option.
+.It Fl V Ar name Ns = Ns Ar value
+Specify environment variables used by the
+.Sy RUN
+instruction in the
+.Sy build
+stage. See
+.Xr appjail-makejail 5 Ns 's Sy ENV No instruction for more details.
+.It Ar runtime-args
+Arguments used by the Makejail in the
+.Sy build
+stage. Because arguments must be prefixed with a double dash
+.Po e.g. --arg1, --arg2 ... --argN Pc Ns ,
+you must use -- before specifying them so that
+.Xr appjail-makejail 1
+stops processing parameters.
+.El
+.It Fl A Fl j Ar name Oo Fl c Oc Oo Fl ev Oc Oo Fl a Ar makejail Oc Oo Fl B Ar makejail Oc Oo Oo Fl b Ar build-arg Ns Oo = Ns Ar value Oc Oc Ns " " Ns "..." Oc Oo Fl f Ar makejail Oc Oo Oo Fl o Ar option Oc Ns " " Ns "..." Oc Oo Oo Fl V Ar name Ns = Ns Ar value Oc Ns " " Ns "..." Oc Oo -- Ar runtime-args Ns " " Ns "..." Oc
+See
+.Fl c
+parameter and
+.Xr appjail-apply 1 "."
+.It Oo Fl E Oc Fl d Ar id
+.Pp
+.Bl -tag -width xx
+.It Fl E
+Exact match.
+.It Fl d Ar id
+Cloned
+.Xr git 1
+repository ID.
+.Pp
+You can specify an incomplete ID
+.Po e.g. the first few characters Pc Ns ,
+but if more than one repository matches, this parameter will not allow you to continue
+due to ambiguity. Certainly, deleting a repository shouldn't be a mistake because
+such repositories should be ephemeral, but this may not be desirable in certain
+scenarios.
+.El
+.It Fl l
+List the currently cloned
+.Xr git 1
+repositories.
+.It Oo Fl E Oc Fl u Oo Ar id Ns | Ns Cm * Oc
+Update cloned
+.Xr git 1
+repositories.
+.Bl -tag -width xx
+.It Fl E
+Exact match.
+.It Fl u Oo Ar id Ns | Ns Cm * Oc
+Cloned
+.Xr git 1
+repository ID.
+.Pp
+You can specify an incomplete ID
+.Po e.g. the first few characters Pc Ns ,
+.Xr appjail-makejail 1
+will update all matching repositories. Use
+.Cm *
+to update all repositories. If you specify
+.Fl E Ns ,
+you must provide a complete ID.
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail makejail"
+.Sh SEE ALSO
+.Xr appjail-quick 1
+.Xr sysexits 3
+.Xr appjail-initscript 5
+.Xr appjail-makejail 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
