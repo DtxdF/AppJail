@@ -1769,123 +1769,25 @@ _image_chk_jail()
 
 image_help()
 {
-	cat << EOF
-`image_usage`
-
-Parameters:
-    export                    -- Export a jail.
-    get                       -- Get information about a image.
-    import                    -- Import an image.
-    jail                      -- Create a jail using an image.
-    list                      -- Like \`get\` but for all images.
-    metadata                  -- Manipulate the metadata of the given image.
-    remove                    -- Remove an image.
-    update                    -- Update one or all images.
-
-Options for get:
-    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                 in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                        -- Display the name of the columns.
-    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -p                        -- Columnate the list.
-    -t                        -- Tabulate columns and values.
-
-Options for list:
-    -e                        -- This option is the opposite in \`Options for get\`.
-    -H                        -- This option is the opposite in \`Options for get\`.
-    -I                        -- This option is the same as in \`Options for get\`.
-    -p                        -- This option is the opposite in \`Options for get\`.
-    -t                        -- This option is the opposite in \`Options for get\`.
-    -i image                  -- Operate in this image. If not set operate in all images.
-
-Methods for import:
-    cmd                       -- Use the output of a posix shell command as the ajspec.
-    git                       -- Clone a git repository and use the ajspec from it.
-    fetch                     -- Download an ajspec file using HTTP or FTP (depending on what you are using).
-    file                      -- Use the file in the local file system.
-    gh, github                -- Wrapper for the \`git\` method but using \`https://github.com/\` as URL prefix.
-    gh-ssh, github-ssh        -- Wrapper for the \`git\` method but using \`git@github.com:\` as URL prefix.
-    gl, gitlab                -- Wrapper for the \`git\` method but using \`https://gitlab.com/\` as URL prefix.
-    gl-ssh, gitlab-ssh        -- Wrapper for the \`git\` method but using \`git@gitlab.com:\` as URL prefix.
-
-Options for export, import, jail, metadata del, metadata get, metadata set and remove:
-    -t tag                    -- Operate in this tag. Default: ${IMAGE_TAG}
-
-Options for import, jail:
-    -a arch                   -- Operate in this architecture. If \`arch\` is \`host\`, \`${IMAGE_ARCH}\` will be
-                                 used. Default: host
-
-Options for remove:
-    -a arch                   -- Operate in this architecture.
-
-Options for jail:
-    -i image                  -- Use this image to create the jail.
-
-Options for export and import:
-    -f                        -- Overwrites the image. When the -f is not used, on export AppJail will complain when the
-                                 image has been previously saved successfully. On import AppJail will not complain but
-				 will report that the image is already updated only when the timestamp is set.
-    -n name                   -- Image name. If you are exporting and the name is not defined, the name of the jail used.
-                                 If you are importing and the name is not defined, the name specified by the ajspec file
-				 is used, but if it does not have the name keyword, AppJail will complain and you will
-				 have to specify the name explicitly.
-
-Options for import:
-    -N ajspec_name            -- ajspec filename. Only used by git and git-like methods. Default: ${IMAGE_DEFAULT_AJSPEC}
-
-Parameters for metadata:
-    del                       -- Remove the keyword.
-    edit                      -- Open an editor to edit the ajspec file interactively.
-    get                       -- Get a keyword.
-    info                      -- Display information of one or all images in a user-friendly format.
-    set                       -- Update a value of an existing keyword or create a new one. For the keywords \`maintainer\`,
-                                 \`description\` and \`source:<arch>\` you can use \`+=\` to add the value instead of
-				 replacing it.
-
-Parameters for metadata del, metadata edit, metadata get and metadata set:
-    -f                        -- Use a file as the target.
-    -I                        -- Use an image as the target.
-
-Options for metadata del and metadata get:
-    -i                        -- Don't complain when the given keyword does not exist
-
-Keywords for metadata del, metadata get and metadata set:
-    You have to replace \`<arch>\` with the given architecture.
-
-    arch                      -- Image architectures.
-    name                      -- Image name.
-    tags                      -- Image tags.
-    timestamp:<arch>          -- Timestamp.
-    maintainer                -- Image's maintainer(s).
-    comment                   -- One-line description.
-    url                       -- Home page.
-    description               -- Long description.
-    sum:<arch>                -- Checksum.
-    source:<arch>             -- Sites where the image will be downloaded.
-    size:<arch>               -- Image size.
-    entrypoint                -- The method used by the \`import\` command.
-    ajspec                    -- ajspec filename.
-
-Keywords for metadata get:
-    timestamp-human:<arch>    -- Display \`timestamp\` in a human-readable form.
-EOF
+	man 1 appjail-image
 }
 
 image_usage()
 {
 	cat << EOF
-usage: image export [-f] [-c compress] [-n name] [-t tag] jail
-       image get [-eHIpt] image
-       image import [-f] [-a arch] [-N ajspec_name] [-n name] [-t tag] [method+]path
-       image jail [-a arch] [-t tag] -i image jail [options ...]
-       image list [-eHIpt] [-i image] [keyword ...]
-       image remove [-a arch] [-t tag] image
-       image update [image]
+usage: image export [-f] [-c <algo>] [-n <name>] [-t <tag>] <jail>
+       image get [-eHIpt] <image>
+       image import [-f] [-a <arch>] [-N <ajspec-name>] [-n <image-name>]
+               [-t <tag>] [<method>+]<path>
+       image jail [-a <arch>] [-t <tag>] -i <image> <jail> [<options> ...]
+       image list [-eHIpt] [-i <image>] [<keyword> ...]
+       image remove [-a <arch>] [-t <tag>] <image>
+       image update [<image>]
 
-usage: image metadata del [-f | -I] [-i] [-t tag] target keyword
-       image metadata edit [-f | -I] target
-       image metadata get [-f | -I] [-i] [-t tag] target keyword
-       image metadata info [image]
-       image metadata set [-f | -I] [-t tag] target keyword[+]=value
+usage: image metadata del [-f|-I] [-i] [-t <tag>] <target> <keyword>
+       image metadata edit [-f|-I] <target>
+       image metadata get [-f|-I] [-i] [-t <tag>] <target> <keyword>
+       image metadata info [<image>]
+       image metadata set [-f|-I] [-t <tag>] <target> <keyword>[+]=<value>
 EOF
 }

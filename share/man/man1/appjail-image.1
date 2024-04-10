@@ -1,0 +1,555 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 9, 2024
+.Dt APPJAIL-IMAGE 1
+.Os
+.Sh NAME
+.Nm appjail-image
+.Nd Create, list, remove, update images and much more
+.Sh SYNOPSIS
+.Nm appjail image
+.Cm export
+.Op Fl f
+.Op Fl c Ar algo
+.Op Fl n Ar name
+.Op Fl t Ar tag
+.Ar jail
+.Nm appjail image
+.Cm get
+.Op Fl eHIpt
+.Ar image
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail image
+.Cm import
+.Op Fl f
+.Op Fl a Ar arch
+.Op Fl N Ar ajspec-name
+.Op Fl n Ar image-name
+.Op Fl t Ar tag
+.Oo Ar method Ns + Oc Ns Ar path
+.Nm appjail image
+.Cm jail
+.Op Fl a Ar arch
+.Op Fl t Ar tag
+.Fl i Ar image
+.Ar jail
+.Op Ar options Ns " " Ns "..."
+.Nm appjail image
+.Cm list
+.Op Fl eHIpt
+.Op Fl i Ar image
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail image
+.Cm remove
+.Op Fl a Ar arch
+.Op Fl t Ar tag
+.Ar image
+.Nm appjail image
+.Cm update
+.Op Ar image
+.Pp
+.Nm appjail image metadata
+.Cm del
+.Op Fl f Ns | Ns Fl I
+.Op Fl i
+.Op Fl t Ar tag
+.Ar target
+.Ar keyword
+.Nm appjail image metadata
+.Cm edit
+.Op Fl f Ns | Ns Fl I
+.Ar target
+.Nm appjail image metadata
+.Cm get
+.Op Fl f Ns | Ns Fl I
+.Op Fl i
+.Op Fl t Ar tag
+.Ar target
+.Ar keyword
+.Nm appjail image metadata
+.Cm info
+.Op Ar image
+.Nm appjail image metadata
+.Cm set
+.Op Fl f Ns | Ns Fl I
+.Op Fl t Ar tag
+.Ar target
+.Ar keyword Ns Oo + Oc Ns = Ns Ar value
+.Sh DESCRIPTION
+The
+.Sy appjail image
+utility manages AppJail images, that is, it creates them, imports them, updates
+them, creates jails using them, lists them, removes them, and so on.
+.Pp
+The options are as follows:
+.Pp
+.Bl -tag -width xxx
+.It Cm export Oo Fl f Oc Oo Fl c Ar algo Oc Oo Fl n Ar name Oc Oo Fl t Ar tag Oc Ar jail
+Create an image using a jail. The jail must be stopped before using this subcommand.
+.Pp
+.Bl -tag -width xx
+.It Fl f
+Overwrite the image if it already exists.
+.Pp
+If this parameter is not specified, this subcommand will not allow you to continue
+when the image has previously been exported successfully.
+.It Fl c Ar algo
+Algorithm to compress the image. If
+.Sy none
+is specified, the image is not compressed. By default, the compression algorithm
+specified by the
+.Sy IMAGE_COMPRESS
+parameter is used.
+.It Fl n Ar name
+Image name.
+.Pp
+By default the jail name is used.
+.It Fl t Ar tag
+Export the image with the specified tag.
+.Pp
+By default, the tag specified by the
+.Sy IMAGE_TAG
+parameter is used.
+.El
+.It Cm get Oo Fl eHIpt Oc Ar image Oo Ar keyword Ns " " Ns "..." Oc
+Get information about
+.Ar image
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the default is Sy name Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.El
+.It Cm import Oo Fl f Oc Oo Fl a Ar arch Oc Oo Fl N Ar ajspec-name Oc Oo Fl n Ar image-name Oc Oo Fl t Ar tag Oc Oo Ar method Ns + Oc Ns Ar path
+Import an image using an
+.Sy AJSPEC
+file.
+.Pp
+.Ar method
+indicates how to get the
+.Sy AJSPEC
+file,
+.Ar path
+is used as an argument to
+.Ar method Ns "." See Sx METHODS No for more details.
+.Pp
+.Bl -tag -width xx
+.It Fl f
+By default, an image is not re-imported if it was imported successfully and the
+timestamp matches the
+.Sy AJSPEC
+on the remote site, but when this parameter is specified, the process is done
+again regardless of the above.
+.It Fl a Ar arch
+Import the image that was created for the specified architecture.
+.Pp
+Use
+.Sy host
+.Pq default
+to use the architecture specified by the
+.Sy IMAGE_ARCH
+parameter, which is probably the same as the host. The reason for using a special
+keyword instead of simply using the
+.Sy IMAGE_ARCH
+parameter is for those Makejails that use an image that supports multiple architectures,
+but want to use the host platform instead of a hardcoded one, perhaps via an argument.
+.It Fl N Ar ajspec-name
+For the
+.Sy git
+and
+.Sy git-like
+methods, this parameter indicates what filename is currently used for the
+.Sy AJSPEC
+file. The default is
+.Sy .ajspec "."
+.It Fl n Ar image-name
+Image name.
+.Pp
+If this option is not specified, the name is obtained from the
+.Sy AJSPEC
+file, but if it is not defined there,
+.Sy appjail image
+will not allow you to continue.
+.It Fl t Ar tag
+Import the image with the specified tag.
+.Pp
+By default, the tag specified by the
+.Sy IMAGE_TAG
+parameter is used.
+.El
+.It Cm jail Oo Fl a Ar arch Oc Oo Fl t Ar tag Oc Fl i Ar image Ar jail Oo Ar options Ns " " Ns "..." Oc
+Create a jail using an image.
+.Pp
+You can pass
+.Xr appjail-quick 1 Ns 's
+options, except
+.Sy import+root
+which is already passed. In effect, this is essentially just a wrapper for that option with the
+.Sy portable
+subparameter set.
+.Pp
+.Bl -tag -width xx
+.It Fl a Ar arch
+Import the image that was created for the specified architecture.
+.Pp
+Use
+.Sy host
+.Pq default
+to use the architecture specified by the
+.Sy IMAGE_ARCH
+parameter, which is probably the same as the host.
+.It Fl t Ar tag
+Import the image with the specified tag.
+.It Fl i Ar image
+Image to be imported.
+.El
+.It Cm list Oo Fl eHIpt Oc Oo Fl i Ar image Oc Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each image in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl i Ar image
+.No Only show information for Ar image Ns "."
+.El
+.It Cm remove Oo Fl a Ar arch Oc Oo Fl t Ar tag Oc Ar image
+Remove
+.Ar image
+.Ns "."
+.Pp
+When using ZFS as the backend file system, this subcommand will recursively remove
+all datasets including all references, such as clones. Be careful.
+.Pp
+If
+.Fl a
+is specified, images matching
+.Ar arch
+are removed, and if
+.Fl t
+is specified, images matching
+.Ar tag
+are removed. Both can be supplied to match exactly. If none is specified, all images matching
+.Ar image
+are removed.
+.It Cm update Oo Ar image Oc
+Update all images or, if
+.Ar image
+is specified, only that one is updated.
+.It Cm metadata del Oo Fl f Ns | Ns Fl I Oc Oo Fl i Oc Oo Fl t Ar tag Oc Ar target Ar keyword
+Remove
+.Ar keyword
+from
+.Ar target
+.Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl f Ns | Ns Fl I Oc
+Treat
+.Ar target
+as a file
+.Pq Fl f
+or as an image
+.Po Fl I Pc Ns "."
+.It Fl i
+Don't complain when
+.Ar keyword
+does not exist.
+.It Fl t Ar tag
+Image tag.
+.El
+.It Cm metadata edit Oo Fl f Ns | Ns Fl I Oc Ar target
+The program specified by the
+.Ev EDITOR
+environment variable is open to edit the
+.Sy AJSPEC
+file.
+.Pp
+You should edit the
+.Sy AJSPEC
+file using
+.Cm metadata set
+and
+.Cm metadata del
+unless you know what you are doing.
+.It Cm metadata get Oo Fl f Ns | Ns Fl I Oc Oo Fl i Oc Oo Fl t Ar tag Oc Ar target Ar keyword
+Get the keyword value from
+.Ar target
+.Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl f Ns | Ns Fl I Oc
+Treat
+.Ar target
+as a file
+.Pq Fl f
+or as an image
+.Po Fl I Pc Ns "."
+.It Fl i
+Don't complain when
+.Ar keyword
+does not exist.
+.It Fl t Ar tag
+Image tag.
+.El
+.It Cm metadata info Oo Ar image Oc
+Get information in a human-readable format from all images or just
+.Ar image
+.Ns "."
+.It Cm metadata set Oo Fl f Ns | Ns Fl I Oc Oo Fl t Ar tag Oc Ar target Ar keyword Ns Oo + Oc Ns = Ns Ar value
+Configure a new or existing keyword.
+.Pp
+If
+.Sy +
+is provided,
+.Ar value
+will be appended instead of replacing the entire value. Not all keywords accept this
+type of insertion.
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl f Ns | Ns Fl I Oc
+Treat
+.Ar target
+as a file
+.Pq Fl f
+or as an image
+.Po Fl I Pc Ns "."
+.It Fl t Ar tag
+Image tag.
+.El
+.El
+.Sh KEYWORDS
+.Ss get, list
+.Bl -tag -width xx
+.It Sy name
+Image name.
+.It Sy has_metadata
+Shows
+.Sy 1
+if the image has the
+.Sy AJSPEC
+file,
+.Sy 0
+if it does not.
+.El
+.Ss metadata del, metadata get, metadata set
+.Bl -tag -width xx
+.It Sy arch
+Image architectures.
+.Pp
+Valid are:
+.Bl -dash -compact
+.It
+.Sy arm64 Ns | Ns Sy aarch64
+.It
+.Sy amd64
+.It
+.Sy arm Ns | Ns Sy armv6 Ns | Ns Sy armv7
+.It
+.Sy i386
+.It
+.Sy mips Ns | Ns Sy mipsel Ns | Ns Sy mips64 Ns | Ns Sy mips64el Ns | Ns Sy mipshf Ns | Ns Sy mipselhf Ns | Ns Sy mips64elhf Ns | Ns Sy mipsn32
+.It
+.Sy powerpc Ns | Ns Sy powerpcspe Ns | Ns Sy powerpc64 Ns | Ns Sy powerpc64le
+.It
+.Sy riscv Ns | Ns Sy riscv64 Ns Sy | Ns Sy riscv64sf
+.El
+.Pp
+.Em append Ns :
+.Sy Yes
+.It Sy name
+Image name.
+.Pp
+Valid names are
+.Sy "^[a-zA-Z0-9_][a-zA-Z0-9_-]*$"
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy tags
+Image tags.
+.Pp
+Valid tags are
+.Sy "^[a-zA-Z0-9_][a-zA-Z0-9._-]*$"
+.Pp
+.Em append Ns :
+.Sy Yes
+.It Sy timestamp Ns : Ns Ar arch
+Unix date on which the image is supposed to have been created or modified.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy maintainer
+The person or entity who is in charge of the image and everything related to it, preferably in a format such as
+.So Sy maintainer-name No < Ns Sy email-address Ns > Sc Ns "."
+.Pp
+.Em append Ns :
+.Sy Yes
+.It Sy comment
+One-line description.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy url
+Home page.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy description
+Long description.
+.Pp
+.Em append Ns :
+.Sy Yes
+.It Sy sum Ns : Ns Ar arch
+Checksum.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy source Ns : Ns Ar arch
+Sites where the image can be downloaded.
+.Pp
+.Em append Ns :
+.Sy Yes
+.It Sy size Ns : Ns Ar arch
+Image size.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy entrypoint
+Indicates the method that was used to obtain the
+.Sy AJSPEC
+file.
+.Pp
+.Em append Ns :
+.Sy \&No
+.It Sy ajspec
+.Sy AJSPEC
+filename.
+.Pp
+.Em append Ns :
+.Sy \&No
+.El
+.Ss metadata get
+.Bl -tag -width xx
+.It Sy timestamp-human Ns : Ns Ar arch
+Display
+.Sy timestamp
+in a human-readable form.
+.El
+.Sh METHODS
+.Bl -tag -width xx
+.It Sy cmd
+Use the output of a command as an
+.Sy AJSPEC
+file.
+.It Sy git
+Use the
+.Sy AJSPEC
+file found in a
+.Xr git 1
+repository.
+.It Sy fetch
+The program specified in
+the
+.Sy IMAGE_FETCH_CMD
+parameter is used to get the
+.Sy AJSPEC
+file.
+.It Sy file
+Default. Use a file on the local file system.
+.It Sy gh Ns | Ns Sy github
+Wrapper for the
+.Sy git
+method but using
+.Sy https://github.com/
+as URL prefix.
+.It Sy gh-ssh Ns | Ns Sy github-ssh
+Wrapper for the
+.Sy git
+method but using
+.Sy git@github.com:
+as URL prefix.
+.It Sy gl Ns | Ns Sy gitlab
+Wrapper for the
+.Sy git
+method but using
+.Sy https://gitlab.com/
+as URL prefix.
+.It Sy gl-ssh Ns | Ns Sy gitlab-ssh
+Wrapper for the
+.Sy git
+method but using
+.Sy git@gitlab.com:
+as URL prefix.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail image"
+.Sh SEE ALSO
+.Xr appjail-quick 1
+.Xr sysexits 3
+.Xr appjail-ajspec 5
+.Xr appjail-template 5
+.Xr appjail.conf 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
