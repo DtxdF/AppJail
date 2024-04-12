@@ -946,94 +946,21 @@ fstab_keyword2file()
 
 fstab_help()
 {
-cat << EOF
-`fstab_usage`
-
-${fstab_desc}
-
-Parameters:
-    all                  -- Operate in all jails.
-    jail                 -- Operate in a jail.
-
-Parameters for all and jail:
-    compile              -- Compile all enabled NROes and save them as {JAILDIR}/{jail_name}/conf/fstab.
-    get                  -- Get information about the current fstab.
-    list                 -- Like \`get\` but for all NROes.
-    mount                -- Wrapper for mount(8) but with the -F flag set to {JAILDIR}/{jail_name}/conf/fstab.
-    mounted              -- Displays the mounted file systems.
-    remove               -- Remove all NROes or just a single NRO.
-    set                  -- Set parameters to an existing NRO or create it if it does not exist.
-    umount               -- Wrapper for umount(8) but with the -F flag set to {JAILDIR}/{jail_name}/conf/fstab.
-
-Parameters for remove:
-    all                  -- Remove all NROes.
-    nro                  -- Remove an NRO.
-
-Options for all:
-    -e                   -- Exits when a command returns a non-zero value.
-
-Options for get:
-    -e                   -- This option is not required when using -p. The \\t character is used to delimit columns,
-                            in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                   -- Display the name of the columns.
-    -I                   -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -i                   -- Do not complain when the NRO does not exist.
-    -p                   -- Columnate the list.
-    -t                   -- Tabulate columns and values.
-    -n nro               -- Operate in this NRO.
-
-Options for list:
-    -e                   -- This option is the opposite in \`Options for get\`.
-    -H                   -- This option is the opposite in \`Options for get\`.
-    -I                   -- This option is the same as in \`Options for get\`.
-    -i                   -- This option is the same as in \`Options for get\`.
-    -p                   -- This option is the opposite in \`Options for get\`.
-    -t                   -- This option is the opposite in \`Options for get\`.
-    -n nro               -- Operate in this NRO. If not set, operate in all NROes.
-
-Keywords for get and list:
-    enabled              -- See \`set -E\` and \`set -e\`.
-    nro                  -- See \`set -n\`.
-    name                 -- See \`set -N\`.
-    device               -- See \`set -d\`.
-    mountpoint           -- See \`set -m\`.
-    type                 -- See \`set -t\`.
-    options              -- See \`set -o\`.
-    dump                 -- See \`set -D\`.
-    pass                 -- See \`set -P\`.
-
-Options for set:
-    -E                   -- Enable this NRO.
-    -e                   -- Disable this NRO.
-    -p                   -- By default the mountpoint is checked against a path traversal check.
-                            This is not a security measure, it is just for convenience so as not
-			    to mount in a non-existent directory or mount outside the jail
-			    directory. This option disable this check and also creates the
-			    mountpoint. Deprecated. Currently this is a no-op flag.
-    -D dump              -- Default: ${FSTAB_DEFAULT_FSFREQ}. The fifth field, (fs_freq). See fstab(5).
-    -d device            -- The first field, (fs_spec). See fstab(5). This option and mountpoint are not
-                            required unless the NRO (\`-n\`) has no such values.
-    -m mountpoint        -- The second field, (fs_file). See fstab(5).
-    -N name              -- The name of this NRO. It is not relevant, it is only for your
-                            convenience.
-    -n auto|nro          -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
-                            {JAILDIR}/{jail_name}/conf/boot/fstab.
-    -o options           -- Default: ${FSTAB_DEFAULT_FSMNTOPS}. The fourth field, (fs_mntops). See fstab(5).
-    -P pass              -- Default: ${FSTAB_DEFAULT_FSPASSNO}. The sixth field, (fs_passno). See fstab(5).
-    -t type              -- Default: ${FSTAB_DEFAULT_FSVFSTYPE}. The third field, (fs_vfstype). See fstab(5).
-EOF
+	man 1 appjail-fstab
 }
 
 fstab_usage()
 {
 	cat << EOF
-usage: [all -e | jail jail_name] compile
-       [all -e | jail jail_name] get [-eHIpt] -n nro [keyword ...]
-       [all -e | jail jail_name] list [-eHIpt] [-n nro] [keyword ...]
-       [all -e | jail jail_name] mounted
-       [all -e | jail jail_name] mount args ...
-       [all -e | jail jail_name] remove [all | nro nro ...]
-       [all -e | jail jail_name] set -d device -m mountpoint [-Eep] [-D dump] [-N name] [-n auto | nro] [-o options] [-P pass] [-t type]
-       [all -e | jail jail_name] umount args ...
+usage: appjail fstab [all [-e]|jail <jail>] compile
+       appjail fstab [all [-e]|jail <jail>] get [-eHIpt] -n <nro> [<keyword> ...]
+       appjail fstab [all [-e]|jail <jail>] [list] [-eHIpt] [-n <nro>] [<keyword> ...]
+       appjail fstab [all [-e]|jail <jail>] mounted
+       appjail fstab [all [-e]|jail <jail>] mount [<args> ...]
+       appjail fstab [all [-e]|jail <jail>] remove [all|jail <jail>]
+       appjail fstab [all [-e]|jail <jail>] set -d <device> -m <mountpoint> [-E|-e]
+               [-p] [-D <dump>] [-N <name>] [-n [auto|<nro>]] [-o <options>] [-P <pass>]
+	       [-t <type>]
+       appjail fstab [all [-e]|jail <jail>] umount <args> ...
 EOF
 }
