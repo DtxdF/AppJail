@@ -85,7 +85,8 @@ already exists, an error occurs.
 .Ar volume Ns 's
 group ID.
 .It Fl m Ar mountpoint
-Path within the jail to mount the volume.
+Path within the jail to mount the volume. The default is
+.Sy VOLUMESDIR Ns / Ns Ar volume Ns "."
 .It Fl o Ar uid
 .Ar volume Ns 's
 user ID.
@@ -93,7 +94,8 @@ user ID.
 .Ar volume Ns 's
 file mode.
 .It Fl t Ar type
-File system type.
+File system type. The default is
+.Sy "<pseudofs>" Ns "."
 .El
 .It Cm get Oo Fl eHIpt Oc Fl v Ar volume Ar jail Oo Ar keyword Ns " " Ns "..." Oc
 Get information about
