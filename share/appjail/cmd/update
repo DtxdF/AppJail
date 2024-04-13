@@ -355,37 +355,13 @@ update_release()
 
 update_help()
 {
-	cat << EOF
-`update_usage`
-
-${update_desc}
-
-Parameters:
-    jail                      -- Update a jail.
-    release                   -- Update a release. Default: ${DEFAULT_RELEASE}
-
-Options:
-    -f                        -- See \`-F\` in freebsd-update(8).
-
-Options for jail:
-    Note: -b, -k, -K and -j are valid only by thickjails that use a release compiled from a source tree.
-
-    -b                        -- Build the world and the kernel (see below).
-    -k                        -- Unconditionally build the kernel.
-    -K                        -- If a successful kernel compilation is detected from the release,
-                                 the kernel will be compiled. This option disables this feature.
-    -j jobs                   -- Number of jobs to use. Default: ${JOBS}
-
-Options for release:
-    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
-    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
-EOF
+	man 1 appjail-update
 }
 
 update_usage()
 {
 	cat << EOF
-usage: update jail [-bfKk] [-j jobs] jail_name
-       update release [-f] [-a freebsd_arch] [-v freebsd_version] [release_name]
+usage: update jail [-bfKk] [-j <jobs>] <jail>
+       update release [-f] [-a <arch>] [-v <version>] <release>
 EOF
 }

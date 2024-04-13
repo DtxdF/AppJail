@@ -1,0 +1,145 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 13, 2024
+.Dt APPJAIL-UPDATE 1
+.Os
+.Sh NAME
+.Nm appjail-update
+.Nd Update a thick jail or a release
+.Sh SYNOPSIS
+.Nm appjail update
+.Cm jail
+.Op Fl bfKk
+.Op Fl j Ar jobs
+.Ar jail
+.Nm appjail update
+.Cm release
+.Op Fl f
+.Op Fl a Ar arch
+.Op Fl v Ar version
+.Ar release
+.Sh DESCRIPTION
+The
+.Sy appjail update
+is a utility to fetch and install updates to a jail or a release.
+.Pp
+.Bl -tag -width -xxx
+.It Cm jail Oo Fl bfKk Oc Oo Fl j Ar jobs Oc Ar jail
+Update
+.Ar jail Ns "."
+.Pp
+You can only update a thick jail, except when it comes from an empty release.
+.Pp
+This subcommand updates a thick jail using
+.Xr freebsd-update 8
+.Pq binary updates
+or using the FreeBSD source tree
+.Po source updates Pc Ns ;
+However, it depends entirely on how this jail was created. For thin jails, it is
+not possible to use this subcommand, but there are at least two methods: the first
+method uses
+.Xr appjail-etcupdate 8
+after updating the release that uses the thin jail and the second method is to
+separate the data that needs to be persisted from data that is considered ephemeral,
+so you can destroy and recreate a jail, but preserving the non-ephemeral data.
+.Pp
+Note that when the jail comes from a build from the FreeBSD source tree, the release
+is linked indirectly. To detect that the jail comes from a build from the FreeBSD
+source tree, to obtain the kernel configuration file, architecture, version and other
+parameters this subcommand uses the release directory, since those parameters are
+stored there. This is important if you want to export the jail and the release on
+another system.
+.Pp
+.Bl -tag -width xx
+.It Fl b
+Build the world and, if the kernel was compiled successfully when building the release
+.Pq and if Fl K No is not specified
+or
+.Fl k
+is specified, the kernel.
+.It Fl f
+Force
+.Xr freebsd-update 8 Cm fetch
+to proceed in the case of an unfinished upgrade. Ignored when the jail was created
+using a build from the FreeBSD source tree.
+.It Fl K
+By default, this subcommand detects whether a kernel has been compiled successfully
+when the release is created, so it will proceed to install the kernel again and, if
+.Fl b
+is specified, it will build the kernel again. This option disables this behavior.
+.It Fl k
+Build and install the kernel even if it is not necessary, that is, when it was not
+compiled correctly or at all when creating the release.
+.It Fl j Ar jobs
+Number of jobs. If this option is not set, the number of jobs specified by the
+.Sy JOBS
+parameter is used.
+.El
+.It Cm release Oo Fl f Oc Oo Fl a Ar arch Oc Oo Fl v Ar version Oc Ar release
+Update
+.Ar release Ns "."
+.Pp
+A release cannot be updated if it was created using a build from the FreeBSD source
+tree or if it is an empty release. On the one hand, an empty release is assumed to
+be the user, you, the only person who knows how to update it, and on the other hand,
+to update a release that was created using a build from the FreeBSD source tree,
+.Xr appjail-fetch 1
+should be used and, if your workflow requires it, you should also use
+.Xr appjail-etcupdate 1
+and
+.Xr appjail-deleteOld 1 "."
+.Pp
+.Bl -tag -width xx
+.It Fl f
+Force
+.Xr freebsd-update 8 Cm fetch
+to proceed in the case of an unfinished upgrade.
+.It Fl a Ar arch
+Update
+.Ar release
+with the given architecture.
+.It Fl v Ar version
+Update
+.Ar release
+with the given version.
+.El
+.Pp
+.Bl -tag -width xx
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail update"
+.Sh SEE ALSO
+.Xr appjail-checkOld 1
+.Xr appjail-etcupdate 1
+.Xr appjail-deleteOld 1
+.Xr appjail-fetch 1
+.Xr appjail-upgrade 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
