@@ -1,0 +1,335 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 12, 2024
+.Dt APPJAIL-FETCH 1
+.Os
+.Sh NAME
+.Nm appjail-fetch
+.Nd Fetch and extract components to create jails
+.Sh SYNOPSIS
+.Nm appjail fetch
+.Cm debootstrap
+.Op Fl A
+.Op Fl a Ar arch
+.Op Fl c Ar cache-start
+.Op Fl m Ar mirror
+.Op Fl r Ar name
+.Op Fl S Ar script
+.Ar suite
+.Nm appjail fetch
+.Cm destroy
+.Op Fl fR
+.Op Fl a Ar arch
+.Op Fl v Ar version
+.Ar release
+.Nm appjail fetch
+.Cm empty
+.Op Fl a Ar arch
+.Op Fl v Ar version
+.Op name
+.Nm appjail fetch
+.Cm list
+.Ar arch Ns Oo / Ns Ar version Oc
+.Nm appjail fetch
+.Cm local
+.Op Fl C
+.Op Fl a Ar arch
+.Op Fl r Ar name
+.Op Fl u Ar url
+.Op Fl v Ar version
+.Op Ar component Ns " " Ns "..."
+.Nm appjail fetch
+.Cm src
+.Op Fl bDIkNR
+.Op Fl a Ar target Ns Oo / Ns Ar target-arch Oc
+.Op Fl j Ar jobs
+.Op Fl K Ar kernel
+.Op Fl s Ar source-tree
+.Op - Ns | Ns Ar name
+.Op Ar args Ns " " Ns "..."
+.Nm appjail fetch
+.Cm www
+.Op Fl C
+.Op Fl a Ar arch
+.Op Fl r Ar name
+.Op Fl u Ar url
+.Op Fl v Ar version
+.Op Ar component Ns " " Ns "..."
+.Sh DESCRIPTION
+The
+.Sy appjail fetch
+utility is responsible for creating a release, a directory that can be used to create
+jails, which can be created in different ways, such as using FreeBSD components, using
+.Xr debootstrap 8 ","
+using the FreeBSD source tree, and so on. This utility, in addition to creating releases,
+can destroy and list them.
+.Pp
+Similar to how
+.Xr appjail-jail 1
+handles jails, releases can be marked as dirty, meaning they can be removed if they were not created correctly. However, unlike
+.Xr appjail-jail 1 ","
+the user can't arbitrarily mark or unmark a release as dirty. A release marked dirty
+is useless in most cases and can be destroyed without user consent or you can use
+the individual
+.Sy destroy
+subcommand and create the release again.
+.Pp
+When no command is specified, the default is whatever
+.Cm DEFAULT_FETCH_METHOD No specifies, but of course you must use it explicitly if you want to use any of its arguments.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm debootstrap Oo Fl A Oc Oo Fl a Ar arch Oc Oo Fl c Ar cache-start Oc Oo Fl m Ar mirror Oc Oo Fl r Ar name Oc Oo Fl S Ar script Oc Ar suite
+.Sy debootstrap
+bootstraps a basic Debian system of
+.Ar suite
+into the release directory from
+.Ar mirror
+by running
+.Ar script Ns "."
+.Pp
+.Sy You must install Em sysutils/debootstrap Sy before using this method.
+.Pp
+See
+.Xr debootstrap 8
+for details.
+.Pp
+.Bl -tag -width xx
+.It Fl A
+By default,
+.Sy APT:Cache-Start
+is increased. This option disables this behavior.
+.It Fl a Ar arch
+Specify the architecture to use in the release. If this option is not set, the architecture specified by the
+.Sy DEBOOTSTRAP_ARCH
+parameter is used.
+.It Fl c Ar cache-start
+See
+.Xr apt.conf 5
+for a description of
+.Sy Cache-Start "."
+If this option is not set, the value specified by the
+.Sy APT_CACHE_START
+parameter is used.
+.It Fl m Ar mirror
+See
+.Xr debootstrap 8
+for a description of
+.Ar MIRROR Ns "."
+If this option is not set, the mirror specified by the
+.Sy DEBOOTSTRAP_MIRROR
+parameter is used.
+.It Fl r Ar name
+Release name. If this option is not set, the name specified by the
+.Sy DEFAULT_RELEASE
+parameter is used.
+.It Fl S Ar script
+See
+.Xr debootstrap 8
+for a description of
+.Ar SCRIPT Ns "."
+If this option is not set, the mirror specified by the
+.Sy DEBOOTSTRAP_SCRIPT
+parameter is used.
+.El
+.It Cm destroy Oo Fl fR Oc Oo Fl a Ar arch Oc Oo Fl v Ar version Oc Ar release
+Destroy
+.Ar release Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl f
+Forcibly unmount file system. Ignored when ZFS is not enabled.
+.It Fl R
+Recursively destroy all dependents, including cloned file systems outside the target
+hierarchy. Ignored when ZFS is not enabled.
+.It Fl a Ar arch
+Destroy
+.Ar release
+with the given architecture. If this option is not set, the architecture specified by the
+.Sy FREEBSD_ARCH
+parameter is used.
+.It Fl v Ar version
+Destroy
+.Ar release
+with the given version. If this option is not set, the version specified by the
+.Sy FREEBSD_VERSION
+parameter is used.
+.El
+.It Cm empty Oo Fl a Ar arch Oc Oo Fl v Ar version Oc Oo Ar name Oc
+Create an empty release, that is, a directory with three files:
+.Pa .empty
+file,
+.Pa .done
+file, and
+.Pa release
+directory.
+.Pa .empty
+is a hint that commands like
+.Xr appjail-update 1
+and
+.Xr appjail-upgrade 1
+not update this release, since this method assumes you need this level of control.
+.Pa .done
+is to know if the release is dirty or not. And the
+.Pa release
+directory is where the files used to create jails should be.
+.Pp
+.Bl -tag -width xx
+.It Fl a Ar arch
+Specify the architecture to use in the release. If this option is not set,
+.Sy any
+is used since this method does not know which architecture is best in your case.
+.It Fl v Ar version
+Specify the version to use in the release. If this option is not set,
+.Sy any
+is used since this method does not know which version is best in your case.
+.El
+.It Cm list Ar arch Ns Oo / Ns Ar version Oc
+List current releases. You can limit the list by specifying
+.Ar arch Ns ,
+and
+.Ar version Ns "."
+.It Cm local Oo Fl C Oc Oo Fl a Ar arch Oc Oo Fl r Ar name Oc Oo Fl u Ar url Oc Oo Fl v Ar version Oc Oo Ar component Ns " " Ns "..." Oc
+This is exactly the same as
+.Cm www Ns ,
+but use
+.Xr cp 1
+to copy the components to be extracted from
+.Ar url Ns "."
+You must explicitly set at least
+.Ar url Ns , as it might not be valid for this method.
+.It Cm src Oo Fl bDIkNR Oc Oo Fl a Ar target Ns Oo / Ns Ar target-arch Oc Oc Oo Fl j Ar jobs Oc Oo Fl K Ar kernel Oc Oo Fl s Ar source-tree Oc Oo - Ns | Ns Ar name Oc Oo Ar args Ns " " Ns "..." Oc
+Create a release called
+.Ar name
+.Pq or the name specified by the Sy DEFAULT_RELEASE No parameter when - is used
+using a build from the FreeBSD source tree.
+.Ar args
+are arguments used by each
+.Xr make 1
+call, and if they are not specified, arguments specified by the
+.Sy MAKEARGS
+parameter are used.
+.Pp
+.Bl -tag -width xx
+.It Fl b
+Build the world and, if
+.Fl k
+is specified, the kernel.
+.It Fl D
+Don't run
+.Sy delete-old
+and
+.Sy delete-old-libs
+targets.
+.It Fl I
+Don't run
+.Sy installworld
+target.
+.It Fl k
+Build and/or install the kernel. If
+.Fl b
+is not specified, only
+.Sy installkernel
+will be executed.
+.It Fl N
+Don't run
+.Sy distribution
+target.
+.It Fl R
+Don't run
+.Sy distrib-dirs
+target.
+.It Fl a Ar target Ns Oo / Ns ar target-arch Oc
+See
+.Sy TARGET Ns / Ns Sy TARGET_ARCH
+in
+.Xr build 7 "."
+If this option is not set, the value specified by the
+.Sy TARGET_ARCH
+parameter is used.
+.It Fl j Ar jobs
+Number of jobs to use. If this option is not set, the number of jobs specified by
+the
+.Sy JOBS
+parameter is used.
+.It Fl K Ar kernel
+Kernel configuration file. If this option is not set, the kernel specified by the
+.Sy KERNEL
+parameter is used.
+.It Fl s Ar source-tree
+Location of the FreeBSD source tree. If this option is not set, the location specified by the
+.Sy SRCDIR
+parameter is used.
+.El
+.It Cm www Oo Fl C Oc Oo Fl a Ar arch Oc Oo Fl r Ar name Oc Oo Fl u Ar url Oc Oo Fl v Ar version Oc Oo Ar component Ns " " Ns "..." Oc
+Download FreeBSD components using the command specified by the
+.Sy WWW_CMD
+parameter. By default, when no components are specified, this method uses the
+.Sy COMPONENTS
+parameter.
+.Pp
+.Bl -tag -width xx
+.It Fl C
+By default, the
+.Pa MANIFEST
+file is downloaded to check if the components are OK. This option disables this
+behavior.
+.It Fl a Ar arch
+Specify the architecture to use in the release. If this option is not set, the
+architecture specified by the
+.Sy FREEBSD_ARCH
+parameter is used.
+.It Fl r Ar name
+Release name. If this option is not set, the name specified by the
+.Sy DEFAULT_RELEASE
+parameter is used.
+.It Fl u Ar url
+Site where the components will be downloaded. If this option is not set, the
+URL specified by the
+.Sy DOWNLOADURL
+parameter is used.
+.It Fl v Ar version
+Specify the version to use in the release. If this option is not set, the
+version specified by the
+.Sy FREEBSD_VERSION
+parameter is used.
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail fetch"
+.Sh SEE ALSO
+.Xr appjail-deleteOld 1
+.Xr appjail-etcupdate 1
+.Xr appjail-jail 1
+.Xr appjail-quick 1
+.Xr appjail-update 1
+.Xr appjail-upgrade 1
+.Xr appjail.conf 5
+.Xr debootstrap 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

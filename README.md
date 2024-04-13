@@ -105,7 +105,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [X] **appjail-enabled(1)**
   * [X] **appjail-etcupdate(1)**
   * [X] **appjail-expose(1)**
-  * [ ] **appjail-fetch(1)**
+  * [X] **appjail-fetch(1)**
   * [X] **appjail-fstab(1)**
   * [ ] **appjail-healthcheck(1)**
   * [X] **appjail-help(1)**

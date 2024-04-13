@@ -1014,70 +1014,22 @@ _fetch_atomic_end()
 
 fetch_help()
 {
-	cat << EOF
-`fetch_usage`
-
-${fetch_desc}
-
-Parameters:
-    debootstrap               -- Use debootstrap(8) to bootstrap a basic Debian system.
-    destroy                   -- Destroy a release.
-    list                      -- List installed releases.
-    local                     -- Copy components from local filesystem.
-    src                       -- Compile a source tree.
-    www                       -- Default. Use {WWW_CMD} to get FreeBSD components.
-
-Options:
-    -r release_name           -- Release name to use as the new jail or base for thinjails. Default: ${DEFAULT_RELEASE}
-
-Options for debootstrap:
-    -A                        -- By default, APT::Cache-Start is incremented. This option disables it.
-    -a arch                   -- See --arch in debootstrap(8). Default: ${DEBOOTSTRAP_ARCH}
-    -c apt_cache_start        -- See Cache-Start in apt.conf(5). Default: ${APT_CACHE_START}
-    -m mirror                 -- See MIRROR in debootstrap(8).
-    -S script                 -- See SCRIPT in debootstrap(8).
-
-Options for destroy:
-    -f                        -- See -f in zfs-destroy(8).
-    -R                        -- See -R in zfs-destroy(8).
-    -a osarch                 -- Release architecture. Default: ${FREEBSD_ARCH}
-    -v osversion              -- OS version of the release to be destroyed. ${FREEBSD_VERSION}
-
-Options for empty:
-    -a osarch                 -- Release architecture. Default: any
-    -v osversion              -- OS version of the release. Default: any
-
-Options for local and www:
-    -C                        -- By default, appjail tries to download the MANIFEST file and use it to verify the
-                                 downloaded components. This option disables it.
-    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
-    -u downloadurl            -- Website where the components will be downloaded. Default: ${DOWNLOADURL}
-    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
-
-Options for src:
-    -b                        -- Build the world and, if -k is specified, the kernel.
-    -D                        -- Don't run delete-old and delete-old-libs targets.
-    -I                        -- Don't run installworld target.
-    -k                        -- Build and/or install the kernel. If -b is not specified, only installkernel will
-                                 be executed.
-    -N                        -- Don't run distribution target.
-    -R                        -- Don't run distrib-dirs target.
-    -a target[/target_arch]   -- Equivalent to TARGET/TARGET_ARCH in build(7). Default: ${TARGET_ARCH}
-    -j jobs                   -- Number of jobs to use. Default: ${JOBS}
-    -K kernel                 -- Kernel configuration file to be used. Default: ${KERNEL}
-    -s source_tree            -- Source tree. Default: ${SRCDIR}
-EOF
+	man 1 appjail-fetch
 }
 
 fetch_usage()
 {
 cat << EOF
-usage: fetch debootstrap [-A] [-a arch] [-c apt_cache_start] [-m mirror] [-r release_name] [-S script] suite_name
-       fetch destroy [-f] [-a osarch] [-v osversion] release_name
-       fetch empty [-a osarch] [-v osversion] [release_name]
-       fetch list arch[/version]
-       fetch local [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
-       fetch src [-bDIkNR] [-a target[/target_arch]] [-j jobs] [-K kernel] [-s source_tree] [- | release_name] [make_args ...]
-       fetch www [-C] [-a freebsd_arch] [-r release_name] [-u downloadurl] [-v freebsd_version] [component ...]
+usage: fetch debootstrap [-A] [-a <arch>] [-c <cache-start>] [-m <mirror>]
+               [-r <name>] [-S <script>] <suite>
+       fetch destroy [-fR] [-a <arch>] [-v <version>] <release>
+       fetch empty [-a <arch>] [-v <version>] [<name>]
+       fetch list <arch>[/<version>]
+       fetch local [-C] [-a <arch>] [-r <name>] [-u <url>] [-v <version>]
+               [<component> ...]
+       fetch src [-bDIkNR] [-a <target>[/<target-arch>]] [-j <jobs>]
+               [-K <kernel>] [-s <source-tree>] [-|<name>] [<args> ...]
+       fetch www [-C] [-a <arch>] [-r <name>] [-u <url>] [-v <version>]
+               [<component> ...]
 EOF
 }
