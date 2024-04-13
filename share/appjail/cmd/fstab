@@ -952,15 +952,15 @@ fstab_help()
 fstab_usage()
 {
 	cat << EOF
-usage: appjail fstab [all [-e]|jail <jail>] compile
-       appjail fstab [all [-e]|jail <jail>] get [-eHIpt] -n <nro> [<keyword> ...]
-       appjail fstab [all [-e]|jail <jail>] [list] [-eHIpt] [-n <nro>] [<keyword> ...]
-       appjail fstab [all [-e]|jail <jail>] mounted
-       appjail fstab [all [-e]|jail <jail>] mount [<args> ...]
-       appjail fstab [all [-e]|jail <jail>] remove [all|jail <jail>]
-       appjail fstab [all [-e]|jail <jail>] set -d <device> -m <mountpoint> [-E|-e]
+usage: fstab [all [-e]|jail <jail>] compile
+       fstab [all [-e]|jail <jail>] get [-eHIpt] -n <nro> [<keyword> ...]
+       fstab [all [-e]|jail <jail>] [list] [-eHIpt] [-n <nro>] [<keyword> ...]
+       fstab [all [-e]|jail <jail>] mounted
+       fstab [all [-e]|jail <jail>] mount [<args> ...]
+       fstab [all [-e]|jail <jail>] remove [all|jail <jail>]
+       fstab [all [-e]|jail <jail>] set -d <device> -m <mountpoint> [-E|-e]
                [-p] [-D <dump>] [-N <name>] [-n [auto|<nro>]] [-o <options>] [-P <pass>]
 	       [-t <type>]
-       appjail fstab [all [-e]|jail <jail>] umount <args> ...
+       fstab [all [-e]|jail <jail>] umount <args> ...
 EOF
 }
