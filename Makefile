@@ -49,7 +49,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-image.1 \
 	 man1/appjail-fstab.1 \
 	 man1/appjail-fetch.1 \
-	 man1/appjail-update.1
+	 man1/appjail-update.1 \
+	 man1/appjail-upgrade.1
 
 APPJAIL_VERSION?=3.2.0
 

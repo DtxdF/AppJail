@@ -366,36 +366,17 @@ upgrade_release()
 
 upgrade_help()
 {
-	cat << EOF
-`upgrade_usage`
-
-${upgrade_desc}
-
-Parameters:
-    jail                      -- Upgrade a jail.
-    release                   -- Upgrade a release. Default: ${DEFAULT_RELEASE}
-
-Options:
-    -f                        -- See \`-F\` in freebsd-update(8).
-    -i                        -- See \`install\` in freebsd-update(8).
-    -u                        -- See \`upgrade\` in freebsd-update(8).
-    -n new_version            -- Specify the new release to which freebsd-update(8)
-                                 should upgrade. Also, this option is used to know
-				 the directory of the new release.
-
-Options for release:
-    -I                        -- Ignore invalid versions. A valid version is valid if its syntax is valid.
-    -a freebsd_arch           -- FreeBSD architecture. Default: ${FREEBSD_ARCH}
-    -v freebsd_version        -- FreeBSD version. Default: ${FREEBSD_VERSION}
-EOF
+	man 1 appjail-upgrade
 }
 
 upgrade_usage()
 {
 	cat << EOF
-usage: upgrade jail -i [-f] jail_name
-       upgrade jail -u -n new_version [-f] jail_name
-       upgrade release -i -n new_version [-If] [-a freebsd_arch] [-v freebsd_version] [release_name]
-       upgrade release -u -n new_version [-If] [-a freebsd_arch] [-v freebsd_version] [release_name]
+usage: upgrade jail -i [-f] <jail>
+       upgrade jail -u -n <new-release> [-f] <jail>
+       upgrade release -i -n <new-release> [-If] [-a <arch>] [-v <version>]
+               [<release>]
+       upgrade release -u -n <new-release> [-If] [-a <arch>] [-v <version>]
+               [<release>]
 EOF
 }
