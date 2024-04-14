@@ -101,6 +101,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [ ] **appjail-devfs(1)**
   * [X] **appjail-disable(1)**
   * [X] **appjail-dns(8)**
+  * [ ] **appjail-ephemeral(7)**
   * [X] **appjail-enable(1)**
   * [X] **appjail-enabled(1)**
   * [X] **appjail-etcupdate(1)**
