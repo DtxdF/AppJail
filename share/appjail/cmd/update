@@ -362,6 +362,6 @@ update_usage()
 {
 	cat << EOF
 usage: update jail [-bfKk] [-j <jobs>] <jail>
-       update release [-f] [-a <arch>] [-v <version>] <release>
+       update release [-f] [-a <arch>] [-v <version>] [<release>]
 EOF
 }
