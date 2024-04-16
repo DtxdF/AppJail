@@ -1,0 +1,460 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 15, 2024
+.Dt APPJAIL-EPHEMERAL 7
+.Os
+.Sh NAME
+.Nm appjail-ephemeral
+.Nd cattle, pets and jails
+.Sh DESCRIPTION
+AppJail has a notion of treating jails like
+.Sy cattle Ns , so many of the features are designed with that in mind. Although this is a
+priority, FreeBSD users are commonly tied to the notion of treating jails like
+.Sy pets Ns , so the result is that AppJail supports both approaches for different
+users.
+.Pp
+The
+.Dq cattle vs. pets
+approach is not a formal standard, it's just a convention for how you should treat
+your servers, which in this case, servers means jails. The article that clearly
+explains this approach is the following:
+.Pp
+.Lk https://cloudscaling.com/blog/cloud-computing/the-history-of-pets-vs-cattle/ "The History of Pets vs Cattle and How to Use the Analogy Properly"
+.Pp
+In this document I will not explain which approach is best for you as it depends
+entirely on your needs and how you work, instead I will describe how we can use
+AppJail following a concept known as
+.Dq The Ephemeral Concept
+that I am applying, practically since AppJail was born. You should know a lot about
+FreeBSD, AppJail, and the application you're running, so use this approach responsibly.
+.Sh THE EPHEMERAL CONCEPT
+The ephemeral concept means that you should treat your jails as ephemeral as possible.
+This doesn't mean that your jails should disappear after rebooting the system or stopping
+the jail; What this means is that since you have clearly separated the data that should
+persist after the jail is created again, from the data that should not persist.
+.Pp
+What data is ephemeral and what is not? The simplest examples of ephemeral data are binaries
+and all the elements that make up the jail that are restored after recreating the jail. Data
+that should not be destroyed is application data, e.g. If we have a DBMS running inside the
+jail, we should not destroy its database. Configuration files
+.Pq and similar
+may be considered non-ephemeral, but in most cases the main difference compared to application
+data is how you reinstall them; in the case of configuration files
+.Pq and similar
+they can be copied every time the jail is recreated, but it must happen before the jail, or
+service running inside the jail, is started, and the application data is probably achieved
+by mounting it inside the jail using a tool like
+.Xr mount_nullfs 8 "."
+.Sh IMPLEMENTING THE EPHEMERAL CONCEPT
+The simplest way to explain how we can use the ephemeral concept in a jail created
+by Appjail is top-down instead of bottom-up, or in other words, let's create a jail
+with a directory mounted on the data directory that is inside the jail.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm mkdir -p .volumes/wwwdir
+.No # Nm appjail makejail Fl j Ar darkhttpd Fl f Ar gh+AppJail-makejails/darkhttpd No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar "$PWD/.volumes/wwwdir" /usr/local/www/darkhttpd Qc
+\&.\&.\&.
+.No # Nm appjail fstab Cm jail Ar darkhttpd
+NRO  ENABLED  NAME  DEVICE                       MOUNTPOINT                TYPE    OPTIONS  DUMP  PASS
+0    1        -     /home/dtxdf/.volumes/wwwdir  /usr/local/www/darkhttpd  nullfs  rw       0     0
+.No # Nm echo Qo Ar <h1>Hello!</h1> Qc > Pa .volumes/wwwdir/index.html
+.No # Nm appjail jail Cm list Fl j Ar darkhttpd
+STATUS  NAME       TYPE  VERSION       PORTS  NETWORK_IP4
+UP      darkhttpd  thin  13.3-RELEASE  -      10.0.0.5
+.No # Nm curl Ar http://10.0.0.5
+<h1>Hello!</h1>
+.Ed
+.Pp
+The result of this session is self-explanatory: we have created a jail with a static
+web server installed and mounted a directory from the host to the directory that the
+web server uses. The directory, since it is located on the host, can be used to write
+files, so that's what we did: we wrote a little HTML code to display
+.Em Hello!
+to clients connecting to the web server. We did what the ephemeral concept explains:
+we separated the data that should persist from the data that should not. Let's destroy
+the jail to recreate it again:
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail makejail Fl j Ar darkhttpd Fl f Ar gh+AppJail-makejails/darkhttpd No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar "$PWD/.volumes/wwwdir" /usr/local/www/darkhttpd Qc
+\&.\&.\&.
+.No # Nm appjail fstab Cm jail Ar darkhttpd
+NRO  ENABLED  NAME  DEVICE                       MOUNTPOINT                TYPE    OPTIONS  DUMP  PASS
+0    1        -     /home/dtxdf/.volumes/wwwdir  /usr/local/www/darkhttpd  nullfs  rw       0     0
+.No # Nm appjail jail Cm list Fl j Ar darkhttpd
+STATUS  NAME       TYPE  VERSION       PORTS  NETWORK_IP4
+UP      darkhttpd  thin  13.3-RELEASE  -      10.0.0.5
+.No # Nm curl Ar http://10.0.0.5
+<h1>Hello!</h1>
+.Ed
+.Pp
+Amazing! We have successfully implemented the ephemeral concept. So easy, but this
+doesn't show some problems that we must face in real life, specifically two problems:
+.Sy filesystem permissions
+and
+.Sy mounting a directory from the host to a directory containing data "."
+Those issues may or may not affect the application inside the jail. In the case of the
+example above, it is not affected unless the files need to be written with the same
+UID and GID as the running process, but this is not the case.
+.Ss Filesystem Permissions
+The application running inside the jail assumes it can write its data just fine
+and the process is probably running using a dedicated user, so we shouldn't mount
+a directory from the host to the jail without this in mind. We need to know the UID,
+GID, file mode and mount point in advance. This is very easy to know: just create a
+jail and install the application inside it, and proceed to inquire the information we
+need. At this point it is not necessary to configure a directory and we should not do
+it since we do not have the necessary information to do it correctly. Let's create a
+jail to clarify:
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail makejail Fl j Ar rustypaste Fl f Ar gh+AppJail-makejails/rustypaste No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat
+.No # Nm appjail cmd Cm jexec Ar rustypaste Cm ls Fl ld Ar /var/db/rustypaste
+drwxr-xr-x  5 rustypaste  rustypaste  512 Apr 15 05:37 /var/db/rustypaste
+.No # Nm appjail cmd Cm jexec Ar rustypaste Cm pw usershow Ar rustypaste
+rustypaste:*:498:498::0:0:Minimal file upload/pastebin service:/nonexistent:/usr/sbin/nologin
+.No # Nm appjail cmd Cm jexec Ar rustypaste Cm pw groupshow Ar rustypaste
+rustypaste:*:498:
+.Ed
+.Pp
+Of course, I'm cheating since I know in advance which directory the above application uses,
+but for applications you don't know very well I recommend that you read their documentation
+and the
+.Xr rc 8
+script, if the application comes with one.
+.Pp
+As a last note: most services start with an empty directory and put files and more
+directories into it; What you need to know is if that directory is empty or has some
+files. This is very important because the service may need such files and if you simply
+mount a directory from the host to the jail, it will overlap and the service will not
+see those files. See
+.Sx Mounting a Directory from the Host to a Directory Containing Data
+to see how to fix this problem.
+.Pp
+Now that we have enough information, let's create the directory but with the properties that the application needs:
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm mkdir -p .volumes/db
+.No # Nm chmod 755 .volumes/db
+.No # Nm chown -f 498:498 .volumes/db
+.Ed
+.Pp
+The jail can be created again using the same command above but with the
+.Cm fstab
+option pointing to the directory we have recently created.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail makejail Fl j Ar rustypaste Fl f Ar gh+AppJail-makejails/rustypaste No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar $PWD/.volumes/db /var/db/rustypaste Qc
+.No # Nm appjail jail Cm list Fl j Ar rustypaste
+STATUS  NAME        TYPE  VERSION       PORTS  NETWORK_IP4
+UP      rustypaste  thin  13.3-RELEASE  -      10.0.0.7
+.No # Nm appjail cmd Cm jexec Ar rustypaste Cm cat Ar /var/log/rustypaste.log
+2024-04-15T10:06:16.650846Z  INFO rustypaste: Server is running at 0.0.0.0:8000
+2024-04-15T10:06:16.650864Z  INFO actix_server::builder: starting 4 workers
+2024-04-15T10:06:16.650870Z  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+.No # Nm echo Qo Ar Hello! Qc | Nm rpaste Fl s Ar http://10.0.0.7:8000 Fl
+http://10.0.0.7:8000/able-locust.txt
+.No # Nm curl Ar http://10.0.0.7:8000/able-locust.txt
+Hello!
+.Ed
+.Pp
+If we create the jail again using exactly the same command above, we can use the
+application as if the jail destruction had not occurred.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail makejail Fl j Ar rustypaste Fl f Ar gh+AppJail-makejails/rustypaste No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar $PWD/.volumes/db /var/db/rustypaste Qc
+.No # Nm curl Ar http://10.0.0.7:8000/able-locust.txt
+Hello!
+.Ed
+.Ss Mounting a Directory from the Host to a Directory Containing Data
+.Xr mount_nullfs 8 ","
+the preferred tool for mounting files or directories from the host to the jail, is very useful, but it gives us a problem if we use it incorrectly: suppose we have two directories,
+.Pa A/
+and
+.Pa B/ Ns ,
+that have a file in each one,
+.Pa A/foo.txt
+and
+.Pa B/bar.txt Ns ,
+and we want to mount
+.Pa B/
+to
+.Pa A/ Ns ,
+so we run
+.Dq mount_nullfs B/ A/
+and run
+.Dq ls A/
+to see that we now have only
+.Pa A/bar.txt Ns "."
+There is nothing wrong with
+.Xr mount_nullfs 8 ","
+but we must keep this in mind to use it correctly.
+.Pp
+This problem means that we need to move the files from the jail to the host and
+mount the directory from the host to the jail as we normally do. This, of course,
+must be achieved before the service is started, which in real life means that it
+must be achieved before the jail is started, since it is common for the service
+to start just a few seconds after starting the jail.
+.Pp
+Fortunately for you, the user, AppJail can easily do the above using the
+.Sy <pseudofs>
+pseudo-filesystem. See
+.Xr appjail-fstab 1
+for more details.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm appjail makejail Fl j Ar mariadb Fl f Ar gh+AppJail-makejails/mariadb No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar :<random> address:10.0.0.70 default Qc \e
+.No "    " Ns Fl o Cm nat No Fl - No \e
+.No "        " Ns Fl -mariadb_user Qo Ar wpuser Qc \e
+.No "        " Ns Fl -mariadb_password Qo Ar 123 Qc \e
+.No "        " Ns Fl -mariadb_database Qo Ar wordpress Qc \e
+.No "        " Ns Fl -mariadb_root_password Qo 321 Qc
+.No # Nm appjail jail Cm list Fl j Ar mariadb
+STATUS  NAME     TYPE  VERSION       PORTS  NETWORK_IP4
+UP      mariadb  thin  13.3-RELEASE  -      10.0.0.70
+.No # Nm appjail makejail Fl j Ar wordpress Fl f Ar gh+AppJail-makejails/wordpress No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar :<random> default Qc \e
+.No "    " Ns Fl o Cm nat No Fl - No \e
+.No "        " Ns Fl -wp_db_name Qo Ar wordpress Qc \e
+.No "        " Ns Fl -wp_db_user Qo Ar wpuser Qc \e
+.No "        " Ns Fl -wp_db_password Qo Ar 123 Qc \e
+.No "        " Ns Fl -wp_db_host Qo Ar 10.0.0.70 Qc
+.No # Nm appjail cmd Cm jexec Ar wordpress Cm ls Ar /usr/local/www/apache24/data/wp-content
+index.php       plugins         themes
+.No # Nm mkdir Fl p Ar .volumes/wp-content
+.No # Nm chown Ar www:www Ar .volumes/wp-content
+.No # Nm appjail makejail Fl j Ar mariadb Fl f Ar gh+AppJail-makejails/mariadb No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar :<random> address:10.0.0.70 default Qc \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar $PWD/.volumes/wp-content /usr/local/www/apache24/data/wp-content <pseudofs> Qc Fl - No \e
+.No "        " Ns Fl -mariadb_user Qo Ar wpuser Qc \e
+.No "        " Ns Fl -mariadb_password Qo Ar 123 Qc \e
+.No "        " Ns Fl -mariadb_database Qo Ar wordpress Qc \e
+.No "        " Ns Fl -mariadb_root_password Qo Ar 321 Qc
+\&.\&.\&.
+[00:00:50] [ debug ] [wordpress] Compiling fstab file ...
+[00:00:51] [ debug ] [wordpress] Compiling fstab #0: /home/dtxdf/.volumes/wp-content /usr/local/www/apache24/data/wp-content <pseudofs> rw 0 0
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/hello.php -> /home/dtxdf/.volumes/wp-content/plugins/hello.php ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/index.php -> /home/dtxdf/.volumes/wp-content/plugins/index.php ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/readme.txt -> /home/dtxdf/.volumes/wp-content/plugins/akismet/readme.txt ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/class.akismet-rest-api.php -> /home/dtxdf/.volumes/wp-content/plugins/akismet/class.akismet-rest-api.php ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/LICENSE.txt -> /home/dtxdf/.volumes/wp-content/plugins/akismet/LICENSE.txt ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/index.php -> /home/dtxdf/.volumes/wp-content/plugins/akismet/index.php ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/wrapper.php -> /home/dtxdf/.volumes/wp-content/plugins/akismet/wrapper.php ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/changelog.txt -> /home/dtxdf/.volumes/wp-content/plugins/akismet/changelog.txt ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/_inc/akismet.js -> /home/dtxdf/.volumes/wp-content/plugins/akismet/_inc/akismet.js ...
+[00:00:51] [ debug ] [wordpress] Moving /usr/local/appjail/jails/wordpress/jail//usr/local/www/apache24/data/wp-content/plugins/akismet/_inc/akismet-admin.js -> /home/dtxdf/.volumes/wp-content/plugins/akismet/_inc/akismet-admin.js ..
+--snip--
+.No # Nm appjail fstab Cm jail Ar wordpress
+NRO  ENABLED  NAME  DEVICE                           MOUNTPOINT                               TYPE        OPTIONS  DUMP  PASS
+0    1        -     /home/dtxdf/.volumes/wp-content  /usr/local/www/apache24/data/wp-content  <pseudofs>  rw       0     0
+.No # Nm appjail fstab Cm jail Ar wordpress Cm mounted
+/usr/local/appjail/releases/amd64/13.3-RELEASE/default/release -> /usr/local/appjail/jails/wordpress/jail/.appjail
+/home/dtxdf/.volumes/wp-content -> /usr/local/appjail/jails/wordpress/jail/usr/local/www/apache24/data/wp-content
+devfs -> /usr/local/appjail/jails/wordpress/jail/dev
+.Ed
+.Pp
+Fortunately, most programs are flexible enough to use a custom directory, which
+in most cases is initially empty or otherwise only has a few files.
+.Sh VOLUMES
+A volume, at least in AppJail, is a mechanism for keeping data generated by applications
+inside the jail. A volume is not linked to a specific filesystem, but the preferred one
+is
+.Xr nullfs 5 "."
+However, changing the file mode, UID and GID, and remembering the mount point every
+time we need to implement the ephemeral concept is repetitive. A script can be created,
+but if you plan to deploy your application, it is probably best to have a formal way
+to accomplish such a task.
+.Pp
+The formal way is known as
+.Xr appjail-volume 1 ","
+the utility for creating volumes,
+although it works in conjunction with
+.Xr appjail-fstab 1 "."
+Typically, these specifications are not created by the end user, but by the developer
+who wrote the Makejail. It is common to use images to distribute volume specifications
+since they are preserved in this format.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm mkdir Fl p Ar .volumes/db
+.No # Nm appjail makejail Fl j Ar rustypaste Fl f Ar gh+AppJail-makejails/rustypaste No \e
+.No "    " Ns Fl o Cm virtualnet Ns = Ns Qo Ar ":<random> default" Qc No \e
+.No "    " Ns Fl o Cm nat No \e
+.No "    " Ns Fl o Cm fstab Ns = Ns Qo Ar $PWD/.volumes/db rustypaste-db <volumefs> Qc
+.No # Nm appjail fstab Cm jail Ar rustypaste
+NRO  ENABLED  NAME  DEVICE            MOUNTPOINT     TYPE        OPTIONS  DUMP  PASS
+0    1        -     /tmp/.volumes/db  rustypaste-db  <volumefs>  rw       0     0
+.No # Nm appjail fstab Cm jail Ar rustypaste Cm mounted
+/usr/local/appjail/releases/amd64/13.3-RELEASE/default/release -> /usr/local/appjail/jails/rustypaste/jail/.appjail
+/tmp/.volumes/db -> /usr/local/appjail/jails/rustypaste/jail/var/db/rustypaste
+devfs -> /usr/local/appjail/jails/rustypaste/jail/dev
+.No # Nm appjail volume Cm list Ar rustypaste
+NAME           MOUNTPOINT          TYPE        UID  GID  PERM
+rustypaste-db  /var/db/rustypaste  <pseudofs>  498  498  -
+.No # Nm ls Fl ld Ar .volumes/db
+drwxr-xr-x  5 498 498 512 Apr 16 03:09 .volumes/db
+.Ed
+.Pp
+The
+.Sy <volumefs>
+pseudo-filesystem does all the work for the end user. The user only needs to create
+a directory, but the file mode, UID, and GID are completely set by
+.Xr appjail-fstab 1
+depending on the entries specified by
+.Xr appjail-volume 1 "."
+The best part is that it is irrelevant to know where to mount the directory, the
+user only needs to know the volume name.
+.Sh UPDATE / UPGRADE
+This is the part where we see a strong difference between the
+.Dq cattle vs. pets
+debate. FreeBSD users, as mentioned, treat their jails like a cute pet, or in other
+words, they expect to run
+.Xr freebsd-update 8
+on a jail, which is not possible for thin jails, but is possible for thick jails.
+For thin jails,
+.Xr freebsd-update 8
+runs on the release
+.Po or the base directory as known on some websites or books Pc Ns ;
+Everything is fine, if you only need to update, the problem is when you want to upgrade.
+.Pp
+The upgrade process is a bit more complicated than a simple update because you are
+effectively applying changes to a modified system that can cause conflicts. Thin
+jails further complicate this process as they are tied to the release directory
+.Po or base directory Pc Ns ,
+so it is necessary to create a new jail with the installed application and the data
+it uses. The newly created thin jail should of course use a release with the new FreeBSD
+version. Even if you use a thick jail, you have to worry about other things, such as storage
+.Pq in the modern era, it may not be a problem
+and time and resources
+.Po bandwidth, storage, CPU consumption, etc. Pc Ns ,
+since that you need to do the upgrade process for each jail. Clearly, treating jails
+like a pet is not feasible in these cases.
+.Pp
+How can we use the ephemeral concept to upgrade jails? Suppose we have a jail using
+a release with FreeBSD 13.3-RELEASE and we want to upgrade it to 14.0-RELEASE, since
+we follow the ephemeral concept, our data will persist even if we destroy and create
+the jail again, so let's do it, create the jail again but using a release with 14.0-RELEASE.
+.Pp
+.Bd -literal -compact -offset Ds
+.No # Nm cat No << Sy EOF No > Pa Makejail
+OPTION start
+OPTION overwrite=force
+OPTION virtualnet=:<random> default
+OPTION nat
+OPTION pkg=darkhttpd
+OPTION fstab=$PWD/.volumes/wwwdir /usr/local/www/darkhttpd
+
+SERVICE darkhttpd oneenable
+SERVICE darkhttpd start
+.Sy EOF
+.No # Nm appjail fetch Cm list No | Nm grep Fl Ee No \&' Ns Ar ^ARCH Ns \&' Fl e No \&' Ns Ar [0-9]+\.[0-9]+\-RELEASE Ns \&'
+ARCH   VERSION       NAME
+amd64  14.0-RELEASE  default
+amd64  13.3-RELEASE  default
+.No # Nm appjail makejail Fl j Ar darkhttpd Fl o Cm osversion Ns = Ns Ar 13.3-RELEASE
+\&.\&.\&.
+.No # Nm appjail jail Cm list Fl j Ar darkhttpd
+STATUS  NAME       TYPE  VERSION       PORTS  NETWORK_IP4
+UP      darkhttpd  thin  13.3-RELEASE  -      10.0.0.2
+.No # Nm appjail fstab Cm jail Ar darkhttpd
+NRO  ENABLED  NAME  DEVICE                MOUNTPOINT                TYPE    OPTIONS  DUMP  PASS
+0    1        -     /tmp/.volumes/wwwdir  /usr/local/www/darkhttpd  nullfs  rw       0     0
+.No # Nm echo Qo Ar <h1>Hello!</h1> Qc > Pa .volumes/wwwdir/index.html
+.No # Nm appjail update Cm release Fl v Ar 14.0-RELEASE
+\&.\&.\&.
+.No # Nm appjail makejail Fl j Ar darkhttpd Fl o Cm osversion Ns = Ns Ar 14.0-RELEASE
+\&.\&.\&.
+.No # Nm appjail jail Cm list Fl j Ar darkhttpd
+STATUS  NAME       TYPE  VERSION       PORTS  NETWORK_IP4
+UP      darkhttpd  thin  14.0-RELEASE  -      10.0.0.2
+.No # Nm curl Ar http://10.0.0.2
+<h1>Hello!</h1>
+.Ed
+.Pp
+The best part is that we don't need to worry about merging files or anything similar,
+but we do need to take into account the files that need to persist after the jail is
+created again, especially the files in
+.Pa /etc Ns , Pa /usr/local/etc
+and the configuration files used by the application running inside the jail, but
+those files should only be installed at the creation time and if you need to modify
+one of them, modify it on the host and create the jail again with the modified files.
+Fortunately, in most cases users do not modify absolutely all configuration files.
+.Pp
+As a last note, we should keep in mind that old configuration files may or may not
+make sense for new FreeBSD versions or new versions of the application you want to
+run inside the jail. Fortunately, backward compatibility in many projects is a
+priority, but it's worth keeping this note in mind anyway.
+.Sh BACKUP / RESTORE
+There is nothing magical about backing up a volume. You only have to worry about
+a few details:
+.Pp
+.Bl -dash -compact
+.It
+Stop the jail if necessary: Almost in most of the situations it is necessary to
+stop the jail or the service running inside the jail. Data integrity is important,
+and if you back up data that changes constantly, it may be difficult or impossible
+to restore it correctly.
+.It
+Restore the backup as it was: It is very important to note that you need to restore
+the backup not only with the data but also with the metadata: file mode, UID, GID
+and any other metadata required by the application running inside the jail.
+Tools like
+.Xr tar 1
+are your best friends.
+.It
+Use the appropriate backup tool: If the service running inside the jail has a backup
+tool, perhaps in your situation it is preferable to simply backing up the volume.
+.It
+Don't leave the backup on the same system: Needless to say, leaving the backup on
+the system, even if you have RAID, is a bad practice.
+.Sh SEE ALSO
+.Xr appjail 1
+.Xr appjail-fstab 1
+.Xr appjail-image 1
+.Xr appjail-jail 1
+.Xr appjail-makejail 1
+.Xr appjail-update 1
+.Xr appjail-upgrade 1
+.Xr appjail-volume 1
+.Xr appjail-makejail 5
+.Xr mount_nullfs 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
