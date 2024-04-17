@@ -51,7 +51,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-fetch.1 \
 	 man1/appjail-update.1 \
 	 man1/appjail-upgrade.1 \
-	 man7/appjail-ephemeral.7
+	 man7/appjail-ephemeral.7 \
+	 man1/appjail-healthcheck.1
 
 APPJAIL_VERSION?=3.2.0
 

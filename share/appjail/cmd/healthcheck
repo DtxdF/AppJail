@@ -41,7 +41,7 @@ HEALTHCHECK_HEALTH_JAIL_TYPE="jail"
 HEALTHCHECK_RECOVER_HOST_TYPE="host"
 HEALTHCHECK_RECOVER_JAIL_TYPE="jail"
 
-healthcheck_desc="Check jail health by running a command inside the jail or on the host."
+healthcheck_desc="Keep your jails healthy and running"
 
 healthcheck_main()
 {
@@ -865,102 +865,19 @@ _healthcheck_chk_jail()
 
 healthcheck_help()
 {
-	cat << EOF
-`healthcheck_usage`
-
-${healthcheck_desc}
-
-Parameters:
-    get                              -- Get information about the healtcheckers configuration for a given target.
-    list                             -- Like \`get\` but for all NROes.
-    remove                           -- Remove all NROes or just a single NRO.
-    run                              -- Run the enabled healthcheckers.
-    set                              -- Set parameters to an existing NRO or create it if it does not exist.
-
-Options for get:
-    -e                               -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                        in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                               -- Display the name of the columns.
-    -I                               -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -i                               -- Do not complain when the NRO does not exist.
-    -p                               -- Columnate the list.
-    -t                               -- Tabulate columns and values.
-    -n nro                           -- Operate in this NRO.
-
-Options for list:
-    -e                               -- This option is the opposite in \`Options for get\`.
-    -H                               -- This option is the opposite in \`Options for get\`.
-    -I                               -- This option is the same as in \`Options for get\`.
-    -i                               -- This option is the same as in \`Options for get\`.
-    -p                               -- This option is the opposite in \`Options for get\`.
-    -t                               -- This option is the opposite in \`Options for get\`.
-    -n nro                           -- Operate in this NRO. If not set, operate in all NROes.
-
-Keywords for get and list:
-    enabled                          -- See \`set -e\` and \`set -E\`.
-    health_cmd                       -- See \`set -h\`.
-    health_type                      -- See \`set -h\`
-    interval                         -- See \`set -i\`.
-    kill_after                       -- See \`set -k\`.
-    name                             -- See \`set -N\`.
-    nro                              -- See \`set -n\`.
-    recover_cmd                      -- See \`set -r\`.
-    recover_kill_after               -- See \`set -K\`.
-    recover_timeout                  -- See \`set -u\`.
-    recover_timeout_signal           -- See \`set -l\`.
-    recover_total                    -- See \`set -T\`.
-    recover_type                     -- See \`set -r\`.
-    retries                          -- See \`set -R\`.
-    start_period                     -- See \`set -s\`.
-    status                           -- Current state of the healthchecker. \`starting\` is when the healthchecker
-                                        is initializing, \`healthy\` is when the healthchecker is healthy, \`failing\`
-					is when \`health_cmd\` is failing but the healthchecker will retry as many times
-					as \`retries\` indicates before running \`recover_cmd\`, and \`unhealthy\` is
-					when \`recover_total\`has been reached or the \`recover_cmd\` has failed.
-    timeout                          -- See \`set -t\`.
-    timeout_signal                   -- See \`set -u\`.
-
-Options for set:
-    -E                               -- Enable this NRO.
-    -e                               -- Disable this NRO.
-    -h health_cmd                    -- Command to execute to evaluate the jail health. You can specify
-                                        a \`health type\` to execute the command on the host
-					or on the jail using a syntax such as \`health type:command\`.
-					Valid \`Health types\` are \`${HEALTHCHECK_HEALTH_HOST_TYPE}\` and \`${HEALTHCHECK_HEALTH_JAIL_TYPE}\`.
-    -i interval                      -- Interval to check the jail health.
-    -K recover_kill_after            -- Send a SIGKILL to \`recover_cmd\` after the specified seconds.
-    -k kill_after                    -- Send a SIGKILL to \`health_cmd\` after the specified seconds.
-    -l recover_timeout_signal        -- Send the \`recover_timeout_signal\` signal to \`recover_cmd\`
-                                        when \`recover_timeout\` is reached.
-    -N name                          -- The name of this NRO. It is not relevant, it is only for your
-                                        convenience.
-    -n nro                           -- The NRO. If set to auto, uses last NRO plus 1. Default: auto.
-    -R retries                       -- If \`retries\` has failed retry as many times as \`retries\`
-                                        specifies.
-    -r recover_cmd                   -- Command to be executed to try to recover the healthy state.
-                                        The command can be executed on both the jail and the host.
-					See \`-h\` for more details.
-    -S timeout_signal                -- Send the \`timeout_signal\` signal to \`health_cmd\`
-                                        when \`timeout\` is reached.
-    -s start_period                  -- Wait the specified seconds before running the healthchecker
-                                        processes.
-    -T recover_total                 -- The total number of calls to \`recover_cmd\` to avoid eternal
-                                        loops. If the command fails, the healthchecker will stop.
-    -t timeout                       -- Timeout time to send the \`timeout_signal\` signal.
-    -u recover_timeout               -- Timeout time to send the \`recover_timeout_signal\` signal.
-EOF
+	man 1 appjail-healthcheck
 }
 
 healthcheck_usage()
 {
 	cat << EOF
-usage: healthcheck get [-eHIipt] -n nro jail_name
-       healthcheck list [-eHIipt] [-n nro] jail_name
-       healthcheck remove [all | nro nro] jail_name
-       healthcheck run jail_name
-       healthcheck set [-Ee] [-h health_cmd] [-i interval] [-K recover_kill_after] [-k kill_after]
-                       [-l recover_timeout_signal] [-N name] [-n nro] [-R retries] [-r recover_cmd]
-		       [-S timeout_signal] [-s start_period] [-T recover_total] [-t timeout]
-		       [-u recover_timeout] jail_name
+usage: healthcheck get [-eHIipt] -n <nro> <jail>
+       healthcheck list [-eHIipt] [-n <nro>] <jail>
+       healthcheck remove [all|nro <nro>] <jail>
+       healthcheck run <jail>
+       healthcheck set [-E|-e] [-h <command>] [-i <seconds>] [-K <seconds>]
+               [-k <seconds>] [-l <signal>] [-N <name>] [-n [auto|<nro>]] [-R <number>]
+	       [-r <command>] [-S <signal>] [-s <seconds>] [-T <number>] [-t <seconds>]
+	       [-u <seconds>] <jail>
 EOF
 }

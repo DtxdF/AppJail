@@ -1,0 +1,480 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 16, 2024
+.Dt APPJAIL-HEALTHCHECK 1
+.Os
+.Sh NAME
+.Nm appjail-healthcheck
+.Nd Keep your jails healthy and running
+.Sh SYNOPSIS
+.Nm appjail healthcheck
+.Cm get
+.Op Fl eHIipt
+.Fl n Ar nro
+.Ar jail
+.Nm appjail healthcheck
+.Cm list
+.Op Fl eHIipt
+.Op Fl n Ar nro
+.Ar jail
+.Nm appjail healthcheck
+.Cm remove
+.Op Cm all Ns | Ns Cm nro Ar nro
+.Ar jail
+.Nm appjail healthcheck
+.Cm run
+.Ar jail
+.Nm appjail healthcheck
+.Cm set
+.Op Fl E Ns | Ns Fl e
+.Op Fl h Ar command
+.Op Fl i Ar seconds
+.Op Fl K Ar seconds
+.Op Fl k Ar seconds
+.Op Fl l Ar signal
+.Op Fl N Ar name
+.Op Fl n Oo Cm auto Ns | Ns Ar nro Oc
+.Op Fl R Ar number
+.Op Fl r Ar command
+.Op Fl S Ar signal
+.Op Fl s Ar seconds
+.Op Fl T Ar number
+.Op Fl t Ar seconds
+.Op Fl u Ar seconds
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail healthcheck
+utility creates a healthchecker to supervise the jail's health. Technically it supervise
+whether a healthchecker runs correctly or not, so it checks the health of each healthchecker,
+not the jail, but we can assume that if a healthchecker fails, it's probably that the jail or
+the application running inside the jail will get the same result.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm get Oo Fl eHIipt Oc Fl n Ar nro Ar jail
+Get information about current healthcheckers
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy nro Ns , Sy enabled Ns , Sy name Ns , Sy status Ns , Sy health_cmd No and Sy recover_cmd Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl i
+Don't complain when
+.Ar nro
+doesn't exist.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.It Fl n Ar nro
+Identifier.
+.El
+.It Cm list Oo Fl eHIipt Oc Oo Fl n Ar nro Oc Ar jail
+.No Similar to Cm get No but shows each Ar keyword No for each rule in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl i
+Perform the same task as described in
+.Cm get
+.Ns "."
+.It Fl n Ar nro
+.No Only show information for Ar nro Ns "."
+.El
+.It Cm remove Oo Cm all Ns | Ns Cm nro Ar nro Oc Ar jail
+Remove a given healthchecker.
+.Pp
+.Bl -tag -width xx
+.It Cm all
+Remove all healthcheckers.
+.It Cm nro Ar nro
+Remove the healthchecker specified by
+.Ar nro
+.Ns "."
+.El
+.It Cm run Ar jail
+Run enabled healthcheckers in foreground.
+.Pp
+Note that you should run this subcommand only for debugging, although you can view the log that
+.Xr appjail-startup 1
+generates for this purpose. See
+.Xr appjail-logs 1
+for more details.
+.Pp
+One misconception is that you might think that healthcheckers work forever. They
+were not designed with this in mind because a service that constantly crashes is
+useless and should be fixed as soon as possible. What Healthcheckers do is inform
+you when the command they run fails and attempts to repair the service they supervise
+time out, but all of this works within limits defined by the
+.Cm set
+subcommand.
+.It Cm set Oo Fl E Ns | Ns Fl e Oc Oo Fl h Ar command Oc Oo Fl i Ar seconds Oc Oo Fl K Ar seconds Oc Oo Fl k Ar seconds Oc Oo Fl l Ar signal Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Oo Fl R Ar number Oc Oo Fl r Ar command Oc Oo Fl S Ar signal Oc Oo Fl s Ar seconds Oc Oo Fl T Ar number Oc Oo Fl t Ar seconds Oc Oo Fl u Ar seconds Oc Ar jail
+.Pp
+.Bl -tag -width xx
+.It Oo Fl E Ns | Ns Fl e Oc
+Enable
+.Pq Fl E
+or disable
+.Pq Fl e
+this healthchecker.
+.It Fl h Ar command
+Command to evaluate the jail's health. If this option is not set, the command specified by the
+.Sy DEFAULT_HEALTH_CMD
+parameter is used.
+.Pp
+Prefix
+.Ar command
+with
+.Sy host:
+to run the command from the host or with
+.Sy jail:
+to run the command from the jail. If no prefix is specified, the default value
+is the one specified by the
+.Sy DEFAULT_HEALTH_TYPE
+parameter.
+.Pp
+If the keyword
+.Sy %j
+is in
+.Ar command Ns ,
+it will be replaced by the jail name.
+.It Fl i Ar seconds
+Interval to check the jail's health. If this option is not set, the value specified
+by the
+.Sy DEFAULT_HEALTH_INTERVAL
+parameter is used.
+.It Fl K Ar seconds
+Send a
+.Sy SIGKILL
+signal to the process created by the command specified by
+.Fl r
+after
+.Ar seconds
+has been reached only if it is still running. If this option is not set, the value specified
+by the
+.Sy DEFAULT_RECOVER_TIMEOUT_KILL_AFTER
+parameter is used.
+.It Fl k Ar seconds
+Send a
+.Sy SIGKILL
+signal to the process created by the command specified by
+.Fl h
+after
+.Ar seconds
+has been reached only if it is still running. If this option is not set, the
+seconds specified by the
+.Sy DEFAULT_TIMEOUT_KILL_AFTER
+parameter is used.
+.It Fl l Ar signal
+Signal to send on timeout. See
+.Fl u Ns "."
+If this option is not set, the signal specified
+by the
+.Sy DEFAULT_RECOVER_TIMEOUT_SIGNAL
+parameter is used.
+.It Fl N Ar name
+Healthchecker name.
+.It Fl n Ar nro
+Identifier. An identifier is composed of a positive number. Use
+.Cm auto
+.Pq default
+to get the lowest identifier value.
+.It Fl R Ar number
+Number of attempts to heal the jail when it is failing and to start the command
+specified by
+.Fl r Ns "."
+If this option is not set, the number specified by the
+.Sy DEFAULT_HEALTH_RETRIES
+parameter is used.
+.It Fl r Ar command
+Command to heal the jail if it is considered to be failing. If this option is not
+set, the command specified by the
+.Sy DEFAULT_RECOVER_CMD
+parameter is used.
+.Pp
+Prefix
+.Ar command
+with
+.Sy host:
+to run the command from the host or with
+.Sy jail:
+to run the command from the jail. If no prefix is specified, the default value
+is the one specified by the
+.Sy DEFAULT_RECOVER_TYPE
+parameter.
+.Pp
+If the keyword
+.Sy %j
+is in
+.Ar command Ns ,
+it will be replaced by the jail name.
+.It Fl S Ar signal
+Signal to send on timeout. See
+.Fl t Ns "."
+If this option is not set, the signal specified by the
+.Sy DEFAULT_TIMEOUT_SIGNAL
+parameter is used.
+.It Fl s Ar seconds
+Delay before running the healthchecker. If this option is not set, the value specified
+by the
+.Sy DEFAULT_HEALTH_START_PERIOD
+parameter is used.
+.It Fl T Ar number
+The maximum number of attempts reached before the jail is considered unhealthy.
+If this option is not set, the value specified by the
+.Sy DEFAULT_RECOVER_TOTAL
+parameter is used.
+.It Fl t Ar seconds
+Send the signal specified by
+.Fl t
+to the process created by the command specified by
+.Fl h
+after
+.Ar seconds
+has been reached only if it is still running. If this option is not set, the value
+specified by the
+.Sy DEFAULT_HEALTH_TIMEOUT
+parameter is used.
+.It Fl u Ar seconds
+Send the signal specified by
+.Fl l
+to the process created by the command specified by
+.Fl r
+after
+.Ar seconds
+has been reached only if it is still running. If this option is not set, the value
+specified by the
+.Sy DEFAULT_RECOVER_TIMEOUT
+parameter is used.
+.El
+.El
+.Sh HOW HEALTHCHECKERS WORK
+All healthcheckers run in parallel and are described step by step as follows:
+.Pp
+.Bl -enum
+.It
+Set the status to
+.Sy starting "."
+.It
+If the
+.Sy start period
+is greater than
+.Sy 0 ","
+the process sleeps for the indicated seconds.
+.It
+Sleep the process for the given interval.
+.It
+Execute the
+.Sy health command "."
+If the
+.Sy health type
+is
+.Sy host Ns , it executes the given command on the host, otherwise if it is
+.Sy jail
+it executes the command on the jail.
+.It
+If the timeout
+.Pq in seconds
+is reached, the signal configured for the
+.Sy health command
+is sent.
+.It
+The
+.Sy SIGKILL
+signal is sent to the
+.Sy health command
+when its
+.Sy kill after
+.Pq in seconds
+is reached. You should probably set it to be greater than its
+.Sy timeout "."
+.It
+If the
+.Sy health command
+is successful, set the status to
+.Sy healthy
+and repeat step
+.Sy 3 Ns , otherwise set the status to
+.Sy failing
+and if the current
+.Sy retry count
+is reached, continue with step 8, otherwise continue with step 3.
+.It
+If the current total of recoveries is reached, set the status to
+.Sy unhealthy
+and close the healthchecker, otherwise add one to the recovery count and continue with step 9.
+.It
+Execute the
+.Sy recover command "."
+If the
+.Sy recover type
+is
+.Sy host ","
+it executes the given command on the host, otherwise if it is
+.Sy jail
+it executes the command on the jail.
+.It
+If the
+.Sy timeout
+.Pq in seconds
+is reached, the signal configured for the
+.Sy recover command
+is sent.
+.It
+The
+.Sy SIGKILL
+signal is sent to the
+.Sy recover command
+when its
+.Sy kill after
+.Pq in seconds
+is reached. You should probably set it to be greater than its
+.Sy timeout "."
+.It
+If the
+.Sy recover command
+fails, set the status to
+.Sy unhealthy
+and close the healthchecker, otherwise set the status to
+.Sy healthy
+and continue with step 3.
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy nro
+Identifier.
+.It Sy enabled
+Shows
+.Sy 1
+if the rule is enabled,
+.Sy 0
+if it is not.
+.It Sy health_cmd
+See
+.Cm set Fl h Ns "."
+.It Sy health_type
+See
+.Cm set Fl h Ns "."
+.It Sy interval
+See
+.Cm set Fl i Ns "."
+.It Sy kill_after
+See
+.Cm set Fl k Ns "."
+.It Sy name
+See
+.Cm set Fl N Ns "."
+.It Sy recover_cmd
+See
+.Cm set Fl r Ns "."
+.It Sy recover_kill_after
+See
+.Cm set Fl k Ns "."
+.It Sy recover_timeout
+See
+.Cm set Fl u Ns "."
+.It Sy recover_timeout_signal
+See
+.Cm set Fl l Ns "."
+.It Sy recover_total
+See
+.Cm set Fl T Ns "."
+.It Sy recover_type
+See
+.Cm set Fl r Ns "."
+.It Sy retries
+See
+.Cm set Fl R Ns "."
+.It Sy start_period
+See
+.Cm set Fl s Ns "."
+.It Sy status
+Healthchecker status.
+.Pp
+There are four states:
+.Bl -dash -compact
+.It
+.Sy starting ":"
+Initial state. The healthchecker is initializing.
+.It
+.Sy healthy ":"
+The command specified by
+.Fl h
+was executed successfully.
+.It
+.Sy failing ":"
+The command specified by
+.Fl h
+was executed unsuccessfully.
+.It
+.Sy unhealthy ":"
+State set when the total recovery attempts have been reached or when the recovery
+command
+.Pq specified by Fl r
+has been executed without success.
+.El
+.It Sy timeout
+See
+.Cm set Fl t Ns "."
+.It Sy timeout_signal
+See
+.Cm set Fl S Ns "."
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail healthcheck"
+.Sh SEE ALSO
+.Xr appjail-logs 1
+.Xr appjail-startup 1
+.Xr appjail-quick 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
