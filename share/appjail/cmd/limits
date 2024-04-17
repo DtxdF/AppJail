@@ -768,7 +768,7 @@ usage: limits get [-eHIipt] -n <nro> <jail> [<keyword> ...]
        limits on <jail>
        limits remove [all|nro <nro>] <jail>
        limits remove keyword -n <nro> <jail> [<keyword> ...]
-       limits set [-Ee] [-N <name>] [-n [auto|<nro>]] <jail>
+       limits set [-E|-e] [-N <name>] [-n [auto|<nro>]] <jail>
                <resource>:<action>[=<amount>[/<per>]]
        limits stats [-eHIpt] <jail> [<keyword> ...]
 EOF

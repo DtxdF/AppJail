@@ -62,7 +62,7 @@
 .Op Ar keyword Ns " " Ns "..."
 .Nm appjail limits
 .Cm set
-.Op Fl Ee
+.Op Fl E Ns | Ns Fl e
 .Op Fl N Ar name
 .Op Fl n Op Cm auto Ns | Ns Ar nro
 .Ar jail
@@ -169,7 +169,7 @@ identified by
 See
 .Sx KEYWORDS
 for a list of available keywords.
-.It Cm set Oo Fl Ee Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Ar jail Ar resource Ns : Ns Ar action Ns Oo = Ns Ar amount Ns Oo / Ns Ar per Oc Oc
+.It Cm set Oo Fl E Ns | Ns Fl e Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Ar jail Ar resource Ns : Ns Ar action Ns Oo = Ns Ar amount Ns Oo / Ns Ar per Oc Oc
 Configure a new or existing rule.
 .Pp
 You can skip the required parameters and arguments if
@@ -181,7 +181,7 @@ to disable a given
 rule without specifying it again.
 .Pp
 .Bl -tag -width xx
-.It Oo Fl Ee Oc
+.It Oo Fl E Ns | Ns Fl e Oc
 Enable
 .Pq Fl E
 or disable
