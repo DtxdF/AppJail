@@ -738,7 +738,13 @@ has been reached only if it is still running.
 Healthchecker name.
 .It
 .Cm recover_cmd Ns :
-Command to heal the jail if it is considered to be failing.
+Command to heal the jail if it is considered to be failing. Prefix
+.Ar command
+with
+.Sy host:
+to run the command from the host or with
+.Sy jail:
+to run the command from the jail.
 .It
 .Cm recover_kill_after Ns :
 Send a
