@@ -1,0 +1,493 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 19, 2024
+.Dt APPJAIL-NETWORK 1
+.Os
+.Sh NAME
+.Nm appjail-network
+.Nd Create, remove or manage virtual networks for jails
+.Sh SYNOPSIS
+.Nm appjail network
+.Cm add
+.Op Fl O
+.Op Fl d Ar description
+.Op Fl m Ar mtu
+.Ar name
+.Ar address Ns / Ns Ar cidr
+.Nm appjail network
+.Cm assign
+.Fl e Ar interface
+.Fl j Ar jail
+.Fl n Ar network
+.Op Fl d
+.Op Fl a Oo Cm auto Ns | Ns Cm forceauto Ns | Ns Ar address Oc
+.Nm appjail network
+.Cm attach
+.Op Fl b Ar bridge
+.Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
+.Nm appjail network
+.Cm auto-create
+.Nm appjail network
+.Cm detach
+.Op Fl Ddfi
+.Op Fl b Ar bridge
+.Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
+.Nm appjail network
+.Cm fix
+.Op Cm all Ns | Ns Cm dup Ns | Ns Cm addr
+.Op Fl n Ar network
+.Nm appjail network
+.Cm get
+.Op Fl eHIpt
+.Ar network
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail network
+.Cm hosts
+.Fl a
+.Fl n Ar network
+.Nm appjail network
+.Cm hosts
+.Fl d
+.Fl n Ar network
+.Nm appjail network
+.Cm hosts
+.Fl e
+.Fl j Ar jail
+.Nm appjail network
+.Cm hosts
+.Fl l
+.Fl n Ar network
+.Nm appjail network
+.Cm hosts
+.Fl R
+.Fl j Ar jail
+.Op Fl E
+.Op Fl n Ar network
+.Nm appjail network
+.Cm hosts
+.Fl r
+.Fl n Ar network
+.Op Fl H Ns | Ns Fl N
+.Op Fl s
+.Nm appjail network
+.Cm list
+.Op Fl eHIpt
+.Op Fl n Ar network
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail network
+.Cm plug
+.Fl e Ar interface
+.Fl n Ar network
+.Op Fl d Ar description
+.Nm appjail network
+.Cm remove
+.Op Fl df
+.Ar network
+.Nm appjail network
+.Cm reserve
+.Fl j Ar jail
+.Fl n Ar network
+.Op Fl a Oo Cm auto Ns | Ns Cm forceauto Ns | Ns Ar address Oc
+.Nm appjail network
+.Cm unplug
+.Ar network
+.Ar interface
+.Sh DESCRIPTION
+The
+.Sy appjail network
+utility creates, removes, and manages virtual networks and bridges. A virtual network consists of one configured
+.Xr if_bridge 4
+interface and zero or more
+.Xr if_epair 4
+interfaces.
+.Pp
+Virtual networks are an essential part of AppJail since with them we can use features
+such as port forwarding and NAT. Furthermore, this represents a better organization of
+our jails without the need for a DHCP server.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm add Oo Fl O Oc Oo Fl d Ar description Oc Oo Fl m Ar mtu Oc Ar name Ar address Ns / Ns Ar cidr
+Create a new network called
+.Ar name Ns "."
+.Pp
+.Ar address
+must be a valid IPv4 address and
+.Ar cidr
+must be a non-negative number between
+.Sy 0
+and
+.Sy 30 "."
+.Pp
+.Bl -tag -width xx
+.It Fl O
+By default, an overlay test is performed to check if the network to be created
+overlaps an existing network. This test may be a bit slow if you have many
+networks but it avoids some problems.
+.It Fl d Ar description
+A brief description about the network.
+.It Fl m Ar mtu
+Network MTU. A valid MTU is a non-negative number between
+.Sy 576
+and
+.Sy 65535 "."
+If a network does not have an MTU defined, it uses what is specified by the
+.Sy DEFAULT_VIRTUALNET_MTU
+parameter.
+.El
+.It Cm assign Fl e Ar interface Fl j Ar jail Fl n Ar network Oo Fl d Oc Oo Fl a Oo Cm auto Ns | Ns Cm forceauto Ns | Ns Ar address Oc Oc
+Assign a non-reserved IPv4 address from
+.Ar network
+to the
+.Xr if_epair 4
+.Ar interface
+inside
+.Ar jail Ns "."
+.Pp
+If
+.Fl d
+is specified,
+.Ar network
+will be set as the default route. No checking is done if a default route already exists.
+.Pp
+See
+.Cm reserve
+to learn how the IPv4 address is reserved.
+.It Cm attach Oo Fl b Ar bridge Oc Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
+Attach
+.Ar interface
+to
+.Ar bridge Ns "."
+.Pp
+If
+.Ar bridge
+does not exist, it is created. The default bridge is the one specified by the
+.Ar SHARED_BRIDGE
+parameter.
+.Pp
+If an interface type of
+.Cm epair
+.Pq default when none is specified
+is specified, an
+.Xr if_epair 4
+interface is created if it does not exist and if the interface type is
+.Cm iface Ns ,
+an existing interface is attached to the bridge. Remember that all interfaces on
+a bridge must have the same MTU. The first MTU interface is used, so first specify
+an
+.Cm iface
+interface type before an
+.Cm epair
+interface type. In the case where an interface of type
+.Cm epair
+is specified first, the MTU specified by the
+.Sy DEFAULT_MTU
+parameter is used, but note that this may not make sense if an interface of type
+.Cm iface
+is specified with a different MTU.
+.Pp
+For an interface of type
+.Cm epair Ns ,
+two interfaces are created since that is how
+.Xr if_epair 4
+works, but the interfaces will be called
+.Sy sa_ Ns Ar interface No and Sy sb_ Ns Ar interface Ns ,
+where the first is for the host and the second for the jail.
+.It Cm auto-create
+Call the
+.Cm add
+subcommand with the parameters
+.Sy AUTO_NETWORK_ADDR ","
+.Sy AUTO_NETWORK_NAME ","
+and
+.Sy AUTO_NETWORK_DESC
+to create a new network. This is the preferred method for creating a network
+implicitly as it is more portable and simpler. It is mainly used by
+.Xr appjail-quick 1 "."
+.It Cm detach Oo Fl Ddfi Oc Oo Fl b Ar bridge Oc Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
+Detach or destroy
+.Ar interface
+from
+.Ar bridge Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl D
+Destroy
+.Ar bridge
+after detaching or destroying the interfaces.
+.It Fl d
+Destroy interfaces instead of simply removing them from the bridge.
+.Pp
+To destroy an interface, it must belong to the
+.Sy epair
+group; otherwise it is silently ignored. This group is added automatically using
+the
+.Cm attach
+subcommand.
+.It Fl f
+If the interface is to be removed as a member of the bridge but does not belong
+to it, an error may occur. This flag forces this behavior.
+.It Fl i
+Removes or destroys the interface even if it is not a member of the bridge.
+.El
+.It Cm fix Oo Cm all Ns | Ns Cm dup Ns | Ns Cm addr Oc Oo Fl n Ar network Oc
+Fixes some problems that may occur when using virtual networks.
+.Pp
+Problems commonly occur because
+.Xr appjail-jail 1
+is used to import a jail with non-portable parameters, such as an IPv4 address
+that does not belong to any existing virtual network or even the IPv4 may be
+duplicated. These
+.Dq problems
+may not be problems at all, as they may occur due to a backup when you need to
+duplicate all settings from another system. It is preferable to use
+.Xr appjail-quick 1
+to import a jail as it forcibly reserves an IPv4 address but only when using a
+virtual network, but when you need to export/import a jail in a portable way use
+.Xr appjail-image 1
+instead.
+.Pp
+If
+.Fl n
+is specified, this subcommand operates on the specified network; otherwise, it
+operates on all networks.
+.It Cm get Oo Fl eHIpt Oc Ar network Oo Ar keyword Ns " " Ns "..." Oc
+Get information about a network
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy name Ns , Sy network Ns , Sy cidr Ns , Sy broadcast Ns , Sy gateway Ns , Sy minaddr Ns , Sy maxaddr Ns , Sy addresses Ns , Sy description No and Sy mtu Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.El
+.It Cm hosts Fl a Fl n Ar network
+List available IPv4 addresses in
+.Ar network Ns "."
+.It Cm hosts Fl d Fl n Ar network
+List the IPv4 addresses that are duplicated in
+.Ar network Ns "."
+.It Cm hosts Fl e Fl j Ar jail
+List the networks to which
+.Ar jail
+belongs.
+.It Cm hosts Fl l Fl n Ar network
+List all IPv4 addresses in
+.Ar network Ns "."
+.It Cm hosts Fl R Fl j Ar jail Oo Fl E Oc Oo Fl n Ar network Oc
+List assigned IPv4 addresses for
+.Ar jail Ns "."
+If
+.Fl E
+is specified, the network to which the IPv4 addresses belong is displayed.
+.Pp
+Specify
+.Fl e
+to display only IPv4 addresses assigned solely for this network.
+.It Cm hosts Fl r Fl n Ar network Oo Fl H Ns | Ns Fl N Oc Oo Fl s Oc
+List assigned IPv4 addresses in
+.Ar network Ns "."
+.Pp
+If
+.Fl N
+is specified, the jail name is displayed after its IPv4 address. The network is
+shown as
+.Sy Default gateway
+and the broadcast as
+.Sy Broadcast Ns "."
+.Pp
+Shows the jail's hostname. If
+.Fl H
+is specified only once and if the jail does not have a hostname defined in its
+template, the jail name plus the value specified by the
+.Sy HOST_DOMAIN
+parameter is displayed as the hostname. If
+.Fl H
+is specified twice, the jail name plus the network name plus the value specified by the
+.Sy HOST_DOMAIN
+parameter is displayed as the hostname, and if
+.Fl s
+or
+.Sy SHORTEN_DOMAIN_NAMES
+is enabled, the jail name is used as secondary hostname for the network specified
+by the
+.Sy NETWORK_TO_SHORTEN
+parameter.
+.It Cm list Oo Fl eHIpt Oc Oo Fl n Ar network Oc Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each network in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl n Ar network
+.No Only show information for Ar network Ns "."
+.El
+.It Cm plug Fl e Ar interface Fl n Ar network Oo Fl d Ar description Oc
+Create a new
+.Xr if_epair 4
+interface and an
+.Xr if_bridge 4
+interface if it does not exist. The
+.Xr if_epair 4
+interface is added as a member of the bridge.
+.Pp
+This subcommand assumes that if the bridge is not in the
+.Sy appjail_bridge
+group, the bridge is not configured correctly, so it proceeds to configure the parameters specified by the
+.Cm add
+subcommand.
+.Pp
+The interfaces
+.Sy ea_ Ns Ar interface
+and
+.Sy eb_ Ns Ar interface
+represent the cloned
+.Xr if_epair 4 ","
+the first being for the host and the second for the jail. After the interfaces are created, the MTU is configured as set by the
+.Cm add
+subcommand. The
+.Sy appjail_epair
+group is added to
+.Sy ea_ Ns Ar interface Ns "."
+If
+.Fl d
+is specified, a description is added to
+.Sy ea_ Ns Ar interface Ns "."
+And finally,
+.Sy ea_ Ns Ar interface
+is added to the bridge.
+.It Cm remove Oo Fl df Oc Ar network
+Destroy a bridge. To destroy a bridge, it must be in the
+.Sy appjail_bridge
+group and must have no members unless
+.Fl f
+is specified.
+.Pp
+If
+.Fl d
+is specified, the network is also destroyed, so you can create it again using the
+.Cm add
+subcommand.
+.It Cm reserve Fl j Ar jail Fl n Ar network Oo Fl a Oo Cm auto Ns | Ns Cm forceauto Ns | Ns Ar address Oc Oc
+Reserve an IPv4 address for
+.Ar jail
+from
+.Ar network Ns "."
+.Pp
+If
+.Fl a
+is set to
+.Cm auto
+or
+.Cm forceauto Ns ,
+an IPv4 address is automatically assigned from the network address pool. The difference
+between
+.Cm auto
+and
+.Cm forceauto
+is that the former does not assign an IPv4 address if the jail has one, the exception
+is when the IPv4 is invalid depending on the network configuration, and the latter is
+that the IPv4 address is forcibly assigned, that is, the IPv4 address is assigned
+even if the jail has one.
+.Pp
+An IPv4 address can be specified. To be considered valid, it must be a valid IPv4
+address and have a correct range depending on the network address and CIDR. The
+IPv4 address must not also be reserved by another host.
+.It Cm unplug Ar network Ar interface
+Destroy
+.Sy ea_ Ns Ar interface Ns "."
+To destroy the interface, it must be a member of the bridge
+.Ar network Ns , must exist, and be in the
+.Sy appjail_epair
+group.
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy address
+Address used when
+.Cm add
+was executed.
+.It Sy addresses
+Total number of hosts.
+.It Sy broadcast
+Broadcast address.
+.It Sy cidr
+Network prefix.
+.It Sy description
+Network description.
+.It Sy gateway
+Default gateway.
+.It Sy maxaddr
+Last host of the network.
+.It Sy minaddr
+First host of the network.
+.It Sy name
+Network name.
+.It Sy netmask
+Network mask of the network.
+.It Sy network
+Network address.
+.It Sy wildcard
+Network mask with its bits inverted.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail network"
+.Sh SEE ALSO
+.Xr appjail-expose 1
+.Xr appjail-jail 1
+.Xr appjail-nat 1
+.Xr appjail-quick 1
+.Xr sysexits 3
+.Xr if_epair 4
+.Xr if_bridge 4
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

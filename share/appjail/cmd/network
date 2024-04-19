@@ -47,7 +47,7 @@ NETWORK_GENERIC_EPR="epair"
 NETWORK_GENERIC_BRG="bridge"
 NETWORK_GENERIC_LO="lo"
 
-network_desc="Create, remove or manage virtual networks (IPv4 only) for jails."
+network_desc="Create, remove or manage virtual networks for jails."
 
 network_main()
 {
@@ -1592,161 +1592,30 @@ _network_chk_basicjail()
 
 network_help()
 {
-	cat << EOF
-`network_usage`
-
-${network_desc}
-
-Parameters:
-    add                             -- Add a new network.
-    assign                          -- Assign a non-reserved IP address to a jail and its e-pair within it.
-    attach                          -- Attach an interface to a bridge.
-    auto-create                     -- Create a virtual network using the default settings.
-    detach                          -- Detach an interface from a bridge.
-    fix                             -- Fixes some problems that may occur when using virtual networks.
-    get                             -- Get keywords from a specific network.
-    hosts                           -- List the addresses of a network.
-    list                            -- List the networks.
-    plug                            -- Create a new e-pair and adds it as a member of a bridge. It also creates the bridge
-                                       if it does not exist.
-    remove                          -- Destroy a bridge.
-    reserve                         -- Assign a non-reserved IP address to a jail.
-    unplug                          -- Destroy an e-pair.
-
-Options for add:
-    -O                              -- By default, before adding the network, an overlay test is run to check if there is a
-                                       network that might cause problems with a common range. The test can be slow, but it
-			               avoids some problems. If you are sure that a network does not overlap another network,
-			               you can disable the test with this option.
-    -d description                  -- Network description.
-    -m mtu                          -- Set this MTU to the network to be created. For a Virtual Network already created with
-                                       no MTU defined, the MTU is the default anyway. Default: ${DEFAULT_VIRTUALNET_MTU}
-
-Options for assign:
-    -d                              -- Mark network_name as the default route.
-
-Options for assign and reserve:
-    -a auto|forceauto|address       -- IP address to use. Use \`auto\` to use an available IP address. Use \`forceauto\` even
-                                       when the jail has an IP address assigned and you want to obtain a non-specific IP
-				       address.
-    -j jail_name                    -- Jail to assign the IP address.
-    -n network_name                 -- Network name.
-
-Options for assign:
-    -e ether_name                   -- Name of the e-pair.
-
-Options for attach and detach:
-    \`attach\` is a much more generic version of \`plug\` and is intended for environments that need isolation between jails and for
-    environments that do not use NAT to provide connections to the external network. Both \`attach\` and \`detach\` accept an
-    interface using a syntax such as \`type:interface\`.
-
-    Valid types are: ${NETWORK_ATTACH_TYPE_EPAIR}, ${NETWORK_ATTACH_TYPE_IFACE}. If \`type\` is not specified, \`${NETWORK_DEFAULT_ATTACH_TYPE}\` will be used.
-    If \`epair\` is specified, \`attach\` or \`detach\` will create an interface \`if_epair(4)\` using a name such as s[ab]_<interface>.
-    If \`iface\` is specified, an existing interface is added to a bridge member.
-
-    -b bridge                       -- Bridge name. If the bridge does not exist, \`attach\` will create it. Default: ${SHARED_BRIDGE}
-
-Options for detach:
-    -D                              -- Destroy the bridge.
-    -d                              -- Destroy the specified bridge members instead of removing them from the bridge. This option does not destroy
-                                       interfaces that are not in the ${NETWORK_GENERIC_EPR} group, they are simply ignored.
-    -f                              -- When using with \`-d\` it destroys an ${NETWORK_GENERIC_EPR} interface that is not a member of the bridge.
-    -i                              -- Does not display an error when a specified interface is not a member of the specified bridge.
-
-Parameters for fix:
-    all                             -- Try to solve all possible problems in the following order: addr, dup.
-    addr                            -- Reserve a new IP address for a jail that has an address that is not in a valid range in its network.
-    dup                             -- Reserve a new IP address for a jail that has the same IP address as another jail.
-
-Options for fix all, fix addr and fix dup:
-    -n network_name                 -- Operate in this network. If not set operate in all networks.
-
-Options for get:
-    -e                              -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                       in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                              -- Display the name of the columns.
-    -I                              -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -p                              -- Columnate the list.
-    -t                              -- Tabulate columns and values.
-
-Parameters for hosts:
-    -a                              -- List only available IP adddresses.
-    -d                              -- Check for duplicate IP addresses.
-    -e                              -- Show the names of the networks to which this jails belongs.
-    -l                              -- List all IP addresses.
-    -R                              -- Show assigned IP addresses.
-    -r                              -- List only reserved IP addresses.
-
-Options for hosts -a, -d, -l, -R and -r:
-    -n network_name                 -- Operate in this network.
-
-Options for hosts -e and -R:
-    -j jail_name                    -- The name of the target jail.
-
-Options for hosts -R:
-    -E                              -- Show the network name of the IP address of the jail.
-
-Options for hosts -r:
-    -H                              -- Display the host name of the IP address owner.
-                                       Use twice to concatenate name + network + {HOST_DOMAIN}.
-    -N                              -- Display the owner of the IP address.
-    -s                              -- When -HH is used, in addition to displaying the domain name as
-                                       described above, it also displays only the name of each jail.
-
-Options for list:
-    -e                              -- This option is the opposite in \`Options for get\`.
-    -H                              -- This option is the opposite in \`Options for get\`.
-    -I                              -- This option is the same as in \`Options for get\`.
-    -p                              -- This option is the opposite in \`Options for get\`.
-    -t                              -- This option is the opposite in \`Options for get\`.
-    -n network_name                 -- Operate in this network. If not set operate in all networks.
-
-Keywords for get and list:
-    address                         -- Address used in \`network add\`.
-    addresses                       -- Total number of hosts.
-    broadcast                       -- Broadcast address.
-    cidr                            -- Network prefix.
-    description                     -- Network description.
-    gateway                         -- Router address used by the bridge.
-    maxaddr                         -- Last host of this network.
-    minaddr                         -- First host of this network.
-    name                            -- Network name.
-    netmask                         -- Network mask of this network.
-    network                         -- Network address.
-    wildcard                        -- Network mask with its bits inverted.
-
-Options for plug:
-    -e ether_name                   -- Name of the new e-pair.
-    -d description                  -- e-pair description.
-    -n network_name                 -- Bridge to add the e-pair as a new member.
-
-Options for remove:
-    -d                              -- Destroy completely the network, not just destroy the bridge.
-    -f                              -- If the bridge has members, the bridge cannot be destroy, this option force
-                                       the destruction of the bridge.
-EOF
+	man 1 appjail-network
 }
 
 network_usage()
 {
 	cat << EOF
-usage: network add [-O] [-d description] [-m mtu] network_name network_address/cidr
-       network assign -e ether_name -j jail_name -n network_name [-d] [-a auto|forceauto|address]
-       network attach [-b bridge] [[epair|iface]:]interface ...
+usage: network add [-O] [-d <description>] [-m <mtu>] <name> <address>/<cidr>
+       network assign -e <interface> -j <jail> -n <network> [-d]
+               [-a [auto|forceauto|<address>]]
+       network attach [-b <bridge>] [epair|iface:]<interface> ...
        network auto-create
-       network detach [-Ddi] [-b bridge] [[epair|iface]:]interface ...
-       network fix [all | dup | addr] [-n network_name]
-       network get [-eHIpt] network_name [keyword ...]
-       network hosts -a -n network_name
-       network hosts -d -n network_name
-       network hosts -e -j jail_name
-       network hosts -l -n network_name
-       network hosts -R -j jail_name [-E] [-n network_name]
-       network hosts -r -n network_name [-HNs]
-       network list [-eHIpt] [-n network_name] [keyword ...]
-       network plug -e ether_name -n network_name [-d description]
-       network remove [-df] network_name
-       network reserve -j jail_name -n network_name [-a auto|forceauto|address]
-       network unplug network_name ether_name
+       network detach [-Ddfi] [-b <bridge>] [epair|iface:]<interface> ...
+       network fix [all|dup|addr] [-n <network>]
+       network get [-eHIpt] <network> [<keyword> ...]
+       network hosts -a -n <network>
+       network hosts -d -n <network>
+       network hosts -e -j <jail>
+       network hosts -l -n <network>
+       network hosts -R -j <jail> [-E] [-n <network>]
+       network hosts -r -n <network> [-H|-N] [-s]
+       network list [-eHIpt] [-n <network>] [<keyword> ...]
+       network plug -e <interface> -n <network> [-d <description>]
+       network remove [-df] <network>
+       network reserve -j <jail> -n <network> [-a [auto|forceauto|<address>]]
+       network unplug <network> <interface>
 EOF
 }
