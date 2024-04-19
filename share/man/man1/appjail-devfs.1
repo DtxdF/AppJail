@@ -1,0 +1,351 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 17, 2024
+.Dt APPJAIL-DEVFS 1
+.Os
+.Sh NAME
+.Nm appjail-devfs
+.Nd Dynamic DEVFS ruleset management
+.Sh SYNOPSIS
+.Nm appjail devfs
+.Cm append
+.Ar jail
+.AR file
+.Nm appjail devfs
+.Cm apply
+.Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
+.Ar jail
+.Oo Ar rulenum Ns | Ns Ar rulespec Ns " " Ns "..." Oc
+.Nm appjail devfs
+.Cm applyset
+.Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
+.Ar jail
+.Nm appjail devfs
+.Cm del
+.Ar jail
+.Ar rulenum
+.Nm appjail devfs
+.Cm delset
+.Op Fl q
+.Ar jail
+.Nm appjail devfs
+.Cm get
+.Op Fl eHIipt
+.Fl n Ar nro
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail devfs
+.Cm list
+.Op Fl eHIipt
+.Op Fl n Ar nro
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail devfs
+.Cm load
+.Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
+.Ar jail
+.Nm appjail devfs
+.Cm remove
+.Op Cm all Ns | Ns Cm nro Ar nro
+.Ar jail
+.Nm appjail devfs
+.Cm ruleset
+.Cm assign
+.Op Fl R
+.Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
+.Ar jail
+.Nm appjail devfs
+.Cm ruleset
+.Cm get
+.Ar jail
+.Nm appjail devfs
+.Cm ruleset
+.Cm remove
+.Ar jail
+.Nm appjail devfs
+.Cm set
+.Op Fl E Ns | Ns Fl e
+.Op Fl N Ar name
+.Op Fl n Oo Cm auto Ns | Ns Ar nro Oc
+.Ar jail
+.Ar rulespec
+.Nm appjail devfs
+.Cm show
+.Op Fl n Ar name
+.Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
+.Ar jail
+.Nm appjail devfs
+.Cm showsets
+.Nm appjail devfs
+.Cm status
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail devfs
+utility dynamically manages devices inside jails using the DEVFS subsystem. This
+changes the way you managed devices, i.e. you are not required to modify the
+.Xr devfs.rules 5
+file or reload the devfs
+.Xr rc 8
+script before using the ruleset, as this command performs the work for you.
+.Pp
+However, AppJail supports both approaches. The
+.Dq classic way
+is the one you know best: modify your
+.Xr devfs.rules 5
+file to place any devices you need in your jails, reload the rules by restarting the devfs
+.Xr rc 8
+script, and set
+.Sy devfs_ruleset
+to the ruleset number you had specified. The
+.Dq modern way
+involves this subcommand, which is usually achieved in combination with the
+.Xr appjail-quick 1 Ns 's Sy device No option.
+.Pp
+How a ruleset number is assigned depends on the algorithm set by the
+.Sy DEVFS_ASSIGN_ALGO
+parameter.
+.Pp
+The options are as follows:
+.Pp
+.Bl -tag -width xxx
+.It Cm append Ar jail
+Read a file line by line to add new rules. This subcommand calls the
+.Cm set
+subcommand to add a rule for each line.
+.It Cm apply Oo Fl r Oo Cm auto Ns | Ns Ar ruleset Oc Oc Ar jail Oo Ar rulenum Ns | Ns Ar rulespec Ns " " Ns "..." Oc
+Apply rule number
+.Ar rulenum
+or the rule described by
+.Ar rulespec
+to the jail's
+.Pa /dev
+directory. Rules that are
+.Dq applied
+have their conditions checked against all nodes in the mount-point and the actions taken if they match.
+.Pp
+Before applying a rule, this subcommand sets
+.Ar ruleset
+to the ruleset specified by
+.Fl r
+as the current for the jail's
+.Pa /dev
+directory.
+.Pp
+See
+.Sy ruleset assign
+for how the ruleset number is assigned.
+.It Cm applyset Oo Fl r Oo Cm auto Ns | Ns Ar ruleset Oc Oc Ar jail
+Apply all the rules in the ruleset to the jail's
+.Pa /dev
+directory.
+.Pp
+This subcommand first loads all enabled rules set by the
+.Cm set
+subcommand and then applies them to the jail's
+.Pa /dev
+directory with the specified
+.Ar ruleset Ns "."
+.Pp
+See
+.Sy ruleset assign
+for how the ruleset number is assigned.
+.It Cm del Ar jail Ar rulenum
+Delete rule number
+.Ar rulenum
+from the ruleset.
+.Pp
+The ruleset must be loaded before using this subcommand. After deleting the rule
+number, the ruleset is applied to the jail's
+.Pa /dev
+directory for the changes to take effect.
+.It Cm delset Oo Fl q Oc Ar jail
+Delete all rules from the ruleset.
+.Pp
+The ruleset must be loaded before using this subcommand unless
+.Fl q
+is specified, which means that
+.Sy 0
+is returned even if the ruleset is not loaded.
+.It Cm get Oo Fl eHIipt Oc Fl n Ar nro Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+Get information about current rules
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy nro Ns , Sy enabled Ns , Sy name Ns , Sy rule No and Sy loaded Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl i
+Don't complain when
+.Ar nro
+doesn't exist.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.It Fl n Ar nro
+Identifier.
+.El
+.It Cm list Oo Fl eHIipt Oc Oo Fl n Ar nro Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get No but shows each Ar keyword No for each rule in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl i
+Perform the same task as described in
+.Cm get
+.Ns "."
+.It Fl n Ar nro
+.No Only show information for Ar nro Ns "."
+.El
+.It Cm load Oo Fl r Oo Cm auto Ns | Ns Ar ruleset Oc Oc Ar jail
+Load and apply all enabled rules set by the
+.Cm set
+subcommand.
+.Pp
+See
+.Sy ruleset assign
+for how the ruleset number is assigned.
+.It Cm remove Oo Cm all Ns | Ns Cm nro Ar nro Oc Ar jail
+Remove a given rule.
+.Pp
+.Bl -tag -width xx
+.It Cm all
+Remove all rules.
+.It Cm nro Ar nro
+Remove the rule specified by
+.Ar nro
+.Ns "."
+.El
+.It Cm ruleset Cm assign Oo Fl R Oc Oo Fl r Oo Cm auto Ns | Ns Ar ruleset Oc Oc Ar jail
+Assign a ruleset number for
+.Ar jail
+using the algorithm specified by the
+.Sy DEVFS_ASSIGN_ALGO
+parameter if
+.Fl r
+is set to
+.Cm auto Ns ,
+but if it is a non-negative
+.Pq and non-zero
+number, it is set as the current ruleset number. Note that setting the ruleset
+number to an existing one may overwrite any rules it has.
+.Pp
+If the ruleset number is already assigned, this subcommand will not reassign
+another one unless
+.Fl R
+is specified.
+.Pp
+Once this subcommand completes, the assigned ruleset number is displayed.
+.It Cm ruleset Cm get Ar jail
+Shows the current ruleset number assigned.
+.It Cm set Oo Fl E Ns | Ns Fl e Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Ar jail Ar rulespec
+Configure a new or existing rule.
+.Pp
+.Bl -tag -width xx
+.It Oo Fl E Ns | Ns Fl e Oc
+Enable
+.Pq Fl E
+or disable
+.Pq Fl e
+this rule.
+.It Fl N Ar name
+Brief description about this rule.
+.It Fl n Oo Cm auto Ns | Ns Ar nro Oc
+Identifier. An identifier is composed of a positive number. Use
+.Cm auto
+.Pq default
+to get the lowest identifier value.
+.El
+.It Cm show Oo Fl n Ar name Oc Oo Fl r Oo Cm auto Ns | Ns Ar ruleset Oc Oc Ar jail
+Display the rules as a valid
+.Xr devfs.rules 5
+file. The first line between brackets denotes the start of a ruleset. In the brackets should be the name of a ruleset specified by
+.Fl n
+or
+.Em devfsrules_ Ns Sy XXXXXXXXXXX Po where the Xs are a random string Pc
+if no name is specified and its number specified by
+.Fl r Ns , separated by an equal sign.
+.Pp
+See
+.Sy ruleset assign
+for how the ruleset number is assigned.
+.It Cm showsets
+Report the numbers of existing rulesets.
+.Pp
+Unlike
+.Xr devfs 8 Ns 's Cm showsets Ns , it includes jail's ruleset numbers even if they are not currently applied.
+.It Cm status Ar jail
+Display all the rules in the ruleset.
+.El
+.Sh KEYWORDS
+.Bl -tag -width xx
+.It Sy nro
+Identifier.
+.It Sy enabled
+Shows
+.Sy 1
+if the rule is enabled,
+.Sy 0
+if it is not.
+.It Sy name
+Brief description about this rule.
+.It Sy rule
+The rule that will be applied.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail devfs"
+.Sh SEE ALSO
+.Xr sysexits 3
+.Xr devfs 5
+.Xr devfs.rules 5
+.Xr devfs 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

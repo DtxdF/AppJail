@@ -871,96 +871,27 @@ devfs_status()
 
 devfs_help()
 {
-    cat << EOF
-`devfs_usage`
-
-${devfs_desc}
-
-Parameters:
-    append                 -- Set rules by reading a file line by line. This command assumes that this file
-                              does not have a devfsrules name like \`[devfsrules_XXX=XX]\` or a \`devfs rule\`
-			      subcommand like \`path\`.
-    apply                  -- Apply a rule. This command uses \`devfs ruleset\` before applying this rule to
-                              reference it.
-    applyset               -- Load rules and apply them.
-    del                    -- Remove a rulenum.
-    delset                 -- Remove a ruleset.
-    get                    -- Get information about the current devfs rule for a given target.
-    list                   -- Like \`get\` but for all NROes.
-    load                   -- Load rules.
-    remove                 -- Remove all NROes or just a single NRO.
-    ruleset                -- Manipulate the ruleset number for this jail.
-    set                    -- Set parameters to an existing NRO or create it if it does not exist.
-    show                   -- Show current rules in a format described in \`devfs.rules(5)\`.
-    showsets               -- Show loaded and assigned rulesets. Assigned rulesets does not imply that they are
-                              loaded.
-    status                 -- Show loaded devfs rules.
-
-Options for apply, applyset, ruleset assign and show:
-    -r auto|ruleset        -- Operate in this ruleset. If not set, \`auto\` is used, which implies that
-                              \`{DEVFS_ASSIGN_ALGO}\` is used to obtain an unused ruleset number.
-
-Options for delset:
-    -q                     -- Quiet mode.
-
-Options for get:
-    -e                     -- This option is not required when using -p. The \\t character is used to delimit columns,
-                              in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                     -- Display the name of the columns.
-    -I                     -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -i                     -- Do not complain when the NRO does not exist.
-    -p                     -- Columnate the list.
-    -t                     -- Tabulate columns and values.
-    -n nro                 -- Operate in this NRO.
-
-Options for list:
-    -e                     -- This option is the opposite in \`Options for get\`.
-    -H                     -- This option is the opposite in \`Options for get\`.
-    -I                     -- This option is the same as in \`Options for get\`.
-    -i                     -- This option is the same as in \`Options for get\`.
-    -p                     -- This option is the opposite in \`Options for get\`.
-    -t                     -- This option is the opposite in \`Options for get\`.
-    -n nro                 -- Operate in this NRO. If not set, operate in all NROes.
-
-Parameters for ruleset:
-    assign                 -- Assign a ruleset. It also display the current ruleset number.
-    get                    -- Get the current ruleset.
-    remove                 -- Remove the current ruleset.
-
-Options for ruleset assign:
-    -R                     -- Reassign a ruleset.
-
-Options for set:
-    -E                     -- Enable this NRO.
-    -e                     -- Disable this NRO.
-    -N name                -- The name of this NRO. It is not relevant, it is only for your
-                              convenience.
-    -n auto|nro            -- Default: auto. The NRO. If set to auto, uses the total of all NROes in
-                              {JAILDIR}/{jail_name}/conf/boot/devfs.
-
-Options for show:
-    -n name                -- The name of this ruleset. If not set, a random name is chosen.
-EOF
+	man 1 appjail-devfs
 }
 
 devfs_usage()
 {
     cat << EOF
-usage: devfs append jail_name devfs_rules
-       devfs apply [-r auto | ruleset] jail_name rulespec ...
-       devfs applyset [-r auto | ruleset] jail_name
-       devfs del jail_name rulenum
-       devfs delset [-q] jail_name
-       devfs get [-eHIipt] -n nro jail_name [keyword ...]
-       devfs list [-eHIipt] [-n nro] jail_name [keyword ...]
-       devfs load [-r auto | ruleset] jail_name
-       devfs remove [all | nro nro] jail_name
-       devfs ruleset assign [-R] [-r auto | ruleset] jail_name
-       devfs ruleset get jail_name
-       devfs ruleset remove jail_name
-       devfs set [-Ee] [-N name] [-n auto | nro] jail_name rulespec
-       devfs show [-n name] [-r auto | ruleset] jail_name
+usage: devfs append <jail>
+       devfs apply [-r [auto|<ruleset>]] <jail> [<rulenum>|<rulespec> ...]
+       devfs applyset [-r [auto|<ruleset>]] <jail>
+       devfs del <jail> <rulenum>
+       devfs delset [-q] <jail>
+       devfs get [-eHIipt] -n <nro> <jail> [<keyword> ...]
+       devfs list [-eHIipt] [-n <nro>] <jail> [<keyword> ...]
+       devfs load [-r [auto|<ruleset>]] <jail>
+       devfs remove [all|nro <nro>] <jail>
+       devfs ruleset assign [-R] [-r [auto|<ruleset>]] <jail>
+       devfs ruleset get <jail>
+       devfs ruleset remove <jail>
+       devfs set [-E|-e] [-N <name>] [-n [auto|<nro>]] <jail> <rulespec>
+       devfs show [-n <name>] [-r [auto|<ruleset>]] <jail>
        devfs showsets
-       devfs status jail_name
+       devfs status <jail>
 EOF
 }
