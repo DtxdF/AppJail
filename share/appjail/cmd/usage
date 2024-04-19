@@ -41,20 +41,18 @@ usage_for()
 
 	cmd="$1"
 	if [ -z "${cmd}" ]; then
-		echo "usage: usage_for cmd"
-		return ${EX_USAGE}
+		usage_usage
+		exit ${EX_USAGE}
 	fi
 
 	if [ ! -x "${COMMANDS}/${cmd}" ]; then
-		echo "The command \"${cmd}\" does not exist."
-		return ${EX_NOINPUT}
+		lib_err ${EX_NOINPUT} "Command \"${cmd}\" does not exist."
 	fi
 
 	lib_load "${COMMANDS}/${cmd}"
 
 	if ! lib_check_func "${cmd}_usage"; then
-		echo "${cmd}_usage function does not exist in the ${cmd} command."
-		return ${EX_SOFTWARE}
+		lib_err ${EX_SOFTWARE} "${cmd}_usage function does not exist in the ${cmd} command."
 	fi
 
 	${cmd}_usage

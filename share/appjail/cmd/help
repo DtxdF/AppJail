@@ -86,7 +86,8 @@ help_for()
 
 	cmd="$1"
 	if [ -z "${cmd}" ]; then
-		lib_err ${EX_USAGE} "usage: help_for cmd"
+		help_usage
+		exit ${EX_USAGE}
 	fi
 
 	if [ ! -x "${COMMANDS}/${cmd}" ]; then
