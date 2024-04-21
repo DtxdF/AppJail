@@ -1,0 +1,304 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 21, 2024
+.Dt APPJAIL-NAT 1
+.Os
+.Sh NAME
+.Nm appjail-nat
+.Nd Mapping local IPv4 address to an external IPv4 address
+.Sh SYNOPSIS
+.Nm appjail nat
+.Cm add
+.Cm jail
+.Fl n Ar network
+.Op Fl e Ar interface
+.Op Fl l Oo - Ns | Ns Ar options Oc
+.Op Fl o Ar interface
+.Ar jail
+.Nm appjail nat
+.Cm add
+.Cm jail
+.Fl N
+.Fl n Ar network
+.Op Fl e Ar interface
+.Op Fl o Ar interface
+.Ar jail
+.Nm appjail nat
+.Cm get
+.Cm jail
+.Op Fl eHIpt
+.Fl n Ar network
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail nat
+.Cm list
+.Cm jail
+.Op Fl eHIpt
+.Op Fl n Ar network
+.Ar jail
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail nat
+.Cm off
+.Cm jail
+.Ar jail
+.Nm appjail nat
+.Cm on
+.Cm jail
+.Ar jail
+.Nm appjail nat
+.Cm remove
+.Cm jail
+.Fl n Ar network
+.Ar jail
+.Nm appjail nat
+.Cm status
+.Cm jail
+.Ar jail
+.Pp
+.Nm appjail nat
+.Cm add
+.Cm network
+.Op Fl e Ar interface
+.Op Fl l Oo - Ns | Ns Ar options Oc
+.Op Fl o Ar interface
+.Ar network
+.Nm appjail nat
+.Cm boot
+.Op Cm off Ns | Ns Cm on
+.Cm network
+.Ar network
+.Nm appjail nat
+.Cm get
+.Cm network
+.Op Fl eHIpt
+.Ar network
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail nat
+.Cm list
+.Cm network
+.Op Fl eHIpt
+.Op Fl n Ar network
+.Op Ar keyword Ns " " Ns "..."
+.Nm appjail nat
+.Cm off
+.Cm network
+.Ar network
+.Nm appjail nat
+.Cm on
+.Cm network
+.Ar network
+.Nm appjail nat
+.Cm remove
+.Cm network
+.Ar network
+.Nm appjail nat
+.Cm status
+.Cm network
+.Ar network
+.Sh DESCRIPTION
+The
+.Sy appjail nat
+utility performs NAT for jails and networks. It uses virtual networks to do this,
+that is, it performs NAT to allow jails to communicate with the outside. The
+difference between per-jail NAT and per-network NAT is how it is applied: in the
+first case, NAT is only applied to one jail and the second case is applied to the
+entire network, which includes all jails that have an IPv4 address assigned from
+the network the NAT rule is applied. For those cases where you want to apply a
+per-network NAT rule but do not want to apply NAT to a particular jail, you can
+apply a rule known as
+.Po NO Pc Ns NAT Ns "."
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm add Cm jail Fl n Ar network Oo Fl e Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar jail
+Configure a new rule to perform NAT.
+.Pp
+.Bl -tag -width xx
+.It Fl n Ar network
+Use the IPv4 address assigned from this network address pool as the local IPv4
+address.
+.It Fl e Ar interface
+Interface to obtain the external IPv4 address. If not set, the interface specified
+by the
+.Sy EXT_IF
+parameter is used.
+.It Fl l Oo - Ns | Ns Ar options Oc
+Firewall-specific logging options. Use a minus sign to enable logging, but without options.
+.It Fl o Ar interface
+Apply rules to packets coming in on, or going out through, this interface. If not
+set, the interface specified by the
+.Sy ON_IF
+parameter is used.
+.El
+.It Cm add Cm jail Fl N Fl n Ar network Oo Fl e Ar interface Oc Oo Fl o Ar interface Oc Ar jail
+Perform
+.Po NO Pc Ns NAT Ns "."
+.Pp
+.Bl -tag -width xx
+.It Fl N
+Configure a new rule to perform
+.Po NO Pc Ns NAT Ns "."
+.Pp
+Useful when NAT is applied per network and you don't want to apply NAT for a particular
+jail.
+.It Fl n Ns , Fl e Ns , Fl o
+All of these options perform the same task as the options described in
+.Cm add Cm jail Ns "."
+.El
+.It Cm get Cm jail Oo Fl eHIpt Oc Oo Fl n Ar network Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+Get information about current rules
+.Ns , that is, the
+.Ar keyword
+that represent the information to be obtained. Multiple keywords can be specified,
+which are displayed as a table-like interface in the order in which they are specified.
+.No If no Ar keyword No is specified, the defaults are Sy name Ns , Sy network No and Sy rule Ns "."
+.Pp
+See
+.Sx KEYWORDS
+for a list of available keywords.
+.Pp
+.Bl -tag -width xx
+.It Fl e
+Not required when using
+.Fl p
+.Ns "."
+The
+.Sy \et
+character is used to delimit columns,
+so as not to show strange values, this option shows
+.Sy <TAB>
+instead of
+.Sy \et
+in the case that a value contains the latter.
+.It Fl H
+Shows the name of the columns.
+.It Fl I
+Include empty values. By default, a minus sign is displayed when a value is empty.
+.It Fl p
+Columnate the list.
+.It Fl t
+Tabulate columns and values.
+.It Fl n Ar network
+Identifier.
+.El
+.It Cm list Cm jail Oo Fl eHIpt Oc Oo Fl n Ar network Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+.No Similar to Cm get Cm jail No but shows each Ar keyword No for each rule in a nice table.
+.Pp
+.Bl -tag -width xx
+.It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
+.No All of these options perform the opposite task of the options described in Cm get Cm jail Ns "."
+.It Fl n Ar network
+.No Only show information for Ar network Ns "."
+.El
+.It Cm off Cm jail Ar jail
+Flush the rules currently in use.
+.It Cm on Cm jail Ar jail
+Load enabled rules configured by
+.Cm add
+.Cm jail
+.Ns "."
+.It Cm remove Cm jail Fl n Ar network Ar jail
+Remove the given rule.
+.It Cm status Cm jail Ar jail
+Shows the rule that is currently in use or an error if it is not yet applied.
+.It Cm add Cm network Oo Fl e Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar network
+Same as
+.Cm add
+.Cm jail
+but for networks.
+.It Cm boot Oo Cm off Ns | Ns Cm on Oc Cm network Ar network
+Enable
+.Pq on
+or disable
+.Pq off
+NAT per-network using
+.Xr appjail-startup 1 "."
+.It Cm get Cm network Oo Fl eHIpt Oc Ar network Oo Ar keyword Ns " " Ns "..." Oc
+Same as
+.Cm get
+.Cm jail
+but for networks.
+.It Cm list Cm network Oo Fl eHIpt Oc Oo Fl n Ar network Oc Oo Ar keyword Ns " " Ns "..." Oc
+Same as
+.Cm get
+.Cm jail
+but for networks.
+.It Cm off Cm network Ar network
+Same as
+.Cm off
+.Cm jail
+but for networks.
+.It Cm on Cm network Ar network
+Same as
+.Cm on
+.Cm jail
+but for networks.
+.It Cm remove Cm network Ar network
+Same as
+.Cm remove
+.Cm jail
+but for networks.
+.It Cm status Cm network Ar network
+Same as
+.Cm status
+.Cm jail
+but for networks.
+.El
+.Sh KEYWORDS
+.Ss get jail, get network, list jail, list network
+.Bl -tag -width xx
+.It Sy name
+Target
+.Pq jail or network
+name.
+.It Sy rule
+The rule that will be applied.
+.El
+.Ss get jail, list jail
+.Bl -tag -width xx
+.It Sy network
+Network to obtain the local IPv4 address.
+.El
+.Ss get network, list network
+.Bl -tag -width xx
+.It Sy boot
+Shows
+.Sy 1
+if the rule will be applied by
+.Xr appjail-startup 1 ","
+.Sy 0
+otherwise.
+.El
+.Sh EXIT STATUS
+.Ex -std "appjail nat"
+.Sh SEE ALSO
+.Xr appjail-network 1
+.Xr appjail-startup 1
+.Xr sysexits 3
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

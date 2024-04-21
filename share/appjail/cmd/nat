@@ -34,7 +34,7 @@ lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
 
-nat_desc="Mapping a network or jail IPv4 address to an external IPv4 address (NAT)."
+nat_desc="Mapping local IPv4 address to an external IPv4 address."
 
 nat_main()
 {
@@ -1169,88 +1169,30 @@ _nat_chk_network()
 
 nat_help()
 {
-	cat << EOF
-`nat_usage`
-
-${nat_desc}
-
-Parameters:
-    add                       -- Add a NAT configuration. This parameter overrides the current rule.
-    boot                      -- Set the \`boot\` flag to apply NAT rules using \`appjail startup\`.
-    get                       -- Get information about the current NAT configuration for a given target.
-    list                      -- Like \`get\` but for all targets.
-    off                       -- Disables the current NAT rule.
-    on                        -- Enables the current NAT rule.
-    remove                    -- Remove the current NAT rule.
-    status                    -- Show loaded nat rules.
-
-Parameters for add jail:
-    -N                        -- Don't use NAT for this jail.
-
-Options for add jail and add network:
-    -e ext_if                 -- The external interface. If not defined, {EXT_IF} is used.
-    -l - | log_options        -- Enable logging. Not all firewalls support options. At the moment, pf(4) accepts
-                                 options like \`(option1, option2, optionN)\`. Pass - to enable logging, but not use
-    -o on_if                  -- The name or group of the network interface to transmit packets on. If not defined, {ON_IF} is used.
-				 the options.
-
-Options for add jail:
-    -n network_name           -- The network to obtain the IP.
-
-Parameters for boot:
-    off                       -- Removes the boot flag.
-    on                        -- Creates the boot flag.
-
-Parameters for boot off and boot on:
-    network                   -- Creates or removes the boot flag on a network.
-
-Options for get jail and get network:
-    -e                        -- This option is not required when using -p. The \\t character is used to delimit columns,
-                                 in order not to display strange values, this option displays <TAB> instead of \\t.
-    -H                        -- Display the name of the columns.
-    -I                        -- Include empty values. By default, a minus sign is displayed when a value is empty.
-    -p                        -- Columnate the list.
-    -t                        -- Tabulate columns and values.
-
-Options for list jail and list network:
-    -e                        -- This option is the opposite in \`Options for get\`.
-    -H                        -- This option is the opposite in \`Options for get\`.
-    -I                        -- This option is the same as in \`Options for get\`.
-    -p                        -- This option is the opposite in \`Options for get\`.
-    -t                        -- This option is the opposite in \`Options for get\`.
-    -n network_name           -- Operate in this network. If not defined, operate in all networks.
-
-Keywords for get jail, get network, list jail and list network:
-    name                      -- Jail or network name.
-    rule                      -- Firewall rule to be used.
-
-Keywords for get jail and list jail:
-    network                   -- Network used by the jail to obtain the IP address.
-
-Keywords for get network and list network:
-    boot                      -- If 1, the NAT rule for the network will be started using the \`appjail startup\` command.
-EOF
+	man 1 appjail-nat
 }
 
 nat_usage()
 {
 	cat << EOF
-usage: nat add jail -n network_name [-e ext_if] [-l [- | log_options]] [-o on_if] jail_name
-       nat add jail -N -n network_name [-e ext_if] [-o on_if] jail_name
-       nat get jail [-eHIpt] -n network_name jail_name [keyword ...]
-       nat list jail [-eHIpt] [-n network_name] jail_name [keyword ...]
-       nat off jail jail_name
-       nat on jail [-n network_name] jail_name
-       nat remove jail -n network_name jail_name
-       nat status jail jail_name
+usage: nat add jail -n <network> [-e <interface>] [-l [-|<options>]]
+               [-o <interface>] <jail>
+       nat add jail -N -n <network> [-e <interface>] [-o <interface>] <jail>
+       nat get jail [-eHIpt] -n <network> <jail> [<keyword> ...]
+       nat list jail [-eHIpt] [-n <network>] <jail> [<keyword> ...]
+       nat off jail <jail>
+       nat on jail <jail>
+       nat remove jail -n <network> <jail>
+       nat status jail <jail>
 
-usage: nat add network [-e ext_if] [-l [- | log_options]] [-o on_if] network_name
-       nat boot [off | on] network network_name
-       nat get network [-eHIpt] network_name [keyword ...]
-       nat list network [-eHIpt] [-n network_name] [keyword ...]
-       nat off network network_name
-       nat on network network_name
-       nat remove network network_name
-       nat status network network_name
+usage: nat add network [-e <interface>] [-l [-|<options>]] [-o <interface>]
+               <network>
+       nat boot [off|on] network <network>
+       nat get network [-eHIpt] <network> [<keyword> ...]
+       nat list network [-eHIpt] [-n <network>] [<keyword> ...]
+       nat off network <network>
+       nat on network <network>
+       nat remove network <network>
+       nat status network <network>
 EOF
 }

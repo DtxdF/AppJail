@@ -118,7 +118,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [X] **appjail-logs(1)**
   * [X] **appjail-makejail(1)**
   * [ ] **appjail-makejail(5)**
-  * [ ] **appjail-nat(1)**:
+  * [X] **appjail-nat(1)**:
   * [X] **appjail-network(1)**
   * [X] **appjail-pkg(1)**
   * [X] **appjail-quick(1)**
