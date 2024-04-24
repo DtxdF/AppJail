@@ -50,6 +50,191 @@ provides a quick guide to configuring AppJail, RC scripts, the packet filter,
 and some recommendations.
 .Sy This tutorial is not suitable for all kind of users ","
 but for beginners or users who do not need all the features of AppJail.
+.Sh SUBCOMMANDS
+.Ss Tutorial
+.Bl -tag -width xxx
+.It Xr appjail-tutorial 7
+A tutorial introduction to AppJail.
+.El
+.Ss Configuration
+.Bl -tag -width xxx
+.It Xr appjail.conf 5
+Configuration parameters for AppJail.
+.El
+.Ss Image
+.Bl -tag -width xxx
+.It Xr appjail-ajspec 5
+AJSPEC file specification.
+.It Xr appjail-image 1
+Create, list, remove, update images and much more.
+.El
+.Ss Automation
+.Bl -tag -width xxx
+.It Xr appjail-initscript 5
+Jail automation script.
+.It Xr appjail-makejail 5
+Build a jail using a Makejail file.
+.El
+.Ss Templates
+.Bl -tag -width xxx
+.It Xr appjail-config 1
+Configuration utiliy for templates.
+.It Xr appjail-template 5
+Template file specification.
+.El
+.Ss Makejails
+.Bl -tag -width xxx
+.It Xr appjail-apply 1
+Apply a Makejail to an existing jail.
+.It Xr appjail-makejail 1
+Build a jail using a Makejail file.
+.El
+.Ss Networking
+.Bl -tag -width xxx
+.It Xr appjail-network
+Create, remove or manage virtual networks for jails.
+.It Xr appjail-nat 1
+Mapping local IPv4 address to an external IPv4 address.
+.It Xr appjail-expose 1
+Port forwarding from host port to jail port.
+.El
+.Ss Help
+.Bl -tag -width xxx
+.It Xr appjail-help 1
+Display help information about AppJail.
+.It Xr appjail-usage 1
+Display the syntax of a given command.
+.It Xr appjail-version 1
+Display version information about AppJail.
+.El
+.Ss DNS
+.Bl -tag -width xxx
+.It Xr appjail-dns 8
+DNS information for AppJail users.
+.El
+.Ss ZFS
+.Bl -tag -width xxx
+.It Xr appjail-zfs 1
+Common ZFS commands for jails.
+.El
+.Ss Source
+.Bl -tag -width xxx
+.It Xr appjail-deleteOld 1
+Run delete-old and delete-old-libs targets on a given release or jail.
+.It Xr appjail-checkOld 1
+Run check-old target on a given release or jail
+.It Xr appjail-etcupdate 1
+Manage updates to system files not updated by installworld.
+.El
+.Ss Startup Management
+.Bl -tag -width xxx
+.It Xr appjail-restart 1
+Restart a running jail.
+.It Xr appjail-rstop 1
+Stop a jail and the jails it depends on.
+.It Xr appjail-stop 1
+Stop a running jail.
+.It Xr appjail-startup 1
+Unattended command to start jails and other related things.
+.It Xr appjail-start 1
+Start a stopped jail.
+.It Xr appjail-status 1
+Show the status of a jail.
+.El
+.Ss Volume Management
+.Bl -tag -width xxx
+.It Xr appjail-fstab 1
+Static information about the file systems of a jail.
+.It Xr appjail-volume 1
+Volume management for jails.
+.El
+.Ss Resource Management
+.Bl -tag -width xxx
+.It Xr appjail-limits 1
+Display and update resource limits database for jails.
+.It Xr appjail-cpuset 1
+Configure processor sets for jails.
+.El
+.Ss Update / Upgrade
+.Bl -tag -width xxx
+.It Xr appjail-update 1
+Update a thick jail or a release.
+.It Xr appjail-upgrade 1
+Upgrade a jail or a release.
+.El
+.Ss Argument Persistence
+.Bl -tag -width xxx
+.It Xr appjail-disable 1
+Remove default parameters for stages.
+.It Xr appjail-enable 1
+Set default parameters for stages.
+.It Xr appjail-enabled 1
+Get the value for a given enabled parameter.
+.El
+.Ss Supervisor
+.Bl -tag -width xxx
+.It Xr appjail-healthcheck 1
+Keep your jails healthy and running.
+.El
+.Ss Logs Management
+.Bl -tag -width xxx
+.It Xr appjail-logs 1
+Log management for jails.
+.El
+.Ss Xr rc 8 Management
+.Bl -tag -width xxx
+.It Xr appjail-service 1
+Control (start/stop/etc.) or list system services within a jail.
+.It Xr appjail-sysrc 1
+Safely edit system rc files within a jail.
+.El
+.Ss Trusted Users
+.Bl -tag -width xxx
+.It Xr appjail-user 8
+Hints and parameters for trusted users.
+.El
+.Ss Jail Creation
+.Bl -tag -width xxx
+.It Xr appjail-jail 1
+Creates, removes, lists and configures jails.
+.It Xr appjail-quick 1
+Create a pre-configured jail.
+.El
+.Ss Command Execution
+.Bl -tag -width xxx
+.It Xr appjail-cmd 1
+Execute commands in a jail.
+.El
+.Ss Dynamic Device Management
+.Bl -tag -width xxx
+.It Xr appjail-devfs 1
+Dynamic DEVFS ruleset management.
+.El
+.Ss Package Management
+.Bl -tag -width xxx
+.It Xr appjail-pkg 1
+Manipulate packages within a jail.
+.El
+.Ss Release Creation
+.Bl -tag -width xxx
+.It Xr appjail-fetch 1
+Fetch and extract components to create jails.
+.El
+.Ss Ephemeral Concept
+.Bl -tag -width xxx
+.It Xr appjail-ephemeral 7
+cattle, pets and jails.
+.El
+.Ss Login
+.Bl -tag -width xxx
+.It Xr appjail-login 1
+Log into the jail.
+.El
+.Ss User-defined Stages
+.Bl -tag -width xxx
+.It Xr appjail-run 1
+Run user-defined stages.
+.El
 .Sh EXIT STATUS
 .Ex -std
 It may fail for one of the following reasons:
