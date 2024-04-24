@@ -1,0 +1,929 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd April 21, 2024
+.Dt APPJAIL-MAKEJAIL 5
+.Os
+.Sh NAME
+.Nm appjail-makejail
+.Nd Automate the steps of creating a jail
+.Sh DESCRIPTION
+Makejail is a simple text file that automates the steps of creating a jail, generate
+an
+.Sy InitScript
+and a
+.Sy BuildScript Ns "."
+.Pp
+Makejails are processed line by line, removing comments, empty lines and including
+the Makejails specified by
+.Cm INCLUDE
+.Pq if any
+in a single, temporary Makejail that is responsible for executing the rest of the
+supported instructions. See
+.Cm INCLUDE
+for more details.
+.Pp
+Makejail files are divided in stages that can be changed using the
+.Cm STAGE
+instruction, which are actually functions as described in
+.Xr appjail-initscript 5 ","
+except the build stage which is not used by
+.Sy InitScript Ns ,
+but is used by the
+.Sy BuildScript Ns .
+See
+.Xr appjail-makejail 1
+for more details.
+.Sh INSTRUCTIONS
+.Bl -tag -width xxx -compact
+.It Cm ADD Oo Fl Fl verbose Oc Ar url Oo Ar destination Oc
+Download and extract a tarball file from
+.Ar url
+to the jail directory or
+.Ar destination Ns ,
+a path relative to the jail directory, using the program specified by the
+.Sy MAKEJAIL_ADD_FETCH_CMD
+parameter. Use
+.Fl Fl verbose
+to produce a verbose output when extracting the tarball using
+.Xr tar 1 "."
+.Pp
+.Cm WORKDIR
+can affect this instruction.
+.Pp
+.It Cm ARG Ar name Ns Oo Oo Cm \&? Oc Ns Cm = Oc Ns Oo Ar default-value Oc
+Create arguments as specified by
+.Xr appjail-initscript 5 "."
+If no default value is specified, the arguments become non-optional unless
+.Cm \&?
+is used. When
+.Cm \&?
+is used, the user can set a parameter to an empty value.
+.Pp
+You don't need the argument value enclosed in double quotes even when it has spaces.
+.Pp
+See
+.Cm CMD
+for how arguments are passed to the process.
+.Pp
+.It Cm CLEAR Oo Cm entrypoint Ns | Ns Cm user Ns | Ns Cm workdir Ns | Ns Cm stage Oc
+Clear the value previously set by one of the following instructions:
+.Cm ENTRYPOINT Ns , Cm USER Ns , Cm WORKDIR No or Cm STAGE Ns "."
+.Pp
+In the case of the
+.Cm STAGE
+instruction, all commands written up to this instruction and in the current stage are removed.
+.Pp
+.It Cm CMD Fl Fl chroot Ar command Oo Ar args No "..." Oc
+.It Cm CMD Fl Fl jaildir Ar command Oo Ar args No "..." Oc
+.It Cm CMD Oo Fl Fl jexec Oc Oo Fl Fl noclean Oc Oo Fl Fl juser Ar username Ns | Ns Fl Fl huser Ar username Oc Ar command Oo Ar args No "..." Oc
+.It Cm CMD Fl Fl local Ar command Oo Ar args No "..." Oc
+.It Cm CMD Fl Fl local-jaildir Ar command Oo Ar args No "..." Oc
+.It Cm CMD Fl Fl local-rootdir Ar command Oo Ar args No "..." Oc
+This instruction uses the AppJail tokenizer best described in
+.Xr appjail-template 5
+to execute a string with
+.Xr sh 1
+instructions. This instruction keeps the \&", \&', and \e characters in the string to better emulate the behavior of
+.Xr sh 1 "."
+.Pp
+Internally,
+.Cm ARG
+and
+.Cm VAR
+.Pq it doesn't do this by default, but does it with one of its parameters
+can create variables that are passed via environment variables to the
+.Xr sh 1
+process.
+.Pp
+.Bd -literal -compact -offset Ds
+OPTION overwrite
+OPTION start
+
+ARG name=DtxdF
+
+CMD echo "Hello, ${name}"
+.Ed
+.Pp
+This instruction has the advantage that it can execute virtually any shell command.
+.Pp
+.Bd -literal -compact -offset Ds
+CMD cd /usr/local/etc/opensearch/opensearch-security; for i in $(ls *.sample) ; do cp -p "$i" $(echo $i | sed "s|.sample||g"); done
+.Ed
+.Pp
+All of the above commands will be executed on the jail, not on the host, even the embedded shell commands.
+.Pp
+Remember that this command uses the AppJail tokenizer, so you cannot use an invalid
+.Pq but accepted by Xr sh 1
+shell command. For example, if you run
+.Nm echo No \&"\e\&"
+in a shell script, you will get the error
+.Dq Syntax error: Unterminated quoted string
+but if you run it in a Makejail you will get
+.Dq Tokenizer: ERROR [ret:-4, errno:0] <Invalid syntax (WDERRS).>.
+.Pp
+.Fl Fl chroot No is equivalent to Xr appjail-cmd 1 Cm chroot Ns "."
+.Pp
+.Fl Fl jaildir No is equivalent to Xr appjail-cmd 1 Cm jaildir Ns "."
+.Pp
+.Fl Fl jexec Fl Fl noclean No is equivalent to Xr appjail-cmd 1 Cm jexec Fl l Ns "."
+.br
+.Fl Fl jexec Fl Fl juser No is equivalent to Xr appjail-cmd 1 Cm jexec Fl U Ns "."
+.br
+.Fl Fl jexec Fl Fl huser No is equivalent to Xr appjail-cmd 1 Cm jexec Fl u Ns "."
+.Pp
+.Fl Fl local No runs a command from the host but using the local directory which may be different. See
+.Cm INCLUDE
+for more details.
+.Pp
+.Fl Fl local-jaildir No is equivalent to Xr appjail-cmd 1 Cm local Fl j Ns "."
+.Pp
+.Fl Fl local-rootdir No is equivalent to Xr appjail-cmd 1 Cm local Fl r Ns "."
+.Pp
+.It Cm COPY Oo Fl Fl glob Ns | Ns Fl Fl glob-left Ns | Ns Fl Fl glob-right Oc Oo Fl Fl verbose Oc Oo Fl Fl jail Ar jail Oc Ar source Oo Ar destination Oc
+Copy a file from the host to the jail or
+.Ar destination Ns ,
+a path relative to the jail directory.
+.Pp
+.Cm WORKDIR
+can affect this instruction.
+.Pp
+Use
+.Fl Fl jail
+to copy
+.Ar source
+from another jail.
+.Pp
+Using
+.Fl Fl glob Ns , Fl Fl glob-left Ns , Fl Fl glob-right No is equivalent to
+.No * Ns Ar source Ns * Ns , * Ns Ar source No and Ar source Ns * Ns ,
+but you can't use such expressions in
+.Ar source Ns "."
+.Pp
+Increase the verbosity using
+.Fl Fl verbose Ns "."
+.Pp
+Note that this instruction copies the file or directory as is, that is, metadata
+such as file mode, uid, gid, etc., are preserved.
+.Pp
+.It Cm DESTROY Oo Fl Fl force Oc Oo Fl Fl with-all-dependents Oc Ar jail
+Stop and destroy
+.Ar jail Ns "."
+.Pp
+.Fl Fl force No is equivalent to Xr appjail-jail 1 Cm destroy Fl f Ns "."
+.Pp
+.Fl Fl with-all-dependents No is equivalent to Xr appjail-jail 1 Cm destroy Fl R Ns "."
+.Pp
+.It Cm DEVICE Ar rulespec No "..."
+Apply
+.Pq see Xr appjail-devfs 1 Cm apply
+and add
+.Pq see Xr appjail-devfs 1 Cm set
+a new DEVFS rule.
+.Pp
+.It Cm ENTRYPOINT Ar program
+When running a program using
+.Cm RUN Ns ,
+the program specified by this instruction is used implicitly, for example:
+.Pp
+.Bd -literal -compact -offset Ds
+ENTRYPOINT python3.10
+RUN script.py
+.Ed
+.Pp
+.It Cm ENV Ar name Ns Oo = Ns Ar value Oc
+Environment variables used by
+.Cm RUN Ns "."
+Additional environment variables can be passed using the
+.Fl V
+parameter supported by
+.Xr appjail-apply 1 ","
+.Xr appjail-makejail 1 ","
+.Xr appjail-start 1 ","
+.Xr appjail-stop 1
+and
+.Xr appjail-run 1 "."
+.Pp
+.It Cm EXEC Oo Fl Fl continue-with-errors Oc Oo Fl Fl verbose Oc Oo Oo Fl Fl after-include Ar makejail Oc No "..." Oc Oo Oo Fl Fl arg Ar parameter Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl Fl before-include Ar makejail Oc No "..." Oc Oo Oo Fl Fl build-arg Ar parameter Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl Fl option Ar option Oc No "..." Oc Fl Fl file Ar makejail Fl Fl name Ar name
+Run a Makejail.
+.Pp
+.Fl Fl continue-with-errors No is equivalent to Xr appjail-makejail 1 Fl e Ns "."
+.Pp
+.Fl Fl verbose No is equivalent to Xr appjail-makejail 1 Fl v Ns "."
+.Pp
+.Fl Fl after-include No is equivalent to Xr appjail-makejail 1 Fl a Ns "."
+.Pp
+.Fl Fl arg No is equivalent to passing arguments as you normally do from command-line but without double dashes.
+.Pp
+.Fl Fl before-include No is equivalent to Xr appjail-makejail 1 Fl B Ns "."
+.Pp
+.Fl Fl option No is equivalent to Xr appjail-makejail 1 Fl o Ns "."
+.Pp
+.Fl Fl file No is equivalent to Xr appjail-makejail 1 Fl f Ns "."
+.Pp
+.Fl Fl name No is equivalent to Xr appjail-makejail 1 Fl j Ns "."
+.Pp
+.Fl Fl file ","
+.Fl Fl after-include
+and
+.Fl Fl before-include
+can use a temporary Makejail defined by
+.Cm GLOBAL Ns "."
+.Pp
+.It Cm FROM Oo Fl Fl ajspec Ar name Oc Oo Fl Fl entrypoint Oo Ar entrypoint Ns | Ns Cm none Oc Oc Oo Fl Fl platform Ar platform Oc Ar image Ns Oo : Ns Ar tag Oc
+Import an image to create a jail.
+.Pp
+.Fl Fl ajspec No is equivalent to Xr appjail-image 1 Cm import Fl N Ns "."
+.Pp
+If
+.Fl Fl entrypoint
+is not specified, this instruction does what
+.Sy IMAGE_ENTRYPOINT
+describes. If set to
+.Cm none Ns ,
+it is assumed that the image is currently installed, so this instruction will not
+attempt to download it. See
+.Xr appjail-image 1 Cm import No for more details.
+.Pp
+.Fl Fl platform No is equivalent to Xr appjail-image 1 Cm import Fl a Ns "."
+.Pp
+.Ar image No is equivalent to Xr appjail-image 1 Cm import Fl n Ns "."
+.Pp
+.Ar tag No is equivalent to Xr appjail-image 1 Cm import Fl t Ns "."
+If not defined, the tag specified by the
+.Sy IMAGE_TAG
+parameter is used.
+.Pp
+.It Cm GLOBAL No : Ns Ar name Ns : Oo Ar instruction Oo Ar args No "..." Oc Oc
+Create a temporary Makejail that can be executed by
+.Sy EXEC Ns "."
+This instruction is intended for those who want to build, from another jail, an
+application that generates an executable that is copied by the main Makejail and
+used by the main jail, although this instruction can be used for much more, for
+example deploying multiple jails whose services are used by the main jail. However,
+nothing prevents you from creating another Makejail file and configuring the
+.Sy EXEC
+instruction to use it.
+.Pp
+Note that since the Makejail generated by this instruction is a temporary file,
+any reference to a file is relative to that directory since
+.Cm INCLUDE
+works this way.
+.Pp
+.Bd -literal -compact -offset Ds
+# Correct
+GLOBAL :darkhttpd: INCLUDE gh+AppJail-makejails/darkhttpd
+GLOBAL :darkhttpd: COPY --verbose "${APPJAIL_PWD}/usr/" usr
+
+# Wrong
+GLOBAL :darkhttpd: INCLUDE gh+AppJail-makejails/darkhttpd
+GLOBAL :darkhttpd: COPY --verbose usr
+.Ed
+.Pp
+.It Cm INCLUDE Oo Ar method Ns + Oc Ns Ar path Oo Ar args No "..." Oc
+This is the first instruction executed, which includes a Makejail file, removes
+empty lines and comments, changes the current directory to the directory where
+the included Makejail is located, and restores the previous stage after reading
+the last included Makejail. After doing all this, internally a single Makejail
+file will be written with all the instructions from all the other Makejails
+.Pq except the Cm INCLUDE No instructions, of course
+which is finally executed.
+.Pp
+The following Makejails ilustrate the above description:
+.Pp
+.Pa a.makejail Ns :
+.Bd -literal -compact -offset Ds
+OPTION start
+OPTION overwrite
+
+INCLUDE b.makejail
+
+CMD echo "I'm a in the build stage."
+.Ed
+.Pp
+.Pa b.makejail Ns :
+.Bd -literal -compact -offset Ds
+STAGE cmd
+
+CMD echo "I'm b in the cmd stage."
+.Ed
+.Pp
+The resulting MAkejail will be:
+.Pp
+.Bd -literal -compact -offset Ds
+OPTION start
+OPTION overwrite
+STAGE cmd
+CMD echo "I'm b in the cmd stage."
+STAGE build
+CMD echo "I'm a in the build stage."
+.Ed
+.Pp
+To illustrate how INCLUDE changes the current directory, the following examples are useful:
+.Pp
+.Pa A/Makejail Ns :
+.Bd -literal -compact -offset Ds
+OPTION start
+OPTION overwrite
+
+CMD echo "I'm A in the build stage."
+
+INCLUDE ../B/Makejail
+
+CMD echo "I'm A in the build stage again."
+.Ed
+.Pp
+.Pa B/Makejail Ns :
+.Bd -literal -compact -offset Ds
+STAGE cmd
+
+CMD echo "I'm B in the cmd stage."
+
+INCLUDE ../C/Makejail
+.Ed
+.Pp
+.Pa C/Makejail Ns :
+.Bd -literal -compact -offset Ds
+STAGE build
+
+CMD echo "I'm C in the build stage."
+CMD mkdir -p /usr/local/etc
+COPY config.conf /usr/local/etc
+CMD cat /usr/local/etc/config.conf
+
+STAGE start
+CMD echo "I'm C in the start stage."
+.Ed
+.Pp
+After including all Makejails in a single Makejail:
+.Pp
+.Bd -literal -compact -offset Ds
+RAW cd -- "/tmp/n/A" # Makejail: /tmp/n/A/Makejail
+OPTION start
+OPTION overwrite
+CMD echo "I'm A in the build stage."
+RAW cd -- "/tmp/n/B" # Makejail: /tmp/n/B/Makejail
+STAGE cmd
+CMD echo "I'm B in the cmd stage."
+STAGE build
+RAW cd -- "/tmp/n/C" # Makejail: /tmp/n/C/Makejail
+CMD echo "I'm C in the build stage."
+CMD mkdir -p /usr/local/etc
+COPY config.conf /usr/local/etc
+CMD cat /usr/local/etc/config.conf
+STAGE start
+CMD echo "I'm C in the stage stage."
+STAGE cmd
+STAGE build
+RAW cd -- "/tmp/n/A" # Makejail: /tmp/n/A/Makejail
+CMD echo "I'm A in the build stage again."
+.Ed
+.Pp
+Some
+.Cm STAGE
+instructions seem unnecessary, but are relevant in some cases, for example:
+.Pp
+.Pa A/Makejail Ns :
+.Bd -literal -compact -offset Ds
+OPTION overwrite
+OPTION start
+
+CMD echo "I'm A before include B."
+
+INCLUDE ../B/Makejail
+
+CMD echo "I'm A after include B."
+.Ed
+.Pp
+.Pa B/Makejail Ns :
+.Bd -literal -compact -offset Ds
+STAGE start
+
+CMD echo "I'm B in the start stage."
+.Ed
+.Pp
+The resulting Makejail will be as follows:
+.Pp
+.Bd -literal -compact -offset Ds
+RAW cd -- "/tmp/c/A" # Makejail: /tmp/c/A/Makejail
+OPTION overwrite
+OPTION start
+CMD echo "I'm A before include B."
+RAW cd -- "/tmp/c/B" # Makejail: /tmp/c/B/Makejail
+STAGE start
+CMD echo "I'm B in the start stage."
+STAGE build
+RAW cd -- "/tmp/c/A" # Makejail: /tmp/c/A/Makejail
+CMD echo "I'm A after include B."
+.Ed
+.Pp
+The previous example illustrates the importance of restoring the stage so as not
+to execute instructions at a different stage than intended.
+.Pp
+A Makejail can be included in several ways, depending on the
+.Ar method
+used:
+.Pp
+.Bl -tag -compact -width xx
+.It Cm file Ns + Ns Ar makejail
+Include a Makejail file from the local file system. This is the default method.
+.Pp
+Note that you must set this method explicitly when the pathname has a
+.Sy +
+sign.
+.Pp
+.It Cm cmd Ns + Ns Ar command Oo Ar args No "..." Oc
+Use the output of a command as the Makejail file.
+.Pp
+.It Cm git Ns + Ns Ar url Oo Fl Fl baseurl Oc Oo Fl Fl cachedir Oc Oo Fl Fl file Oc Oo Fl Fl global Ns | Ns Fl Fl local Oo Fl Fl cachedir Ar directory Oc Ns | Ns Fl Fl tmp Oc
+Clone a
+.Xr git 1
+repository. With
+.Fl Fl global Ns ,
+the
+.Xr git 1
+repository is cloned to the global cache directory defined by
+.Sy GLOBAL_GIT_CACHEDIR ","
+with
+.Fl Fl local Ns ,
+the
+.Xr git 1
+repository is cloned to the local cache directory defined by the
+.Fl Fl cachedir
+parameter, and with
+.Fl Fl tmp
+the
+.Xr git 1
+repository is cloned as a temporary directory.
+.Pp
+.Fl Fl basedir No is intended for other git-like methods.
+.Pp
+This instruction requires that
+.Em devel/git
+be installed before use.
+.Pp
+.It Cm fetch Ns + Ns Ar url
+Use the program specified by
+.Sy MAKEJAIL_FETCH_CMD
+to download the Makejail file.
+.Pp
+.It Cm gh Ns + Ns Ar username Ns / Ns Ar reponame
+.It Cm github Ns + Ns Ar username Ns / Ns Ar reponame
+Wrapper for the
+.Cm git
+method but with
+.Fl Fl basedir
+set to
+.Sy https://github.com/ Ns "."
+.Pp
+.It Cm gh-ssh Ns + Ns Ar username Ns / Ns Ar reponame
+.It Cm github-ssh Ns + Ns Ar username Ns / Ns Ar reponame
+Wrapper for the
+.Cm git
+method but with
+.Fl Fl basedir
+set to
+.Sy git@github.com: Ns "."
+.Pp
+.It Cm gl Ns + Ns Ar username Ns / Ns Ar reponame
+.It Cm gitlab Ns + Ns Ar username Ns / Ns Ar reponame
+Wrapper for the
+.Cm git
+method but with
+.Fl Fl basedir
+set to
+.Sy https://gitlab.com/ Ns "."
+.Pp
+.It Cm gl-ssh Ns + Ns Ar username Ns / Ns Ar reponame
+.It Cm gitlab-ssh Ns + Ns Ar username Ns / Ns Ar reponame
+Wrapper for the
+.Cm git
+method but with
+.Fl Fl basedir
+set to
+.Sy git@gitlab: Ns "."
+.Pp
+.El
+.Pp
+.It Cm MOUNT Fl Fl nopersist Ar device Ar mountpoint Oo Ar type Oc Oo Ar options Oc Oo Ar dump Oc Oo Ar pass Oc
+.It Cm MOUNT Oo Fl Fl nomount Oc Oo Fl Fl nro Oo Cm auto Ns | Ns Ar nro Oc Oc Ar device Ar mountpoint Oo Ar type Oc Oo Ar options Oc Oo Ar dump Oc Oo Ar pass Oc
+Mount file systems inside the jail.
+.Pp
+This instruction simulates an
+.Xr fstab 5
+entry as you can see, but unlike it only
+.Ar device
+and
+.Ar mountpoint
+are required, and the others,
+.Ar type
+.Po default: Sy nullfs Pc Ns ,
+.Ar options
+.Po default: Sy rw Pc Ns ,
+.Ar dump
+.Po default: Sy 0 Pc
+and
+.Ar pass
+.Po default: Sy 0 Pc
+are optional.
+.Pp
+If
+.Fl Fl nopersist
+is specified,
+.Xr mount 8
+is used instead of
+.Xr appjail-fstab 1 ","
+that is, the mount point will not persist on reboot and must be unmounted before the jail is stopped.
+.Pp
+By default,
+.Xr appjail-fstab 1
+entries are compiled and mounted unless
+.Fl Fl nomount
+is specified. This option is recommended when you specify multiple entries: you
+can gain performance by specifying this option except for the last entry.
+.Pp
+You can specify the identifier using
+.Fl Fl nro Ns ,
+but it is recommended to keep it as is, that is,
+.Cm auto Ns ,
+which is the default value.
+.Pp
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Ar package No "..."
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Fl Fl remove Ar package No "..."
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Fl Fl autoremove
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Fl Fl clean
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Fl Fl update
+.It Cm PKG Oo Fl Fl chroot Ns | Ns Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Fl Fl upgrade
+Manipulate packages.
+.Pp
+.Fl Fl chroot No is equivalent to Xr appjail-pkg 1 Cm chroot Ns "."
+This option can only be used for thick and thin jails, but the latter requires
+the jail to be started.
+.Pp
+.Fl Fl jexec Po default Pc No is equivalent to Xr appjail-pkg 1 Cm jail Ns "."
+.Fl Fl jail No is equivalent to Xr appjail-pkg 1 Cm jail Fl j Ns "."
+.Pp
+.Fl Fl local Ns ,
+run
+.Xr pkg 8
+on the host instead of inside the jail.
+.Pp
+.Fl Fl remove Ns , removes one or more packages instead of installing them.
+.Pp
+.Fl Fl autoremove Ns , removes orphaned or unused packages.
+.Pp
+.Fl Fl clean Ns , clean the local cache of fetched remote packages.
+.Pp
+.Fl Fl update Ns , update the package list.
+.Pp
+.Fl Fl upgrade Ns , perform upgrades of package software distributions.
+.Pp
+.It Cm RAW Oo Ar code Oc
+Remember that an InitScript is
+.Xr sh 1
+code and is generated by Makejails, so in many cases it is very useful for writing code that is processed as is, such as conditionals, loops, etc., however some instructions cannot be used for these purposes. See
+.Sx NON-CONDITIONAL INSTRUCTIONS
+for details.
+.Pp
+.It Cm REPLACE Ar file Ar keyword Oo Ar value Oc Oo Ar output Oc
+Replace a given
+.Ar keyword
+.Pq without being enclosed in Sy %{ No and Sy }
+with a
+.Ar value
+.Pq or empty, if not defined
+in a
+.Ar file Ns "." Keywords begin with the
+.Sy %
+character and then the keyword name enclosed in curly braces. Use
+.Sy %
+twice to escape, for example
+.Sy %%{KEYWORD}
+will be converted to
+.Sy %{KEYWORD} Ns ,
+but will not be replaced by any value. A different file can be used as
+.Ar output
+for the replaced keywords.
+.Pp
+.It Cm RUN Oo Fl Fl maintain-env Oc Oo Fl Fl noclean Oc Oo Fl Fl juser Ar username Ns | Ns Fl Fl huser Ar username Oc Oo Ar command Oo Ar args No "..." Oc Oc
+The
+.Cm RUN
+instruction executes a program, but unlike
+.Cm CMD Ns ,
+it cannot execute
+.Xr sh 1
+code, it cannot execute interactive programs like Python, it cannot use variables created by
+.Cm ARG
+or
+.Cm VAR
+but it can use environment variables created by
+.Cm ENV Ns ,
+and instructions such as
+.Cm USER Ns , Cm WORKDIR Ns , and Cm ENTRYPOINT No affect this instruction.
+.Pp
+If
+.Fl Fl maintain-env
+is specified, leave the environment unchanged instead of simulating a full login.
+.Pp
+The rest of the parameters have the same meaning as
+.Cm CMD Fl Fl jexec Ns "."
+.Pp
+.It Cm SERVICE Ar args No "..."
+Manipulate services. See
+.Xr appjail-service 1 "."
+.Pp
+.It Cm SET Oo Fl Fl mark Oc Oo Fl Fl column Ar column Oc Oo Fl Fl row Ar row Oc Ar parameter Ns Oo Ar value Oc
+Use
+.Xr appjail-config 1
+to edit the template used by the jail.
+.Pp
+If
+.Fl Fl mark
+is specified, the given parameter is marked as required.
+.Pp
+.Fl Fl column
+and
+.Fl Fl row
+can be specified to edit a specific parameter; However, if
+.Fl Fl column
+is set to a number greater than
+.Sy 1 Ns ,
+.Xr appjail-config 1 Cm setColumn
+is used instead of
+.Xr appjail-config 1 Cm set Ns "."
+.Pp
+.It Cm STAGE Ar stage
+Change the current stage. The default stage is
+.Sy build Ns "."
+.Pp
+.It Cm SYSRC Oo Fl Fl jail Ns | Ns Fl Fl local Oc Ar name Ns Oo Oo + Ns | Ns - Oc Ns = Ns Ar value Oc No "..."
+Safely edit system rc files within a jail.
+.Pp
+.Fl Fl jail No is equivalent to Xr appjail-sysrc 1 Cm jail Ns "."
+.Pp
+.Fl Fl local No is equivalent to Xr appjail-sysrc 1 Cm local Ns "."
+It is only recommended to use this parameter with thick jails instead of thin jails,
+as it may not work correctly with the latter.
+.Pp
+.It Cm UMOUNT Ar mountpoint
+Unmount a mounted file system.
+.Pp
+.It Cm USER Ar user
+The user to run
+.Cm RUN
+as.
+.Pp
+Unlike other instructions, this one cannot use shell variables.
+.Pp
+.It Cm VAR Oo Fl Fl make-arg-env Oc Oo Fl Fl noexpand Oc Ar name Ns Oo = Ns Ar default-value Oc
+Create or set a variable.
+.Pp
+If
+.Fl Fl make-arg-env
+is specified,
+the variable is available to
+.Cm CMD Ns "."
+.Pp
+If
+.Fl Fl noexpand
+the
+.Sy $
+character is escaped. Useful for
+.Sx BUILD ARGUMENTS Ns "."
+.Pp
+.It Cm WORKDIR Ar directory
+Create a new directory and use it as the working directory by
+.Cm ADD Ns ,
+.Cm COPY Ns ,
+and
+.Cm RUN Ns "."
+.Pp
+Unlike other instructions, this one cannot use shell variables.
+.Pp
+.It Cm LOGIN Oo Fl Fl user Ar username Oc
+Log into the jail.
+.Pp
+.Fl Fl user No is equivalent to Xr appjail-login 1 Fl u Ns "."
+.Pp
+.It Cm OPTION Ar option
+.Xr appjail-quick 1 Ns 's options Ns "."
+.Pp
+You don't need the option value enclosed in double quotes even when it has spaces.
+.Pp
+.It Cm RESTART
+Restart the jail using
+.Xr appjail-restart 1 "."
+.Pp
+.It Cm START
+Start the jail using
+.Xr appjail-start 1 "."
+.Pp
+.It Cm STOP
+Stop the jail using
+.Xr appjail-stop 1 "."
+.Pp
+.It Cm VOLUME Oo Fl Fl group Ar gid Oc Oo Fl Fl mountpoint Ar mountpoint Oc Oo Fl Fl owner Oc Oo Fl Fl perm Ar mode Oc Oo Fl Fl type Ar type Oc Ar volume
+Create a new volume.
+.Pp
+.Fl Fl group No is equivalent to Xr appjail-volume 1 Cm add Fl g Ns "."
+.Pp
+.Fl Fl mountpoint No is equivalent to Xr appjail-volume 1 Cm add Fl m Ns "."
+.Pp
+.Fl Fl owner No is equivalent to Xr appjail-volume 1 Cm add Fl o Ns "."
+.Pp
+.Fl Fl perm No is equivalent to Xr appjail-volume 1 Cm add Fl p Ns "."
+.Pp
+.Fl Fl type No is equivalent to Xr appjail-volume 1 Cm add Fl t Ns "."
+.El
+.Sh NON-CONDITIONAL INSTRUCTIONS
+The following instructions cannot be used conditionally because they change the
+behavior of the resulting
+.Sy InitScript
+or
+.Sy BuildScript
+and do not generate code, or generate code that can only be used on specific
+lines:
+.Pp
+.Bl -tag -width xx
+.It Cm ARG
+.It Cm CLEAR
+.It Cm ENTRYPOINT
+.It Cm ENV
+.It Cm GLOBAL
+.It Cm INCLUDE
+.It Cm STAGE
+.It Cm USER
+.It Cm VAR Ns ":"
+This instruction generates code that can be used conditionally, but if you use
+.Fl Fl make-arg-env Ns ,
+there is a side effect: even if you use this instruction conditionally, the environment
+variables will be available to
+.Sy CMD.
+.It Cm OPTION
+.El
+.Sh INSTRUCTIONS THAT DO NOT USE THE TOKENIZER
+The following instructions do not use the tokenizer, so they are parsed using their
+own methods:
+.Pp
+.Bl -tag -width xx
+.It Cm ARG
+.It Cm ENV
+.It Cm ENTRYPOINT
+.It Cm GLOBAL
+.It Cm RAW
+.It Cm USER
+.It Cm UMOUNT
+.It Cm WORKDIR
+.It Cm OPTION
+.El
+.Sh BUILD STAGE INSTRUCTIONS
+The following instructions are valid only in the build stage:
+.Pp
+.Bl -tag -width xx
+.It Cm FROM
+.It Cm LOGIN
+.It Cm OPTION
+.It Cm RESTART
+.It Cm START
+.It Cm STOP
+.El
+.Sh BUILD ARGUMENTS
+Unlike arguments created by
+.Cm ARG
+that can only be used for the current stage, build arguments are overridden regardless
+of the stage. They work similarly to the
+.Cm REPLACE
+instruction, but are a little
+.Dq smarter.
+However, note that build arguments are not intended to replace
+.Cm ARG Ns :
+they cannot be used conditionally, for example. Although you can build
+.Cm ARG
+and build arguments to get the best of both worlds.
+.Pp
+.No %{ Ns Ar name Ns Oo Cm : Ns | Ns Cm ! Oc Ns Oo Ar value Oc Ns }
+.Pp
+.Bl -dash -compact
+.It
+.No %{ } No - Beginning and end of a build argument.
+If % is used twice, the first % will be removed and the rest of the string will be kept as is.
+.It
+.Ar name No - Argument name. By convention, in uppercase.
+.It
+.Cm : Ns | Ns Cm ! No -
+Use
+.Cm :
+to use
+.Ar value
+as the default value and make the build argument optional, or
+.Cm !
+to use
+.Ar value
+as the description shown when the user doesn't set a value.
+.It
+.Ar value No - Default value or description.
+.El
+.Pp
+Two notes to keep in mind: if you plan to declare build arguments that use other
+build arguments, you must escape the
+.Sy }
+character using
+.Sy \e Ns "."
+The other note is that you must first declare build arguments that use other build
+arguments before the latter are defined:
+.Pp
+.Bd -literal -compact -offset Ds
+%{PYTHON_EXECUTABLE:python%{PYTHON_MAJOR\}.%{PYTHON_MINOR\}}
+%{PYTHON_MAJOR:3}
+%{PYTHON_MINOR:9}
+.Ed
+.Pp
+This is because the processing is sequential and recursive:
+.Pp
+.Bl -dash -compact
+.It
+.No CMD %{PYTHON_EXECUTABLE}
+.It
+.No CMD python%{PYTHON_MAJOR}.%{PYTHON_MINOR}
+.It
+.No CMD python3.%{PYTHON_MINOR}
+.It
+.No CMD python3.9
+.El
+.Pp
+To get the best of both worlds, we can use
+.Cm VAR
+and build arguments in a Makejail, but note that
+.Cm VAR
+should have to set the
+.Fl Fl noexpand
+parameter to avoid the special meaning of the dollar sign:
+.Pp
+.Bd -literal -compact -offset Ds
+VAR --noexpand python_major=%{PYTHON_MAJOR}
+VAR --noexpand python_minor=%{PYTHON_MINOR}
+
+RAW if ! echo "${python_major}" | grep -Eq '^[23]$'; then
+RAW     echo "MAJOR VALID VERSIONS: 2, 3" >&2
+RAW     exit 1
+RAW fi
+
+RAW if ! echo "${python_minor}" | grep -Eq '^(7|8|9|10|11)$'; then
+RAW     echo "MINOR VALID VERSIONS: 7, 8, 9, 10, 11" >&2
+RAW     exit 1
+RAW fi
+
+RAW if [ ${python_major} -eq 2 ]; then
+RAW     if [ ${python_minor} -ne 7 ]; then
+RAW             echo "MINOR VALID VERSION FOR 2: 7" >&2
+RAW             exit 1
+RAW     fi
+RAW fi
+
+PKG python${python_major}${python_minor}
+.Ed
+.Sh ENVIRONMENT
+.Bl -tag -width xxxx
+.It Ev APPJAIL_PWD
+.Xr appjail-makejail 1 ","
+when processing the
+.Cm INCLUDE
+instruction, changes the current directory, so
+.Ev PWD
+does not reflect the current directory. Only available in the build stage.
+.El
+.Sh SEE ALSO
+.Xr appjail-config 1
+.Xr appjail-image 1
+.Xr appjail-makejail 1
+.Xr appjail-service 1
+.Xr appjail-sysrc 1
+.Xr appjail-quick 1
+.Xr appjail-initscript 5
+.Xr appjail-template 5
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

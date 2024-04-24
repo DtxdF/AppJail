@@ -88,7 +88,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
 - [x] Add option to `appjail config` to check if the parameters of a template are valid for `jail(8)`. (Done with the new tool, `appjail-config`)
 - [ ] Implement all `jail(8)` parameters in `appjail quick`.
 - [ ] The `jng` script is useful, but AppJail must create the Netgraph nodes in the same way as bridges and epairs.
-- [ ] Man pages (**WIP**):
+- [X] Man pages:
   * [X] **appjail(1)**
   * [X] **appjail-ajspec(5)**
   * [X] **appjail-apply(1)**
@@ -117,7 +117,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [X] **appjail-login(1)**
   * [X] **appjail-logs(1)**
   * [X] **appjail-makejail(1)**
-  * [ ] **appjail-makejail(5)**
+  * [X] **appjail-makejail(5)**
   * [X] **appjail-nat(1)**:
   * [X] **appjail-network(1)**
   * [X] **appjail-pkg(1)**
