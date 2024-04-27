@@ -68,6 +68,7 @@ QUICK_KEY_HEALTH="healthcheck"
 QUICK_KEY_IP4="ip4"
 QUICK_KEY_IP6="ip6"
 QUICK_KEY_JNG="jng"
+QUICK_KEY_LABELS="labels"
 QUICK_KEY_LIMITS="limits"
 QUICK_KEY_NAT="nat"
 QUICK_KEY_NETWORK="network"
@@ -123,6 +124,7 @@ QUICK_OPTION_IP6_DISABLE=0
 QUICK_OPTION_IP6_INHERIT=0
 QUICK_OPTION_JAILTYPE="${JAIL_TYPE_THIN}"
 QUICK_OPTION_JNG=0
+QUICK_OPTION_LABEL=0
 QUICK_OPTION_LINUXFS=0
 QUICK_OPTION_LOGIN="${DEFAULT_LOGIN}"
 QUICK_OPTION_LOGIN_USER="${DEFAULT_LOGIN_USER}"
@@ -195,7 +197,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -205,6 +207,9 @@ quick_main()
 
 	# create jail
 	quick_create_jail
+
+	local label_options
+	label_options="label"
 
 	local file_options
 	file_options="copy tzdata resolv_conf"
@@ -255,7 +260,7 @@ quick_main()
 	args_options="create_args start_args run_args stop_args"
 
 	local all_options
-	all_options="${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
+	all_options="${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
 
 	for option in ${all_options}; do
 		quick_run_${option}
@@ -381,6 +386,48 @@ quick_end_jail()
 	appjail jail mark clean "${QUICK_JAILNAME}" > /dev/null 2>&1
 
 	lib_debug "Done."
+}
+
+quick_run_label()
+{
+	if [ ${QUICK_OPTION_LABEL} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_keys_list "${QUICK_KEY_LABELS}" | while IFS= read -r label; do
+		value=`lib_keys_get "${QUICK_KEY_LABELS}" "${label}" "value"`
+
+		lib_debug "Adding label ${label}=${value} ..."
+
+		appjail label add "${QUICK_JAILNAME}" "${label}" "${value}" || exit $?
+	done || exit $?
+}
+
+quick_set_label()
+{
+	local label
+
+	label="$1"
+
+	quick_reqoption "label" "${label}"
+
+	local key value
+
+	key=`lib_jailparam_name "${label}" :`
+
+	if ! lib_check_labelname "${key}"; then
+		lib_err ${EX_DATAERR} "Invalid label name '${key}'"
+	fi
+
+	value=`lib_jailparam_value "${label}" :`
+
+	if lib_check_empty "${value}"; then
+		lib_err ${EX_DATAERR} "label syntax: key:value"
+	fi
+
+	lib_keys_set "${QUICK_KEY_LABELS}" "${key}" "value" "${value}"
+
+	QUICK_OPTION_LABEL=1
 }
 
 quick_run_vnet()
