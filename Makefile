@@ -56,7 +56,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-devfs.1 \
 	 man1/appjail-network.1 \
 	 man1/appjail-nat.1 \
-	 man5/appjail-makejail.5
+	 man5/appjail-makejail.5 \
+	 man1/appjail-label.1
 
 APPJAIL_VERSION?=3.2.0
 

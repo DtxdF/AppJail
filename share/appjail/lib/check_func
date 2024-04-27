@@ -228,6 +228,21 @@ lib_check_volumename()
 	fi
 }
 
+lib_check_labelname()
+{
+	local labelname="$1"
+
+	if [ -z "${labelname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_labelname labelname"
+	fi
+
+	if printf "%s" "${labelname}" | grep -qEe '^[a-z][a-z0-9]*((\.|-)?[a-z][a-z0-9]*)*$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 _lib_check_humanname()
 {
 	local name="$1"

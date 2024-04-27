@@ -1,0 +1,355 @@
+#!/bin/sh
+#
+# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/table"
+
+label_desc="Add metadata to jails."
+
+label_main()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		add|get|list|remove) ;;
+		*) label_usage; exit ${EX_USAGE} ;;
+	esac
+
+	label_${entity} "$@"
+}
+
+label_add()
+{
+	local jail_name="$1"
+	_label_chk_jail "${jail_name}"
+
+	local label_name="$2"
+
+	if lib_check_empty "${label_name}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	local label_value="$3"
+
+	if lib_check_empty "${label_value}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_labelname "${label_name}"; then
+		lib_err ${EX_DATAERR} "Invalid label name '${label_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local labeldir="${jail_path}/conf/labels/${label_name}"
+
+	if [ -d "${labeldir}" ]; then
+		lib_err ${EX_CANTCREAT} "Label '${label_name}' already exists."
+	fi
+
+	if ! mkdir -p -- "${labeldir}"; then
+		lib_err ${EX_IOERR} "Error creating ${labeldir}"
+	fi
+
+	if ! printf "%s" "${label_value}" > "${labeldir}/value"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the label value."
+	fi
+}
+
+label_get()
+{
+	local _o
+	local label_name=
+
+        local flag_name=0
+	local flag_value=0
+
+	lib_table_init "label_get"
+
+	lib_table_disable_escape
+	lib_table_disable_columns
+	lib_table_disable_empty
+	lib_table_disable_pretty
+	lib_table_disable_tabulate
+	
+	while getopts ":eHIptl:" _o; do
+		case "${_o}" in
+			l)
+				if lib_check_empty "${OPTARG}"; then
+					label_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			e)
+				lib_table_enable_escape
+				;;
+			H)
+				lib_table_enable_columns
+				;;
+			I)
+				lib_table_enable_empty
+				;;
+			p)
+				lib_table_enable_pretty
+				;;
+			t)
+				lib_table_enable_tabulate
+				;;
+			l)
+				label_name="${OPTARG}"
+				;;
+			*)
+				label_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	_label_chk_jail "${jail_name}"
+
+	if lib_check_empty "${label_name}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_labelname "${label_name}"; then
+		lib_err ${EX_DATAERR} "Invalid label name '${label_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local basedir="${jail_path}/conf/labels/${label_name}"
+	if [ ! -d "${basedir}" ]; then
+		lib_err ${EX_NOINPUT} "Label '${label_name}' does not exist."
+	fi
+
+	if [ $# -eq 0 ]; then
+		set -- "name" "value"
+	fi
+
+	local keyword
+	for keyword in "$@"; do
+		if lib_check_empty "${keyword}"; then
+			continue
+		fi
+
+		local value=
+
+		case "${keyword}" in
+			name)
+				value="${label_name}"
+				;;
+			value)
+				if [ -f "${basedir}/${keyword}" ]; then
+					value=`head -1 "${basedir}/${keyword}"`
+				fi
+				;;
+			*)
+				lib_warn -- "${keyword}: keyword not found."
+				continue
+				;;
+		esac
+
+		if [ `lib_loaded_var "flag_${keyword}"` -eq 1 ]; then
+			continue
+		else
+			setvar flag_${keyword} 1
+		fi
+
+		lib_table_set "${keyword}" "${value}"
+	done
+
+	lib_table_print
+}
+
+label_list()
+{
+	local _o
+	local opt_escape=1 eflag=
+	local opt_columns=1 Hflag=
+	local opt_empty=0 Iflag=
+	local opt_pretty=1 pflag=
+	local opt_tabulate=1 tflag=
+	local label_name=
+
+	while getopts ":eHIptl:" _o; do
+		case "${_o}" in
+			l)
+				if lib_check_empty "${OPTARG}"; then
+					label_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			e)
+				opt_escape=0
+				;;
+			H)
+				opt_columns=0
+				;;
+			I)
+				opt_empty=1
+				;;
+			p)
+				opt_pretty=0
+				;;
+			t)
+				opt_tabulate=0
+				;;
+			l)
+				label_name="${OPTARG}"
+				;;
+			*)
+				label_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name="$1"; shift
+	if lib_check_empty "${jail_name}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	_label_chk_jail "${jail_name}"
+
+	if [ ${opt_escape} -eq 1 ]; then
+		eflag="-e"
+	fi
+
+	if [ ${opt_columns} -eq 1 ]; then
+		Hflag="-H"
+	fi
+
+	if [ ${opt_empty} -eq 1 ]; then
+		Iflag="-I"
+	fi
+
+	if [ ${opt_pretty} -eq 1 ]; then
+		pflag="-p"
+	fi
+
+	if [ ${opt_tabulate} -eq 1 ]; then
+		tflag="-t"
+	fi
+
+	if [ -n "${label_name}" ]; then
+		label_get ${eflag} ${Hflag} ${Iflag} ${pflag} ${tflag} -l "${label_name}" -- "${jail_name}" "$@"
+		return $?
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local labelsdir="${jail_path}/conf/labels"
+
+	if [ ! -d "${labelsdir}" ]; then
+		return 0
+	fi
+
+	ls -A -- "${labelsdir}" | while IFS= read -r label_name
+	do
+		label_get ${eflag} ${Hflag} ${Iflag} ${tflag} -l "${label_name}" -- "${jail_name}" "$@"
+
+		Hflag=
+	done | \
+	if [ ${opt_pretty} -eq 1 ]; then
+		column -ts $'\t'
+	else
+		cat
+	fi
+}
+
+label_remove()
+{
+	local jail_name="$1"
+	_label_chk_jail "${jail_name}"
+
+	local label_name="$2"
+	if lib_check_empty "${label_name}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_labelname "${label_name}"; then
+		lib_err ${EX_DATAERR} "Invalid label name '${label_name}'"
+	fi
+
+	local jail_path="${JAILDIR}/${jail_name}"
+	local labeldir="${jail_path}/conf/labels/${label_name}"
+
+	if [ ! -d "${labeldir}" ]; then
+		lib_err ${EX_CANTCREAT} "Label '${label_name}' does not exist."
+	fi
+
+	rm -rf "${labeldir}"
+}
+
+_label_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		label_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+label_help()
+{
+	man 1 appjail-label
+}
+
+label_usage()
+{
+	cat << EOF
+usage: label add <jail> <label> <value>
+       label get [-eHIpt] -l <label> <jail> [<keyword> ...]
+       label list [-eHIpt] [-l <label>] <jail> [<keyword> ...]
+       label remove <jail> <label>
+EOF
+}

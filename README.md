@@ -114,6 +114,7 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
   * [X] **appjail-initscript(5)**
   * [X] **appjail-jail(1)**
   * [X] **appjail-limits(1)**
+  * [X] **appjail-label(1)**
   * [X] **appjail-login(1)**
   * [X] **appjail-logs(1)**
   * [X] **appjail-makejail(1)**
