@@ -142,6 +142,7 @@ QUICK_OPTION_RELEASE="${DEFAULT_RELEASE}"
 QUICK_OPTION_RESTART="${DEFAULT_RESTART}"
 QUICK_OPTION_RUN="${DEFAULT_RUN}"
 QUICK_OPTION_RUN_ARGS=
+QUICK_OPTION_RUN_ENV=
 QUICK_OPTION_SLAAC=0
 QUICK_OPTION_START="${DEFAULT_START}"
 QUICK_OPTION_START_ARGS=
@@ -198,7 +199,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|slaac|start|start_args|start_env|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -258,7 +259,7 @@ quick_main()
 	health_options="healthcheck"
 
 	local args_options
-	args_options="start_env create_args start_args run_args stop_args"
+	args_options="start_env run_env create_args start_args run_args stop_args"
 
 	local all_options
 	all_options="${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
@@ -2366,6 +2367,29 @@ quick_set_linuxfs()
 	fi
 
 	QUICK_OPTION_LINUXFS=1
+}
+
+quick_run_run_env()
+{
+	if [ -z "${QUICK_OPTION_RUN_ENV}" ]; then
+		return 0
+	fi
+
+	quick_args "run" "-V" "${QUICK_OPTION_RUN_ENV}"
+}
+
+quick_set_run_env()
+{
+	local run_env
+
+	run_env="$1"; quick_reqoption "run_env" "${run_env}"
+	run_env=`lib_escape_string "${run_env}" "" '\"' "-"`
+
+	if [ -z "${QUICK_OPTION_RUN_ENV}" ]; then
+		QUICK_OPTION_RUN_ENV="\"${run_env}\""
+	else
+		QUICK_OPTION_RUN_ENV="${QUICK_OPTION_RUN_ENV} \"${run_env}\""
+	fi
 }
 
 quick_run_start_env()
