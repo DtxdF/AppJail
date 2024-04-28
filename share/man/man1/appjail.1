@@ -237,6 +237,36 @@ Log into the jail.
 .It Xr appjail-run 1
 Run user-defined stages.
 .El
+.Sh SIGNALS
+AppJail returns
+.Sy 70
+when a signal is captured or other depending on the last command executed and
+interrupted. The following signals are captured:
+.Pp
+.Bl -tag -compact -width xx
+.It Sy SIGHUP
+.It Sy SIGINT
+.It Sy SIGQUIT
+.It Sy SIGTERM
+.It Sy SIGXCPU
+.It Sy SIGXFSZ
+.El
+.Pp
+The following signals are ignored:
+.Pp
+.Bl -tag -compact -width xx
+.It Sy SIGALRM
+.It Sy SIGVTALRM
+.It Sy SIGPROF
+.It Sy SIGUSR1
+.It Sy SIGUSR2
+.El
+.Pp
+If a signal is captured or simply terminates execution, AppJail performs several
+operations that depend entirely on the subcommand, but some are general: send a
+.Sy SIGTERM
+.Pq or Sy SIGKILL No if Sy SIGTERM No has no effect after a while
+to all child processes created by the main process and delete temporary files.
 .Sh EXIT STATUS
 .Ex -std
 It may fail for one of the following reasons:
