@@ -40,7 +40,7 @@ main()
 {
 	local env="$1"
 	if lib_check_empty "${env}"; then
-		lib_err ${EX_USAGE} "usage: ENV name[=value]"
+		lib_err ${EX_USAGE} "usage: ENV <name>[=<value>]"
 	fi
 
 	local envdir="${MAKEJAIL_TEMPDIR}/env"

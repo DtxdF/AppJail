@@ -1271,7 +1271,7 @@ makejail_getinclude()
 {
 	local include_file="$1"
 	if lib_check_empty "${include_file}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE [method+]path [args ...]"
+		lib_err ${EX_USAGE} "usage: INCLUDE [<method>+]<path> [<args> ...]"
 	fi
 
 	local method=`lib_jailparam_name "${include_file}" "+"`
@@ -1321,7 +1321,7 @@ makejail_getinclude_cmd()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE cmd+command [args ...]"
+		lib_err ${EX_USAGE} "usage: INCLUDE cmd+<command> [<args> ...]"
 	fi
 
 	local errlevel
@@ -1375,7 +1375,7 @@ makejail_getinclude_fetch()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE fetch+url"
+		lib_err ${EX_USAGE} "usage: INCLUDE fetch+<url>"
 	fi
 
 	local url=`printf "%s\n" "${args}" | head -1 | tail -n 1`
@@ -1416,7 +1416,7 @@ makejail_getinclude_file()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE file+makejail_file"
+		lib_err ${EX_USAGE} "usage: INCLUDE file+<makejail>"
 	fi
 
 	local file=`printf "%s\n" "${args}" | head -1 | tail -n 1`
@@ -1455,7 +1455,7 @@ makejail_getinclude_git()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE git+url [--baseurl url] [--file makejail_filename] [--global | --local [--cachedir directory] | --tmp]"
+		lib_err ${EX_USAGE} "usage: INCLUDE git+<url> [--baseurl <url>] [--file <makejail>] [--global|--local [--cachedir <directory>]|--tmp]"
 	fi
 
 	# Arguments
@@ -1625,7 +1625,7 @@ makejail_change_stage()
 {
 	local stage="$1"
 	if lib_check_empty "${stage}"; then
-		lib_err ${EX_USAGE} -- "usage: STAGE stage"
+		lib_err ${EX_USAGE} -- "usage: STAGE <stage>"
 	fi
 
 	if ! _makejail_check_stages "${stage}"; then

@@ -40,12 +40,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err - "usage: PKG [[--chroot | --jexec [--jail] | --local]] package ..."
-		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --remove package ..."
-		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --autoremove"
-		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --clean"
-		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --update"
-		lib_err - "       PKG [[--chroot | --jexec [--jail] | --local]] --upgrade"
+		lib_err - "usage: PKG [[--chroot|--jexec [--jail]|--local]] <package> ..."
+		lib_err - "       PKG [[--chroot|--jexec [--jail]|--local]] --remove <package> ..."
+		lib_err - "       PKG [[--chroot|--jexec [--jail]|--local]] --autoremove"
+		lib_err - "       PKG [[--chroot|--jexec [--jail]|--local]] --clean"
+		lib_err - "       PKG [[--chroot|--jexec [--jail]|--local]] --update"
+		lib_err - "       PKG [[--chroot|--jexec [--jail]|--local]] --upgrade"
 		exit ${EX_USAGE}
 	fi
 

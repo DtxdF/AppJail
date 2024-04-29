@@ -38,7 +38,7 @@ main()
 {
 	local user="$1"
 	if lib_check_empty "${user}"; then
-		lib_err ${EX_USAGE} "usage: USER user"
+		lib_err ${EX_USAGE} "usage: USER <user>"
 	fi
 
 	local userdir="${MAKEJAIL_TEMPDIR}/user"

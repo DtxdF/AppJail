@@ -43,7 +43,9 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: COPY [--glob | --glob-left | --glob-right] [--verbose] [--jail jail] src [dst]"
+		lib_err - "usage: COPY [--glob|--glob-left|--glob-right] [--verbose] [--jail <jail>] <source>"
+		lib_err - "               [<destination>]"
+		exit ${EX_USAGE}
 	fi
 	
 	# Options

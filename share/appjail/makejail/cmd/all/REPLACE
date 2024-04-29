@@ -40,7 +40,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: REPLACE file old [new] [output]"
+		lib_err ${EX_USAGE} "usage: REPLACE <file> <keyword> [<value>] [<output>]"
 	fi
 
 	# Arguments

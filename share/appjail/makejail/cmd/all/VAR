@@ -38,7 +38,7 @@ main()
 {
 	local var="$1"
 	if lib_check_empty "${var}"; then
-		lib_err ${EX_USAGE} "usage: VAR [--make-arg-env] [--noexpand] name[=default_value]"
+		lib_err ${EX_USAGE} "usage: VAR [--make-arg-env] [--noexpand] <name>[=<default-value>]"
 	fi
 	
 	# options

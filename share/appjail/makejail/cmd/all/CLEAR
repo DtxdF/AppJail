@@ -40,7 +40,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: CLEAR [entrypoint | user | workdir | stage]"
+		lib_err ${EX_USAGE} "usage: CLEAR [entrypoint|user|workdir|stage]"
 	fi
 
 	# Arguments

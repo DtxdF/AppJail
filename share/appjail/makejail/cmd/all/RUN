@@ -45,7 +45,9 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: RUN [--maintain-env] [--noclean] [--juser jail_username | --huser host_username] [cmd [args ...]]"
+		lib_err - "usage: RUN [--maintain-env] [--noclean] [--juser <username>|--huser <username>]"
+		lib_err - "               [<command> [<args> ...]]"
+		exit ${EX_USAGE}
 	fi
 
 	# Entrypoint.

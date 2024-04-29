@@ -40,7 +40,11 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: EXEC [--continue-with-errors] [--verbose] [[--after-include include_file] ...] [[--arg parameter[=value]] ...] [[--before-include include_file] ...] [[--build-arg arg] ...] [[--option option] ...] --file makejail --name jail"
+		lib_err - "usage: EXEC [--continue-with-errors] [--verbose] [[--after-include <makejail>]"
+		lib_err - "               ...] [[--arg <parameter>[=<value>]] ...] [[--before-include <makejail>]"
+		lib_err - "               ...] [[--build-arg <parameter>[=<value>]] ...] [[--option <option>] ...]"
+		lib_err - "               --file <makejail> --name <name>"
+		exit ${EX_USAGE}
 	fi
 	
 	# options

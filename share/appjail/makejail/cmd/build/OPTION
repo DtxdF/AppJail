@@ -39,7 +39,7 @@ main()
 {
 	local option="$1"
 	if lib_check_empty "${option}"; then
-		lib_err ${EX_USAGE} "usage: OPTION option"
+		lib_err ${EX_USAGE} "usage: OPTION <option>"
 	fi
 
 	local escape_chars='`"'

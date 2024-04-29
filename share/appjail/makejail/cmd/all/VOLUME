@@ -40,7 +40,9 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: VOLUME [--group gid] [--mountpoint mountpoint] [--owner uid] [--perm mode] [--type fs_type] volume"
+		lib_err - "usage: VOLUME [--group <gid>] [--mountpoint <mountpoint>] [--owner <owner>] [--perm"
+		lib_err - "               <mode>] [--type <type>] <volume>"
+		exit ${EX_USAGE}
 	fi
 
 	# Options

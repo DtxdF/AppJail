@@ -39,7 +39,7 @@ main()
 {
 	local label="$1"
 	if lib_check_empty "${label}"; then
-		lib_err ${EX_USAGE} "usage: LABEL key=value"
+		lib_err ${EX_USAGE} "usage: LABEL <key>=<value>"
 	fi
 
 	local key value

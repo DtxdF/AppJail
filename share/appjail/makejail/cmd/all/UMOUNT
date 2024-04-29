@@ -39,7 +39,7 @@ main()
 {
 	local mountpoint="$1"
 	if lib_check_empty "${mountpoint}"; then
-		lib_err ${EX_USAGE} "usage: UMOUNT mountpoint"
+		lib_err ${EX_USAGE} "usage: UMOUNT <mountpoint>"
 	fi
 
 	local escape_chars

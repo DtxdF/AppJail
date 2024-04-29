@@ -44,7 +44,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: ADD [--verbose] url [dst]"
+		lib_err ${EX_USAGE} "usage: ADD [--verbose] <url> [<destination>]"
 	fi
 	
 	# Options

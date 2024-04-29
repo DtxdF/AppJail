@@ -40,7 +40,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: SERVICE service_args ..."
+		lib_err ${EX_USAGE} "usage: SERVICE <args> ..."
 	fi
 
 	local escape_chars

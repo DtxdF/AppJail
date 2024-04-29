@@ -40,7 +40,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: DESTROY [--force] [--with-all-dependents] jail"
+		lib_err ${EX_USAGE} "usage: DESTROY [--force] [--with-all-dependents] <jail>"
 	fi
 	
 	# Options

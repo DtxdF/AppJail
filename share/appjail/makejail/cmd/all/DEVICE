@@ -40,7 +40,7 @@ main()
 {
 	local rulespec="$1"
 	if lib_check_empty "${rulespec}"; then
-		lib_err ${EX_USAGE} "usage: DEVICE rulespec"
+		lib_err ${EX_USAGE} "usage: DEVICE <rulespec> ..."
 	fi
 
 	local escape_chars

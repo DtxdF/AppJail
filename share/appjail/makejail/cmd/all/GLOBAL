@@ -39,7 +39,7 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: GLOBAL :name: [instruction [args ...]]"
+		lib_err ${EX_USAGE} "usage: GLOBAL :<name>: [<instruction> [<args> ...]]"
 	fi
 
 	local name=`lib_jailparam_name "${args}" " "`

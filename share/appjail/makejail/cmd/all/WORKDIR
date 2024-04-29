@@ -39,7 +39,7 @@ main()
 {
 	local workdir="$1"
 	if lib_check_empty "${workdir}"; then
-		lib_err ${EX_USAGE} "usage: WORKDIR workdir"
+		lib_err ${EX_USAGE} "usage: WORKDIR <directory>"
 	fi
 
 	local workdirdir="${MAKEJAIL_TEMPDIR}/workdir"

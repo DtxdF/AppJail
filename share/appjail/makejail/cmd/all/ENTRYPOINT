@@ -38,7 +38,7 @@ main()
 {
 	local entrypoint="$1"
 	if lib_check_empty "${entrypoint}"; then
-		lib_err ${EX_USAGE} "usage: ENTRYPOINT entrypoint"
+		lib_err ${EX_USAGE} "usage: ENTRYPOINT <program>"
 	fi
 
 	local entrypointdir="${MAKEJAIL_TEMPDIR}/entrypoint"

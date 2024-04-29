@@ -459,7 +459,7 @@ sign.
 .It Cm cmd Ns + Ns Ar command Oo Ar args No "..." Oc
 Use the output of a command as the Makejail file.
 .Pp
-.It Cm git Ns + Ns Ar url Oo Fl Fl baseurl Oc Oo Fl Fl cachedir Oc Oo Fl Fl file Oc Oo Fl Fl global Ns | Ns Fl Fl local Oo Fl Fl cachedir Ar directory Oc Ns | Ns Fl Fl tmp Oc
+.It Cm git Ns + Ns Ar url Oo Fl Fl baseurl Ar url Oc Oo Fl Fl cachedir Oc Oo Fl Fl file Ar makejail Oc Oo Fl Fl global Ns | Ns Fl Fl local Oo Fl Fl cachedir Ar directory Oc Ns | Ns Fl Fl tmp Oc
 Clone a
 .Xr git 1
 repository. With
@@ -659,7 +659,7 @@ The rest of the parameters have the same meaning as
 Manipulate services. See
 .Xr appjail-service 1 "."
 .Pp
-.It Cm SET Oo Fl Fl mark Oc Oo Fl Fl column Ar column Oc Oo Fl Fl row Ar row Oc Ar parameter Ns Oo Ar value Oc
+.It Cm SET Oo Fl Fl mark Oc Oo Fl Fl column Ar column Oc Oo Fl Fl row Ar row Oc Ar parameter Ns Oo Ns = Ns Ar value Oc
 Use
 .Xr appjail-config 1
 to edit the template used by the jail.
@@ -749,7 +749,7 @@ Start the jail using
 Stop the jail using
 .Xr appjail-stop 1 "."
 .Pp
-.It Cm VOLUME Oo Fl Fl group Ar gid Oc Oo Fl Fl mountpoint Ar mountpoint Oc Oo Fl Fl owner Oc Oo Fl Fl perm Ar mode Oc Oo Fl Fl type Ar type Oc Ar volume
+.It Cm VOLUME Oo Fl Fl group Ar gid Oc Oo Fl Fl mountpoint Ar mountpoint Oc Oo Fl Fl owner Ar owner Oc Oo Fl Fl perm Ar mode Oc Oo Fl Fl type Ar type Oc Ar volume
 Create a new volume.
 .Pp
 .Fl Fl group No is equivalent to Xr appjail-volume 1 Cm add Fl g Ns "."

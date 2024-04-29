@@ -40,7 +40,9 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: FROM [--ajspec ajspec_name] [--entrypoint entrypoint|none] [--platform platform] image[:tag]"
+		lib_err - "usage: FROM [--ajspec <name>] [--entrypoint [<entrypoint>|none]] [--platform"
+		lib_err - "               <platform>] <image>[:<tag>]"
+		exit ${EX_USAGE}
 	fi
 
 	if [ -d "${MAKEJAIL_TEMPDIR}/images" ]; then
