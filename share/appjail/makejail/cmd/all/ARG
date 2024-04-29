@@ -38,7 +38,7 @@ main()
 {
 	local arg="$1"
 	if lib_check_empty "${arg}"; then
-		lib_err ${EX_USAGE} "usage: ARG <name>[[?]=][<default-value>]"
+		lib_err ${EX_USAGE} "usage: ARG <name>[[?]=[<default-value>]]"
 	fi
 
 	local envdir="${MAKEJAIL_TEMPDIR}/arg_env"
