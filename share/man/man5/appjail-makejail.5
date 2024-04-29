@@ -480,6 +480,14 @@ the
 .Xr git 1
 repository is cloned as a temporary directory.
 .Pp
+After the
+.Xr git 1
+repository is cloned, the Makejail specified by
+.Fl Fl file Ns ,
+which by default is
+.Pa Makejail Ns ,
+is executed.
+.Pp
 .Fl Fl basedir No is intended for other git-like methods.
 .Pp
 This instruction requires that
