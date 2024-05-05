@@ -83,6 +83,17 @@ can have
 .Sy precreate
 and
 .Sy postcreate "."
+.Pp
+.Sy pre-
+is executed before the stage is executed and if it fails, the stage will not be executed.
+.Sy post-
+will be executed after
+.Sy pre-
+and the stage even if they fail.
+.Sy pre-
+and the stage affect the exit status, but
+.Sy post-
+does not.
 .Sh ARGUMENTS
 Without user input an
 .Sy InitScript
