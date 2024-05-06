@@ -59,7 +59,7 @@ MANPAGES=man1/appjail.1 \
 	 man5/appjail-makejail.5 \
 	 man1/appjail-label.1
 
-APPJAIL_VERSION?=3.2.0
+APPJAIL_VERSION?=3.3.0
 
 all: install
 
