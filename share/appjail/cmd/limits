@@ -652,6 +652,7 @@ limits_set()
 limits_stats()
 {
 	local _o
+	local opt_human_readable=1
 
 	lib_table_init "limits_stats"
 
@@ -661,7 +662,7 @@ limits_stats()
 	lib_table_enable_pretty
 	lib_table_enable_tabulate
 	
-	while getopts ":eHIptn:" _o; do
+	while getopts ":eHhIptn:" _o; do
 		case "${_o}" in
 			n)
 				if lib_check_empty "${OPTARG}"; then
@@ -677,6 +678,9 @@ limits_stats()
 				;;
 			H)
 				lib_table_disable_columns
+				;;
+			h)
+				opt_human_readable=0
 				;;
 			I)
 				lib_table_enable_empty
@@ -712,6 +716,12 @@ limits_stats()
 		set -- "maxproc" "cputime" "pcpu" "vmemoryuse" "readiops" "writeiops"
 	fi
 
+	local human_readable_flag=
+
+	if [ ${opt_human_readable} -eq 1 ]; then
+		human_readable_flag="-h"
+	fi
+
 	local keyword
 	for keyword in "$@"; do
 		if lib_check_empty "${keyword}"; then
@@ -729,7 +739,7 @@ limits_stats()
 
 		setvar flag_limits_${keyword} 1
 
-		local value=`rctl -hu "jail:${jail_name}" 2> /dev/null | grep -Ee "^${keyword}=" | cut -d= -f2-`
+		local value=`rctl ${human_readable_flag} -u "jail:${jail_name}" 2> /dev/null | grep -Ee "^${keyword}=" | cut -d= -f2-`
 
 		lib_table_set "${keyword}" "${value}"
 	done
@@ -770,6 +780,6 @@ usage: limits get [-eHIipt] -n <nro> <jail> [<keyword> ...]
        limits remove keyword -n <nro> <jail> [<keyword> ...]
        limits set [-E|-e] [-N <name>] [-n [auto|<nro>]] <jail>
                <resource>:<action>[=<amount>[/<per>]]
-       limits stats [-eHIpt] <jail> [<keyword> ...]
+       limits stats [-eHhIpt] <jail> [<keyword> ...]
 EOF
 }

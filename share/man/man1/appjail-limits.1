@@ -69,7 +69,7 @@
 .Ar resource Ns : Ns Ar action Ns Op = Ns Ar amount Ns Op / Ns Ar per
 .Nm appjail limits
 .Cm stats
-.Op Fl eHIpt
+.Op Fl eHhIpt
 .Ar jail
 .Op Ar keyword Ns " " Ns "..."
 .Sh DESCRIPTION
@@ -195,7 +195,7 @@ Identifier. An identifier is composed of a positive number. Use
 .Pq default
 to get the lowest identifier value.
 .El
-.It Cm stats Oo Fl eHIpt Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
+.It Cm stats Oo Fl eHhIpt Oc Ar jail Oo Ar keyword Ns " " Ns "..." Oc
 Get information about resource consumption
 .Ns , that is, the
 .Ar keyword
@@ -210,6 +210,13 @@ for a list of available keywords.
 .Bl -tag -width xx
 .It Fl e Ns , Fl H Ns , Fl I Ns , Fl p Ns , Fl t
 .No All of these options perform the opposite task of the options described in Cm get Ns "."
+.It Fl h
+By default,
+.Cm stats
+displays the output in
+.Qq human-Readable
+format, using unit suffixes such as Byte, Megabyte, Gigabyte, Terabyte, and Petabyte.
+This option does not allow this behavior.
 .El
 .El
 .Sh KEYWORDS
