@@ -82,7 +82,10 @@ main()
 			git -C "${repodir}" fetch -q origin >&2 &&
 			git -C "${repodir}" reset -q --hard origin >&2
 		else
-			lib_warn "Automatic updates are disabled (AUTO_GIT_UPDATE = 0), ${url} (id = ${reponame}) will not be updated."
+			local repoid
+			repoid=`basename -- "${repodir}"` || exit $?
+
+			lib_warn "Automatic updates are disabled (AUTO_GIT_UPDATE = 0), ${url} (id = ${repoid}) will not be updated."
 		fi
 	fi
 
