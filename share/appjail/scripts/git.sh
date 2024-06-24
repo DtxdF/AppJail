@@ -91,7 +91,7 @@ main()
 
 usage()
 {
-	echo "usage: git -f config -r repodir"
+	echo "usage: git [-F] -f config -r repodir -u url"
 }
 
 main "$@"
