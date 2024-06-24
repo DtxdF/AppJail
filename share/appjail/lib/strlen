@@ -71,3 +71,60 @@ lib_getnro()
 
 	echo "${_nro}"
 }
+
+lib_humanize_number()
+{
+	local number="$1"
+
+	if [ -z "${number}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_humanize_number number"
+	fi
+
+	local kib=1024
+	local mib=1048576
+	local gib=1073741824
+	local tib=1099511627776
+	local pib=1125899906842624
+	local eib=1152921504606846976
+
+	local unit=
+	local result=
+	
+	local errlevel
+
+	local initial_test
+	initial_test=`test ${number} -lt ${kib} 2> /dev/null`
+
+	errlevel=$?
+
+	if [ ${errlevel} -eq 2 ]; then
+		return 1
+	fi
+
+	if [ ${errlevel} -eq 0 ]; then
+		result="${number}"
+		unit="B"
+	elif [ ${number} -ge ${kib} -a ${number} -lt ${mib} ]; then
+		result=$((number/kib))
+		unit="KiB"
+	elif [ ${number} -ge ${mib} -a ${number} -lt ${gib} ]; then
+		result=$((number/mib))
+		unit="MiB"
+	elif [ ${number} -ge ${gib} -a ${number} -lt ${tib} ]; then
+		result=$((number/gib))
+		unit="GiB"
+	elif [ ${number} -ge ${tib} -a ${number} -lt ${pib} ]; then
+		result=$((number/tib))
+		unit="TiB"
+	elif [ ${number} -ge ${pib} -a ${number} -lt ${eib} ]; then
+		result=$((number/pib))
+		unit="PiB"
+	else
+		result=$((number/eib))
+		unit="EiB"
+	fi
+
+	echo "${result}${unit}"
+
+	return 0
+}

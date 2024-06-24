@@ -1319,7 +1319,19 @@ image_metadata_info()
 
 					size=`image_metadata_get -it "${tag}" -- "${image_name}" size:${arch}`
 					if ! lib_check_empty "${size}"; then
-						echo "  - SIZE = ${size}"
+						if lib_check_number "${size}"; then
+							echo -n "  - SIZE = ${size}"
+
+							human_size=`lib_humanize_number "${size}"`
+
+							if [ -n "${human_size}" ]; then
+								echo -n " (${human_size})"
+							fi
+
+							echo
+						else
+							lib_warn "${size}: image '${image_name}' has an invalid size."
+						fi
 					fi
 
 					timestamp_human=`image_metadata_get -it "${tag}" -- "${image_name}" timestamp-human:${arch}`
