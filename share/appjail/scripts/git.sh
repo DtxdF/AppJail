@@ -69,7 +69,6 @@ main()
 
 	. "${config}"
 	. "${LIBDIR}/load"
-	lib_load "${LIBDIR}/check_func"
 	lib_load "${LIBDIR}/log"
 
 	if [ ! -d "${repodir}" ]; then
