@@ -426,8 +426,20 @@ makejail_update()
 
 			lib_info "Updating (url = ${url}) ..."
 
-			if ! _makejail_git_update "${GLOBAL_GIT_CACHEDIR}/${repoid}"; then
-				lib_err $? "An error occurred while updating."
+			local errlevel
+
+			local repodir="${GLOBAL_GIT_CACHEDIR}/${repoid}"
+
+			lockf -ks "${TMPDIR}/git.${reponame}.lock" \
+				"${SCRIPTSDIR}/git.sh" \
+					-f "${CONFIG}" \
+					-r "${repodir}" \
+					-u "${url}"
+			
+			errlevel=$?
+
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "An error occurred while updating."
 			fi
 
 			if [ "${current_commit}" = `_makejail_git_getlastcommit "${repoid}"` ]; then
@@ -1576,19 +1588,13 @@ _makejail_git_clone()
 	local repodir
 	repodir="${gitdir}/${reponame}"
 
-	if [ ! -d "${repodir}" ]; then
-		lib_debug "Cloning ${url} as ${repodir} ..."
+	local errlevel
 
-		git clone -q -o origin -- "${url}" "${repodir}" >&2
-	else
-		if [ "${AUTO_GIT_UPDATE}" != 0 ]; then
-			lib_debug "Updating ${repodir} ..."
-
-			_makejail_git_update "${repodir}"
-		else
-			lib_warn "Automatic updates are disabled (AUTO_GIT_UPDATE = 0), ${url} (id = ${reponame}) will not be updated."
-		fi
-	fi
+	lockf -ks "${TMPDIR}/git.${reponame}.lock" \
+		"${SCRIPTSDIR}/git.sh" \
+			-f "${CONFIG}" \
+			-r "${repodir}" \
+			-u "${url}"
 
 	errlevel=$?
 	if [ ${errlevel} -ne 0 ]; then
@@ -1596,7 +1602,7 @@ _makejail_git_clone()
 	fi
 
 	if [ ! -f "${repodir}/${mk_file}" ]; then
-		lib_err ${EX_NOINPUT} -- "${mk_file} file does not exist."
+		lib_err ${EX_NOINPUT} -- "${repodir}/${mk_file} file does not exist."
 	fi
 
 	printf "%s\n" "${repodir}/${mk_file}"
@@ -1607,18 +1613,6 @@ _makejail_check_git()
 	if ! which -s "git"; then
 		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
 	fi
-}
-
-_makejail_git_update()
-{
-	local repodir="$1"
-
-	if [ -z "${repodir}" ]; then
-		lib_err ${EX_USAGE} "usage: _makejail_git_update repodir"
-	fi
-
-	git -C "${repodir}" fetch -q origin >&2 &&
-	git -C "${repodir}" reset -q --hard origin >&2
 }
 
 makejail_change_stage()
