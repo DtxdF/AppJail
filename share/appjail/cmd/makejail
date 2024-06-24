@@ -432,6 +432,7 @@ makejail_update()
 
 			lockf -ks "${TMPDIR}/git.${reponame}.lock" \
 				"${SCRIPTSDIR}/git.sh" \
+					-F \
 					-f "${CONFIG}" \
 					-r "${repodir}" \
 					-u "${url}"

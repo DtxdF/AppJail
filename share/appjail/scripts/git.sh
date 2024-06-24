@@ -76,7 +76,7 @@ main()
 
 		git clone -q -o origin -- "${url}" "${repodir}" >&2
 	else
-		if [ ${opt_force_updates} -eq 1] || [ "${AUTO_GIT_UPDATE}" != 0 ]; then
+		if [ ${opt_force_updates} -eq 1 ] || [ "${AUTO_GIT_UPDATE}" != 0 ]; then
 			lib_debug "Updating ${repodir} ..."
 
 			git -C "${repodir}" fetch -q origin >&2 &&
