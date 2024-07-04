@@ -5,6 +5,7 @@
 /libexec/appjail-config/tok
 /libexec/find-number-from-start/find-number-from-start
 /libexec/find-smallest-missing-number/find-smallest-missing-number
+/libexec/get_assigned_rulesets/get_assigned_rulesets
 *.o
 /*.vim
 /.cpignore

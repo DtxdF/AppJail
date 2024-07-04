@@ -1,5 +1,6 @@
 MAKE?=make
 TARGETS=appjail-config \
+		get_assigned_rulesets \
 		find-smallest-missing-number \
 		find-number-from-start \
 		getservbyname \
