@@ -2216,6 +2216,11 @@ jail_priority()
 	done
 	shift $((OPTIND-1))
 
+	if lib_check_empty "${priority}"; then
+		jail_usage
+		exit ${EX_USAGE}
+	fi
+
 	if ! lib_check_number "${priority}"; then
 		lib_err ${EX_DATAERR} "priority must be a number!"
 	fi
