@@ -265,7 +265,7 @@ uses aliasing in combination with
 we need to clone a loopback interface.
 .Pp
 .Bd -literal -offset indent
-# sysrc cloned_interfaces="lo1"
+# sysrc cloned_interfaces+="lo1"
 # sysrc ifconfig_lo1_name="appjail0"
 .Ed
 .Sh PACKET FILTER
@@ -370,7 +370,7 @@ for each jail, which is not really hard even when you have many jails, but it is
 preferable to change things as little as possible.
 .Pp
 .Bd -literal -offset indent
-# sysrc cloned_interfaces="tap0"
+# sysrc cloned_interfaces+="tap0"
 # sysrc ifconfig_tap0_name="ajdns"
 # sysrc ifconfig_ajdns="inet 172.0.0.1/32"
 # service netif cloneup
@@ -381,7 +381,9 @@ The next step is to decide how our jails copy
 .Xr resolv.conf 5 "."
 There are many ways, but we recommend the most trivial and simplest: set
 .Sy DEFAULT_RESOLV_CONF
-in your AppJail configuration file to a
+in
+.Xr appjail.conf 5
+to a
 .Xr resolv.conf 5
 file, so that AppJail copies it instead of
 .Pa /etc/resolv.conf "."
@@ -398,7 +400,9 @@ DEFAULT_RESOLV_CONF="%%PREFIX%%/etc/appjail/resolv.conf"
 .Pp
 Our
 .Xr resolv.conf 5
-file should be very simple.
+file at
+.Pa %%PREFIX%%/etc/appjail/
+should be very simple.
 .Bd -literal -offset indent
 nameserver 172.0.0.1
 .Ed
