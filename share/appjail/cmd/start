@@ -134,7 +134,7 @@ start_main()
 
 	if lib_jail_exists "${jail_name}"; then
 		if ! lib_jail_created_by_appjail "${jail_name}"; then
-			lib_warn -- "${jail_name} was not been created by appjail."
+			lib_warn -- "${jail_name} has not been created by appjail."
 			exit 0
 		fi
 
