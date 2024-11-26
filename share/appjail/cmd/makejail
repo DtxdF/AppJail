@@ -512,7 +512,7 @@ makejail_run()
 
 		if lib_jail_exists "${MAKEJAIL_JAILNAME}"; then
 			if ! lib_jail_created_by_appjail "${MAKEJAIL_JAILNAME}"; then
-				lib_warn -- "${MAKEJAIL_JAILNAME} was not been created by appjail."
+				lib_warn -- "${MAKEJAIL_JAILNAME} has not been created by appjail."
 				exit 0
 			fi
 		fi
