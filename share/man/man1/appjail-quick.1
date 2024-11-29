@@ -403,6 +403,22 @@ See also
 .It
 .Cm create_args Ns = Ns Qo nginx_conf=/app/nginx.conf Qc
 .El
+.It Cm defaultrouter Ns = Ns Qo Ar router Qc
+.Pp
+Create a static default route to this jail.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm defaultrouter Ns = Ns Qo 192.168.0.1 Qc
+.El
+.It Cm defaultrouter6 Ns = Ns Qo Ar router Qc
+The IPv6 equivalent of
+.Sy defaultrouter Ns "."
 .It Cm device Ns = Ns Qo Ar rulespec Qc
 .Pp
 Add a DEVFS rule.
