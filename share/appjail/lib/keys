@@ -143,7 +143,7 @@ lib_keys_get()
 {
 	local group="$1" subgroup="$2" key="$3"
 	if [ -z "${group}" -o -z "${subgroup}" -o -z "${key}" ]; then
-		lib_err ${EX_USAGE} "usage: lib_keys_set group subgroup key"
+		lib_err ${EX_USAGE} "usage: lib_keys_get group subgroup key"
 	fi
 
 	local groupdir
