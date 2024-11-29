@@ -53,3 +53,8 @@ lib_mksum_str()
 		printf "%s\n" "${_s}" | sha256
 	fi
 }
+
+lib_mksum_macaddr()
+{
+	lib_mksum_str "$1" | cut -b -12 | sed -Ee 's/^([0-9a-fA-F][0-9a-fA-F])([0-9a-fA-F][0-9a-fA-F])([0-9a-fA-F][0-9a-fA-F])([0-9a-fA-F][0-9a-fA-F])([0-9a-fA-F][0-9a-fA-F])/\1:\2:\3:\4:\5:/'
+}

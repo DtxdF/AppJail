@@ -33,6 +33,7 @@ lib_load "${LIBDIR}/copy"
 lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/keys"
 lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/mksum"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/tempfile"
@@ -2769,9 +2770,29 @@ quick_set_macaddr()
 		lib_err ${EX_DATAERR} "macddr syntax: interface:addr"
 	fi
 
-	if [ "${addr}" != "random" ] && ! lib_check_macaddr "${addr}"; then
-		lib_err ${EX_DATAERR} "Invalid MAC address: ${addr}"
-	fi
+	case "${addr}" in
+		static)
+			addr=`lib_mksum_macaddr "${QUICK_JAILNAME}"`
+			;;
+		static:*)
+			local prefix
+			prefix=`lib_jailparam_value "${addr}" :`
+
+			if lib_check_empty "${prefix}" || [ `printf "%s" "${prefix}" | wc -c` -ne 8 ] || ! lib_check_macaddr "${prefix}:00:00:00"; then
+				lib_err ${EX_DATAERR} "Invalid MAC address prefix: ${prefix}"
+			fi
+
+			addr=`lib_mksum_macaddr "${QUICK_JAILNAME}" | cut -b 10-`
+			addr="${prefix}:${addr}"
+			;;
+		random)
+			;;
+		*)
+			if ! lib_check_macaddr "${addr}"; then
+				lib_err ${EX_DATAERR} "Invalid MAC address: ${addr}"
+			fi
+			;;
+	esac
 
 	local nro
 

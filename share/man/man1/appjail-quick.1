@@ -1106,7 +1106,7 @@ parameter is used.
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
 .br
-.It Cm macaddr Ns = Ns Qo Ar interface Ns : Ns Ar addr Qc
+.It Cm macaddr Ns = Ns Qo Ar interface Ns : Ns Ar addr Qc | Cm macaddr Ns = Ns Qo Ar interface Ns : Ns Cm random Qc | Cm macaddr Ns = Ns Qo Ar interface Ns : Ns Cm static Ns Oo : Ns Ar prefix Oc Qc
 .Pp
 Changes the MAC address of a given interface.
 .Pp
@@ -1120,6 +1120,20 @@ Target interface to change MAC address.
 .It
 .Ar addr Ns :
 Mac Address.
+.Pp
+Two special values are accepted, that is,
+.Sy random
+to use a random MAC address, and
+.Sy static Ns ,
+which optionally accepts a MAC address
+.Ar prefix
+of 8 bytes in length.
+.Pp
+The special value
+.Sy static
+generates a MAC address using the jail name and if
+.Ar prefix
+is defined, it will be used as a prefix of the MAC address.
 .El
 .Em Multiple Ns : Ns " " Ns Sy Yes
 .br
@@ -1142,6 +1156,10 @@ Mac Address.
 .Cm macaddr Ns = Ns Qo sb_apache:aa:bb:cc:aa:10:fe Qc
 .It
 .Cm macaddr Ns = Ns Qo sb_jtest:random Qc
+.It
+.Cm macaddr Ns = Ns Qo em1:static Qc
+.It
+.Cm macaddr Ns = Ns Qo em0:static:ab:cd:ef Qc
 .El
 .It Cm mount_devfs
 .Pp
