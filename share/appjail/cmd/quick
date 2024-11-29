@@ -66,6 +66,7 @@ QUICK_KEY_ETHER="ether"
 QUICK_KEY_EXPOSE="expose"
 QUICK_KEY_FSTAB="fstab"
 QUICK_KEY_HEALTH="healthcheck"
+QUICK_KEY_IFCONFIG="ifconfig"
 QUICK_KEY_IP4="ip4"
 QUICK_KEY_IP6="ip6"
 QUICK_KEY_JNG="jng"
@@ -113,6 +114,7 @@ QUICK_OPTION_FILE=
 QUICK_OPTION_FILES=
 QUICK_OPTION_FSTAB=0
 QUICK_OPTION_HEALTH=0
+QUICK_OPTION_IFCONFIG=0
 QUICK_OPTION_IMPORT_JAIL=0
 QUICK_OPTION_IMPORT_ROOT=0
 QUICK_OPTION_INITSCRIPT=
@@ -201,7 +203,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -237,7 +239,7 @@ quick_main()
 	virtualnet_options="virtualnet"
 
 	local interface_options
-	interface_options="macaddr"
+	interface_options="ifconfig macaddr"
 
 	local autoconf_options
 	autoconf_options="dhcp slaac"
@@ -2712,6 +2714,71 @@ quick_set_device()
 	lib_keys_append "${QUICK_KEY_DEVICE}" "rulespec" "${rulespec}" > /dev/null
 
 	QUICK_OPTION_DEVICE=1
+}
+
+quick_run_ifconfig()
+{
+	local errlevel
+
+	if [ ${QUICK_OPTION_IFCONFIG} -eq 0 ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_BRIDGE} -eq 0 -a ${QUICK_OPTION_JNG} -eq 0 -a ${QUICK_OPTION_VNET} -eq 0 ]; then
+		quick_reqoptions "ifconfig" "bridge, jng or vnet"
+	fi
+
+	case "${QUICK_OPTION_JAILTYPE}" in
+		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
+		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: ifconfig can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+	esac
+
+	lib_keys_list "${QUICK_KEY_IFCONFIG}" | while IFS= read -r nro
+	do
+		interface=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "interface"`
+		options=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "options"`
+
+		# Check if {interface} is in {vnet.interface}.
+		match=`quick_vnetiface "${interface}"`
+		if lib_check_empty "${match}"; then
+			interfaces=`quick_list_vifaces`
+			lib_err ${EX_CONFIG} -- "${interface}: the interface is not in vnet.interface. Current interfaces: ${interfaces}"
+		fi
+
+		lib_debug "Configuring ${interface}: ${options}"
+
+		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="${options}" >&2 || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_ifconfig()
+{
+	local parameters
+
+	parameters="$1"; quick_reqoption "ifconfig" "${parameters}"
+
+	local interface options
+
+	interface=`lib_jailparam_name "${parameters}" :`
+	options=`lib_jailparam_value "${parameters}" :`
+
+	if lib_check_empty "${interface}" || lib_check_empty "${options}"; then
+		lib_err ${EX_DATAERR} "ifconfig syntax: interface:options"
+	fi
+
+	local nro
+
+	lib_keys_mk "${QUICK_KEY_IFCONFIG}"
+	nro=`lib_keys_append "${QUICK_KEY_IFCONFIG}" "interface" "${interface}"`
+	lib_keys_set "${QUICK_KEY_IFCONFIG}" "${nro}" "options" "${options}"
+
+	QUICK_OPTION_IFCONFIG=1
 }
 
 quick_run_macaddr()
