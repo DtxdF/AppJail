@@ -206,7 +206,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -2789,18 +2789,19 @@ quick_run_ifconfig()
 	fi
 
 	if [ ${QUICK_OPTION_BRIDGE} -eq 0 -a ${QUICK_OPTION_JNG} -eq 0 -a ${QUICK_OPTION_VNET} -eq 0 ]; then
-		quick_reqoptions "ifconfig" "bridge, jng or vnet"
+		quick_reqoptions "ifconfig|ifconfig6" "bridge, jng or vnet"
 	fi
 
 	case "${QUICK_OPTION_JAILTYPE}" in
 		${JAIL_TYPE_THIN}|${JAIL_TYPE_THICK}) ;;
-		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: ifconfig can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
+		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: ifconfig|ifconfig6 can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
 	esac
 
 	lib_keys_list "${QUICK_KEY_IFCONFIG}" | while IFS= read -r nro
 	do
 		interface=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "interface"`
 		options=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "options"`
+		type=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "type"`
 
 		# Check if {interface} is in {vnet.interface}.
 		match=`quick_vnetiface "${interface}"`
@@ -2811,8 +2812,14 @@ quick_run_ifconfig()
 
 		lib_debug "Configuring ${interface}: ${options}"
 
+		local suffix=
+
+		if [ ${type} -eq 6 ]; then
+			suffix="_ipv6"
+		fi
+
 		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
-		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="${options}" >&2 || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}${suffix}+="${options}" >&2 || exit $?
 	done
 
 	errlevel=$?
@@ -2821,11 +2828,32 @@ quick_run_ifconfig()
 	fi
 }
 
+quick_set_ifconfig6()
+{
+	_quick_set_ifconfig "6" "$1"
+}
+
 quick_set_ifconfig()
 {
+	_quick_set_ifconfig "4" "$1"
+}
+
+_quick_set_ifconfig()
+{
+	local type
+	type="$1"
+
+	shift
+
+	local suffix=
+
+	if [ ${type} -eq 6 ]; then
+		suffix=6
+	fi
+
 	local parameters
 
-	parameters="$1"; quick_reqoption "ifconfig" "${parameters}"
+	parameters="$1"; quick_reqoption "ifconfig${suffix}" "${parameters}"
 
 	local interface options
 
@@ -2833,7 +2861,7 @@ quick_set_ifconfig()
 	options=`lib_jailparam_value "${parameters}" :`
 
 	if lib_check_empty "${interface}" || lib_check_empty "${options}"; then
-		lib_err ${EX_DATAERR} "ifconfig syntax: interface:options"
+		lib_err ${EX_DATAERR} "ifconfig${suffix} syntax: interface:options"
 	fi
 
 	local nro
@@ -2841,6 +2869,7 @@ quick_set_ifconfig()
 	lib_keys_mk "${QUICK_KEY_IFCONFIG}"
 	nro=`lib_keys_append "${QUICK_KEY_IFCONFIG}" "interface" "${interface}"`
 	lib_keys_set "${QUICK_KEY_IFCONFIG}" "${nro}" "options" "${options}"
+	lib_keys_set "${QUICK_KEY_IFCONFIG}" "${nro}" "type" "${type}"
 
 	QUICK_OPTION_IFCONFIG=1
 }
