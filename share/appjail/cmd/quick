@@ -60,6 +60,7 @@ QUICK_USE_AJNET=0
 
 # Directories
 QUICK_KEY_BRIDGE="bridge"
+QUICK_KEY_DEFAULTROUTER="defaultrouter"
 QUICK_KEY_DEVICE="device"
 QUICK_KEY_DHCP="dhcp"
 QUICK_KEY_ETHER="ether"
@@ -104,6 +105,7 @@ QUICK_OPTION_COPY=0
 QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
 QUICK_OPTION_CPUSET=
 QUICK_OPTION_CREATE_ARGS=
+QUICK_OPTION_DEFAULTROUTER=0
 QUICK_OPTION_DEFNET=
 QUICK_OPTION_DEVFS_RULESET=
 QUICK_OPTION_DEVICE=0
@@ -203,7 +205,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|defaultrouter|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -239,7 +241,7 @@ quick_main()
 	virtualnet_options="virtualnet"
 
 	local interface_options
-	interface_options="ifconfig macaddr"
+	interface_options="defaultrouter ifconfig macaddr"
 
 	local autoconf_options
 	autoconf_options="dhcp slaac"
@@ -2714,6 +2716,39 @@ quick_set_device()
 	lib_keys_append "${QUICK_KEY_DEVICE}" "rulespec" "${rulespec}" > /dev/null
 
 	QUICK_OPTION_DEVICE=1
+}
+
+quick_run_defaultrouter()
+{
+	if [ ${QUICK_OPTION_DEFAULTROUTER} -eq 0 ]; then
+		return 0
+	fi
+
+	router=`lib_keys_get "${QUICK_KEY_DEFAULTROUTER}" "defaultrouter" "addr"`
+
+	lib_debug "Configuring default router: ${router}"
+
+	if [ -n "${QUICK_OPTION_DEFNET}" ]; then
+		lib_err ${EX_CONFIG} "defaultrouter can't be used when a virtualnet is the default network."
+	fi
+
+	mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+	sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" defaultrouter="${router}" >&2 || exit $?
+}
+
+quick_set_defaultrouter()
+{
+	local router
+
+	router="$1"; quick_reqoption "defaultrouter" "${router}"
+
+	if ! lib_check_ipv4addr "${router}"; then
+		lib_err ${EX_DATAERR} -- "${router}: invalid IPv4 address."
+	fi
+
+	lib_keys_set "${QUICK_KEY_DEFAULTROUTER}" "defaultrouter" "addr" "${router}"
+
+	QUICK_OPTION_DEFAULTROUTER=1
 }
 
 quick_run_ifconfig()
