@@ -799,6 +799,46 @@ Signal to send on timeout.
 .It
 .Cm healthcheck Ns = Ns \&' Ns Qo health_cmd:jail:service nginx status Qc Qo recover_cmd:jail:service nginx restart Qc Ns \&'
 .El
+.It Cm ifconfig Ns = Ns Qo Ar interface Ns : Ns Ar options Qc
+.Pp
+.Xr ifconfig 8
+.Ar options
+to pass to the specified
+.Ar interface Ns "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Ar interface Ns :
+Target interface.
+.It
+.Ar options Ns :
+.Xr ifconfig 8
+options.
+.El
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Requires
+.Pq any
+.Ns :
+.Bl -dash -compact
+.It
+.Sy bridge
+.It
+.Sy jng
+.It
+.Sy vnet
+.El
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm ifconfig Ns = Ns Qo sb_nginx:192.168.0.114/24 Qc
+.El
+.It Cm ifconfig6
+The IPv6 equivalent of
+.Sy ifconfig Ns "."
 .It Cm import+jail Ns = Ns Qo Cm input Ns : Ns Ar file Oo Cm portable Oc Oo Cm compress Ns : Ns Ar algo Oc Qc
 .Pp
 Create a new jail by importing a tarball file into the jail directory.
