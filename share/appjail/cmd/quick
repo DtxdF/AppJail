@@ -2746,7 +2746,7 @@ quick_run_macaddr()
 		lib_debug "Configuring ${interface} to use the MAC address \`${addr}\`"
 
 		mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
-		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}+="ether ${addr}" >&2 || exit $?
+		sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" ifconfig_${interface}_alias0+="ether ${addr}" >&2 || exit $?
 	done
 
 	errlevel=$?
