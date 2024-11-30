@@ -24,7 +24,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 * DHCP and SLAAC support.
 * Virtual networks - A jail can be on several virtual networks at the same time.
 * Bridge support.
-* VNET support
+* VNET support.
 * Deploy your applications much easier using Makejail!
 * Netgraph support.
 * LinuxJails support.
