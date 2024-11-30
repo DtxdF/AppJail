@@ -35,7 +35,7 @@ lib_mksum()
 	local _f
 
 	_f="$1"
-	if [ -z "_${f}" ]; then
+	if [ -z "${_f}" ]; then
 		lib_err ${EX_USAGE} "usage: lib_mksum file"
 	fi
 
