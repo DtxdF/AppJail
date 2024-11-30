@@ -142,7 +142,7 @@ limits_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "${DEFAULT_COLUMNS_LIMITS}"
+		set -- ${DEFAULT_COLUMNS_LIMITS}
 	fi
 
 	local keyword
