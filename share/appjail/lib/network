@@ -107,7 +107,7 @@ lib_network_getinet_from_jail()
 		lib_err ${EX_USAGE} "usage: lib_network_getinet_from_jail jail"
 	fi
 
-	jexec -l "${jail}" ifconfig -f inet:cidr | grep -Ee 'inet ' | cut -d' ' -f2
+	jexec -l "${jail}" ifconfig -f inet:cidr 2> /dev/null | grep -Ee 'inet ' | cut -d' ' -f2
 }
 
 lib_network_getinet6_from_jail()
@@ -117,5 +117,5 @@ lib_network_getinet6_from_jail()
 		lib_err ${EX_USAGE} "usage: lib_network_getinet6_from_jail jail"
 	fi
 
-	jexec -l "${jail}" ifconfig -f inet:cidr | grep -Ee 'inet6' | cut -d' ' -f2
+	jexec -l "${jail}" ifconfig -f inet:cidr 2> /dev/null | grep -Ee 'inet6' | cut -d' ' -f2
 }
