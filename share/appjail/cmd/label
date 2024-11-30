@@ -159,7 +159,7 @@ label_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "name" "value"
+		set -- ${DEFAULT_COLUMNS_LABEL}
 	fi
 
 	local keyword

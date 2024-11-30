@@ -460,7 +460,7 @@ fstab_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "nro" "enabled" "name" "device" "mountpoint" "type" "options" "dump" "pass"
+		set -- ${DEFAULT_COLUMNS_FSTAB}
 	fi
 
 	local keyword

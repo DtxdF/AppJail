@@ -257,7 +257,7 @@ image_get()
 	lib_set_logprefix " [`random_color`${image_name}${COLOR_DEFAULT}]"
 
 	if [ $# -eq 0 ]; then
-		set -- "name"
+		set -- ${DEFAULT_COLUMNS_IMAGE}
 	fi
 
 	local keyword

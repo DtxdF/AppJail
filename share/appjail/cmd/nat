@@ -480,10 +480,10 @@ nat_get()
 	if [ $# -eq 0 ]; then
 		case "${entity}" in
 			jail)
-				set -- "name" "network" "rule"
+				set -- ${DEFAULT_COLUMNS_NAT_JAIL}
 				;;
 			network)
-				set -- "boot" "name" "rule"
+				set -- ${DEFAULT_COLUMNS_NAT_NETWORK}
 				;;
 		esac
 	fi

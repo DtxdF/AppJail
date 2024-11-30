@@ -336,7 +336,7 @@ devfs_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "nro" "enabled" "name" "rule"
+		set -- ${DEFAULT_COLUMNS_DEVFS}
 	fi
 
 	local keyword

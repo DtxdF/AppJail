@@ -142,7 +142,7 @@ limits_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "nro" "enabled" "name" "rule" "loaded"
+		set -- "${DEFAULT_COLUMNS_LIMITS}"
 	fi
 
 	local keyword
@@ -713,7 +713,7 @@ limits_stats()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "maxproc" "cputime" "pcpu" "vmemoryuse" "readiops" "writeiops"
+		set -- ${DEFAULT_COLUMNS_STATS}
 	fi
 
 	local human_readable_flag=

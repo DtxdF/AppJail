@@ -1747,7 +1747,7 @@ jail_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "status" "name" "type" "version" "ports" "network_ip4"
+		set -- ${DEFAULT_COLUMNS_JAIL}
 	fi
 
 	local keyword

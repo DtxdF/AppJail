@@ -1212,6 +1212,84 @@ Default:
 Default:
 .Em zstd -d ${ZSTD_DECOMPRESS_ARGS}
 .El
+.Sh COLUMNS PARAMETERS
+.Bl -tag -width xxxxx
+.It DEFAULT_COLUMNS_VOLUME
+Default columns for
+.Xr appjail-volume 1 Cm get Ns "."
+.br
+Default:
+.Em name mountpoint type uid gid perm
+.It DEFAULT_COLUMNS_LIMITS
+Default columns for
+.Xr appjail-limits 1 Cm get Ns "."
+.br
+Default:
+.Em nro enabled name rule loaded
+.It DEFAULT_COLUMNS_STATS
+Default columns for
+.Xr appjail-limits 1 Cm stats Ns "."
+.It DEFAULT_COLUMNS_LABEL
+Default columns for
+.Xr appjail-label 1 Cm get Ns "."
+.br
+Default:
+.Em name value
+.It DEFAULT_COLUMNS_JAIL
+Default columns for
+.Xr appjail-jail 1 Cm get Ns "."
+.br
+Default:
+.Em status name type version ports network_ip4
+.It DEFAULT_COLUMNS_NETWORK
+Default columns for
+.Xr appjail-network 1 Cm get Ns "."
+.br
+Default:
+.Em name network cidr broadcast gateway minaddr maxaddr addresses description mtu
+.It DEFAULT_COLUMNS_IMAGE
+Default columns for
+.Xr appjail-image 1 Cm get Ns "."
+.br
+Default:
+.Em name
+.It DEFAULT_COLUMNS_NAT_JAIL
+Default columns for
+.Xr appjail-nat 1 Cm jail Cm get Ns "."
+.br
+Default:
+.Em name network rule
+.It DEFAULT_COLUMNS_NAT_NETWORK
+Default columns for
+.Xr appjail-nat 1 Cm network Cm get Ns "."
+.br
+Default:
+.Em boot name rule
+.It DEFAULT_COLUMNS_HEALTHCHECK
+Default columns for
+.Xr appjail-healthcheck 1 Cm get Ns "."
+.br
+Default:
+.Em nro enabled name status health_cmd recover_cmd
+.It DEFAULT_COLUMNS_FSTAB
+Default columns for
+.Xr appjail-fstab 1 Cm get Ns "."
+.br
+Default:
+.Em nro enabled name device mountpoint type options dump pass
+.It DEFAULT_COLUMNS_DEVFS
+Default columns for
+.Xr appjail-devfs 1 Cm get Ns "."
+.br
+Default:
+.Em nro enabled name rule
+.It DEFAULT_COLUMNS_EXPOSE
+Default columns for
+.Xr appjail-expose 1 Cm get Ns "."
+.br
+Default:
+.Em nro enabled name ports protocol network_name
+.El
 .Sh MISCELLANEOUS PARAMETERS
 .Bl -tag -width xxxxx
 .It AUTO_GIT_UPDATE

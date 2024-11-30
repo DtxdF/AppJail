@@ -232,7 +232,7 @@ volume_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "name" "mountpoint" "type" "uid" "gid" "perm"
+		set -- ${DEFAULT_COLUMNS_VOLUME}
 	fi
 
 	local keyword

@@ -896,7 +896,7 @@ network_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "name" "network" "cidr" "broadcast" "gateway" "minaddr" "maxaddr" "addresses" "description" "mtu"
+		set -- ${DEFAULT_COLUMNS_NETWORK}
 	fi
 
 	local keyword

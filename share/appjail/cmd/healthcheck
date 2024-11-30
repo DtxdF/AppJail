@@ -155,7 +155,7 @@ healthcheck_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "nro" "enabled" "name" "status" "health_cmd" "recover_cmd"
+		set -- ${DEFAULT_COLUMNS_HEALTHCHECK}
 	fi
 
 	local keyword

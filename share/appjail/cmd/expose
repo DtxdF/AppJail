@@ -173,7 +173,7 @@ expose_get()
 	fi
 
 	if [ $# -eq 0 ]; then
-		set -- "nro" "enabled" "name" "ports" "protocol" "network_name"
+		set -- ${DEFAULT_COLUMNS_EXPOSE}
 	fi
 
 	local keyword
