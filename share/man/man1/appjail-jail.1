@@ -517,6 +517,14 @@ if it is not.
 Shows the hostname assigned by the
 .Sy host.hostname
 parameter in a template.
+.It Sy inet
+Shows all IPv4 addresses reported by
+.Xr ifconfig 8 Ns "."
+If the jail is not running, IPv4 addresses cannot be retrieved.
+.It Sy inet6
+Same as
+.Sy inet
+but for IPv6.
 .It Sy ip4
 Shows the IPv4 addresses assigned by the
 .Sy ip4.addr
