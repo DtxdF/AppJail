@@ -69,6 +69,21 @@ lib_check_var()
 	fi
 }
 
+lib_check_env()
+{
+	local variable="$1"
+
+	if [ -z "${variable}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_env variable"
+	fi
+
+	if printf "%s" "${variable}" | grep -Eq '^[a-zA-Z_][a-zA-Z0-9_]*=(.*)?$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 lib_check_varname()
 {
 	local name="$1"
@@ -1107,4 +1122,20 @@ lib_check_mtu()
 	fi
 
 	return 0
+}
+
+lib_check_proc()
+{
+    local pid=$1
+
+    if [ -z "${pid}" ]; then
+        err "usage: lib_check_proc pid"
+        exit ${EX_USAGE}
+    fi
+
+    if [ `ps -o pid -p ${pid} | wc -l` -eq 2 ]; then
+        return 0
+    else
+        return 1
+    fi
 }

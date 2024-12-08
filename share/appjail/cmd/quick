@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@ lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/keys"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mksum"
+lib_load "${LIBDIR}/oci"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/tempfile"
@@ -101,6 +102,13 @@ QUICK_OPTION_BOOT="${DEFAULT_BOOT}"
 QUICK_OPTION_BRIDGE=0
 QUICK_OPTION_CLONE_JAIL=0
 QUICK_OPTION_CLONE_RELEASE=0
+QUICK_OPTION_CONTAINER=
+QUICK_OPTION_CONTAINER_BOOT=0
+QUICK_OPTION_CONTAINER_EXPOSE=0
+QUICK_OPTION_CONTAINER_EXT_IF=
+QUICK_OPTION_CONTAINER_LOGOPTS=0
+QUICK_OPTION_CONTAINER_LOGOPTS_OPTS=
+QUICK_OPTION_CONTAINER_ON_IF=
 QUICK_OPTION_COPY=0
 QUICK_OPTION_COPYDIR="${DEFAULT_COPYDIR}"
 QUICK_OPTION_CPUSET=
@@ -115,6 +123,8 @@ QUICK_OPTION_EMPTY=0
 QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
 QUICK_OPTION_FILES=
+QUICK_OPTION_FROM=0
+QUICK_OPTION_FROM_IMAGE=
 QUICK_OPTION_FSTAB=0
 QUICK_OPTION_HEALTH=0
 QUICK_OPTION_IFCONFIG=0
@@ -206,7 +216,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|empty|expose|file|files|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -216,6 +226,9 @@ quick_main()
 
 	# create jail
 	quick_create_jail
+
+	local oci_options
+	oci_options="from"
 
 	local label_options
 	label_options="label"
@@ -269,11 +282,14 @@ quick_main()
 	args_options="start_env run_env stop_env create_args start_args run_args stop_args"
 
 	local all_options
-	all_options="${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
+	all_options="${oci_options} ${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
 
 	for option in ${all_options}; do
 		quick_run_${option}
 	done
+
+	# unmount the container directory if it is an OCI container
+	quick_oci_umount
 
 	# write template
 	quick_write_template
@@ -397,6 +413,301 @@ quick_end_jail()
 	lib_debug "Done."
 }
 
+quick_set_container()
+{
+	local params="$1"
+	if lib_check_empty "${params}"; then
+		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [ext_if:external_interface] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
+	fi
+
+	params=`lib_split_jailparams "${params}"` || exit $?
+	local total_items=`printf "%s\n" "${params}" | wc -l`
+	local current_index=0
+
+	local arg parameter value
+	while [ ${current_index} -lt ${total_items} ]; do 
+		current_index=$((current_index+1))
+
+		arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+		if lib_check_empty "${arg}"; then
+			continue
+		fi
+
+		parameter=`lib_jailparam_name "${arg}" :`
+		value=`lib_jailparam_value "${arg}" :`
+
+		case "${parameter}" in
+			ext_if|name|on_if)
+				if lib_check_empty "${value}"; then
+					quick_set_container # usage
+				fi
+				;;
+		esac
+
+		case "${parameter}" in
+			boot)
+				QUICK_OPTION_CONTAINER_BOOT=1
+				;;
+			expose)
+				QUICK_OPTION_CONTAINER_EXPOSE=1
+				;;
+			ext_if)
+				QUICK_OPTION_CONTAINER_EXT_IF="${value}"
+				;;
+			logopts)
+				QUICK_OPTION_CONTAINER_LOGOPTS=1
+				QUICK_OPTION_CONTAINER_LOGOPTS_OPTS="${value}"
+				;;
+			name)
+				QUICK_OPTION_CONTAINER="${value}"
+				;;
+			on_if)
+				QUICK_OPTION_ON_IF="${value}"
+				;;
+			*)
+				lib_err ${EX_DATAERR} -- "${parameter} (container): parameter not found."
+				;;
+		esac
+	done
+}
+
+quick_oci_umount()
+{
+	if [ -z "${QUICK_OPTION_CONTAINER}" ]; then
+		return 0
+	fi
+
+	appjail oci umount "${QUICK_JAILNAME}" || exit $?
+}
+
+quick_run_from()
+{
+	if [ ${QUICK_OPTION_FROM} -eq 0 ]; then
+		return 0
+	fi
+
+	oci_check_dependencies
+
+	local container_name
+
+	if [ -z "${QUICK_OPTION_CONTAINER}" ]; then
+		container_name=`random_hexstring 11 0 15 | tr -d '\n'`
+		container_name="appjail-${container_name}"
+	else
+		container_name="${QUICK_OPTION_CONTAINER}"
+	fi
+
+	if ! oci_check_container_name "${container_name}"; then
+		lib_err ${EX_DATAERR} "Invalid container name \"${container_name}\""
+	fi
+
+	lib_debug "Creating a container (name:${container_name}) from ${QUICK_OPTION_FROM_IMAGE} ..."
+
+	if ! oci_from "${QUICK_OPTION_FROM_IMAGE}" "${container_name}"; then
+		lib_err ${EX_SOFTWARE} "Error creating container ${container_name} from ${QUICK_OPTION_FROM_IMAGE}"
+	fi
+
+	appjail oci set-container-name "${container_name}" "${QUICK_JAILNAME}" || exit $?
+
+	QUICK_OPTION_CONTAINER="${container_name}"
+
+	lib_debug "Mounting container directory into jail directory ..."
+
+	lib_atexit_add "if ! appjail status -q \"${QUICK_JAILNAME}\"; then appjail oci umount \"${QUICK_JAILNAME}\" > /dev/null 2>&1; fi"
+
+	appjail oci mount "${QUICK_JAILNAME}" || exit $?
+
+	local arch
+	arch=`oci_ociv1_get_arch "${container_name}"` || exit $?
+
+	local osversion
+	osversion=`oci_get_osversion "${container_name}" "${QUICK_JAILNAME}"` || exit $?
+
+	local params total_items current_index
+
+	local volumes
+	volumes=`oci_ociv1_get_volumes "${container_name}"` || exit $?
+
+	if ! lib_check_empty "${volumes}"; then
+		params=`lib_split_jailparams "${volumes}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local arg
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			local mountpoint
+			mountpoint="${arg}"
+
+			local escape_mountpoint
+			escape_mountpoint=`lib_escape_string "${mountpoint}"`
+
+			local volume
+			volume=`oci_translate_volume "${arg}"`
+
+			local escape_volume
+			escape_volume=`lib_escape_string "${volume}"`
+
+			quick_set_volume "\"${escape_volume}\" \"mountpoint:${escape_mountpoint}\""
+		done
+	fi
+
+	local labels
+	labels=`oci_ociv1_get_labels "${container_name}"` || exit $?
+
+	if ! lib_check_empty "${labels}"; then
+		params=`lib_split_jailparams "${labels}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local arg
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			local label
+			label="${arg}"
+
+			local escape_label
+			escape_label=`lib_escape_string "${label}"`
+
+			local value
+			value=`oci_ociv1_get_label_value "${container_name}" "${label}"`
+
+			if lib_check_empty "${value}"; then
+				quick_set_label "${escape_label}"
+			else
+				local escape_value
+				escape_value=`lib_escape_string "${value}"`
+				quick_set_label "${escape_label}:${escape_value}"
+			fi
+		done
+	fi
+
+	local exposedports
+	exposedports=`oci_ociv1_get_exposedports "${container_name}"` || exit $?
+
+	if ! lib_check_empty "${exposedports}"; then
+		params=`lib_split_jailparams "${exposedports}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local arg
+		while [ ${current_index} -lt ${total_items} ]; do 
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			local exposedport
+			exposedport="${arg}"
+
+			if ! printf "%s" "${exposedport}" | grep -qEe '^[0-9]+(/(udp|tcp))?$'; then
+				lib_err ${EX_CONFIG} "This container image does not contain a valid port (${exposedport})!"
+			fi
+
+			local port
+			port=`lib_jailparam_name "${exposedport}" /`
+
+			if ! lib_check_port "${port}"; then
+				lib_err ${EX_CONFIG} "This container image does not contain a valid port (${port})!"
+			fi
+
+			local proto
+			proto=`lib_jailparam_value "${exposedport}" /`
+
+			if lib_check_empty "${proto}"; then
+				proto="tcp"
+			fi
+
+			case "${proto}" in
+				tcp|udp) ;;
+				*) lib_err ${EX_CONFIG} "This container image does not contain a valid protocol (${proto})!" ;;
+			esac
+
+			local expose_parameters
+			expose_parameters="${port}:${port} proto:${proto}"
+
+			local ext_if
+			ext_if="${QUICK_OPTION_CONTAINER_EXT_IF}"
+
+			if [ -n "${ext_if}" ]; then
+				local escape_ext_if
+				escape_ext_if=`lib_escape_string "${ext_if}"`
+
+				expose_parameters="${expose_parameters} \"ext_if:${escape_ext_if}\""
+			fi
+
+			local on_if
+			on_if="${QUICK_OPTION_CONTAINER_ON_IF}"
+
+			if [ -n "${on_if}" ]; then
+				local escape_on_if
+				escape_on_if=`lib_escape_string "${on_if}"`
+
+				expose_parameters="${expose_parameters} \"on_if:${escape_on_if}\""
+			fi
+
+			if [ ${QUICK_OPTION_CONTAINER_LOGOPTS} -eq 1 ]; then
+				local logopts
+				logopts="${QUICK_OPTION_CONTAINER_LOGOPTS_OPTS}"
+
+				if lib_check_empty "${logopts}"; then
+					expose_parameters="${expose_parameters} logopts"
+				else
+					local escape_logopts
+					escape_logopts=`lib_escape_string "${logopts}"`
+
+					expose_parameters="${expose_parameters} \"logopts:${escape_logopts}\""
+				fi
+			fi
+
+			quick_set_expose "${expose_parameters}"
+		done
+	fi
+
+	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf jail_type=thick  || exit $?
+	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf release_name="${QUICK_OPTION_RELEASE}"  || exit $?
+
+	if [ -n "${arch}" ]; then
+		appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf osarch="${arch}"  || exit $?
+	fi
+
+	if [ -n "${osversion}" ]; then
+		appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf osversion="${osversion}"  || exit $?
+	fi
+
+	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container=1
+	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container_image="${QUICK_OPTION_FROM_IMAGE}"
+
+	if [ ${QUICK_OPTION_CONTAINER_BOOT} -eq 1 ]; then
+		appjail oci set-boot on "${QUICK_JAILNAME}" || exit $?
+	fi
+}
+
+quick_set_from()
+{
+	quick_set_empty
+
+	local image
+	image="$1"; quick_reqoption "from" "${image}"
+
+	QUICK_OPTION_FROM=1
+	QUICK_OPTION_FROM_IMAGE="${image}"
+}
+
 quick_run_label()
 {
 	if [ ${QUICK_OPTION_LABEL} -eq 0 ]; then
@@ -406,7 +717,7 @@ quick_run_label()
 	lib_keys_list "${QUICK_KEY_LABELS}" | while IFS= read -r label; do
 		value=`lib_keys_get "${QUICK_KEY_LABELS}" "${label}" "value"`
 
-		lib_debug "Adding label ${label}=${value} ..."
+		lib_debug "Adding label ${label} (value:${value}) ..."
 
 		appjail label add "${QUICK_JAILNAME}" "${label}" "${value}" || exit $?
 	done || exit $?
@@ -429,10 +740,6 @@ quick_set_label()
 	fi
 
 	value=`lib_jailparam_value "${label}" :`
-
-	if lib_check_empty "${value}"; then
-		lib_err ${EX_DATAERR} "label syntax: key:value"
-	fi
 
 	lib_keys_set "${QUICK_KEY_LABELS}" "${key}" "value" "${value}"
 
@@ -915,6 +1222,10 @@ quick_run_expose()
 		exit ${errlevel}
 	fi
 
+	if [ ${QUICK_OPTION_FROM} -eq 1 ] && [ ${QUICK_OPTION_CONTAINER_EXPOSE} -eq 0 ]; then
+		return 0
+	fi
+	
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart='"appjail expose on \"${name}\""'
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail expose off \"${name}\""'
 }

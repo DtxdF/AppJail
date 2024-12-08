@@ -62,11 +62,6 @@ label_add()
 
 	local label_value="$3"
 
-	if lib_check_empty "${label_value}"; then
-		label_usage
-		exit ${EX_USAGE}
-	fi
-
 	if ! lib_check_labelname "${label_name}"; then
 		lib_err ${EX_DATAERR} "Invalid label name '${label_name}'"
 	fi

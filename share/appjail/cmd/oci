@@ -1,0 +1,1238 @@
+#!/bin/sh
+#
+# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/oci"
+lib_load "${LIBDIR}/mount"
+lib_load "${LIBDIR}/random"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/strlen"
+
+oci_desc="Commands for interpreting OCI images."
+
+oci_main()
+{
+	oci_check_dependencies
+
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		del-env|del-user|del-workdir|exec|from|get-container-name|get-env|get-pid|get-user|get-workdir|kill|ls-env|mount|run|set-boot|set-container-name|set-env|set-user|set-workdir|umount) ;;
+		*) oci_usage; exit ${EX_USAGE} ;;
+	esac
+
+	oci_${entity} "$@"
+}
+
+oci_del-env()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local env_name
+	env_name="$2"
+
+	if lib_check_empty "${env_name}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_varname "${env_name}"; then
+		lib_err ${EX_DATAERR} "Invalid environment variable name '${env_name}'"
+	fi
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local envdir="${ocidir}/env"
+	local envfile="${envdir}/${env_name}"
+
+	if [ ! -f "${envfile}" ]; then
+		lib_err ${EX_NOINPUT} "Environment variable '${env_name}' doesn't seem to exist."
+	fi
+	
+	rm -f -- "${envfile}"
+}
+
+oci_del-user()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local user_file="${ocidir}/user"
+
+	if [ ! -f "${user_file}" ]; then
+		lib_err ${EX_NOINPUT} "The jail '${jail}' has no user."
+	fi
+	
+	rm -f -- "${user_file}"
+}
+
+oci_del-workdir()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local workdir_file="${ocidir}/workdir"
+
+	if [ ! -f "${workdir_file}" ]; then
+		lib_err ${EX_NOINPUT} "The jail '${jail}' has no working directory."
+	fi
+	
+	rm -f -- "${workdir_file}"
+}
+
+oci_exec()
+{
+	local _o
+	local opt_detach=false
+	local env=
+	local user=
+	local workdir=
+
+	while getopts ":de:u:w:" _o; do
+		case "${_o}" in
+			e|u|w)
+				if lib_check_empty "${OPTARG}"; then
+					oci_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			d)
+				opt_detach=true
+				;;
+			e)
+				local env_var="${OPTARG}"
+				if ! lib_check_env "${env_var}"; then
+					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
+				fi
+
+				env_var=`lib_escape_string "${env_var}"`
+
+				if [ -z "${env}" ]; then
+					env="\"${env_var}\""
+				else
+					env="${env} \"${env_var}\""
+				fi
+				;;
+			u)
+				user="${OPTARG}"
+				;;
+			w)
+				workdir="${OPTARG}"
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail
+	jail="$1"
+
+	shift
+
+	if lib_check_empty "${jail}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local entrypoint=
+
+	if [ $# -gt 0 ]; then
+		entrypoint="$1"
+
+		shift
+	fi
+
+	local output errlevel
+
+	output=`"${APPJAIL_PROGRAM}" status -- "${jail}" 2>&1`
+
+	errlevel=$?
+
+	if [ ${errlevel} -eq 1 ]; then
+		printf "%s\n" "${output}" >&2
+		return 0
+	elif [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "${output}"
+	fi
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local container_name
+	container_name=`oci_get-container-name "${jail}"` || exit $?
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	local ocidir="${JAILDIR}/${jail}/conf/boot/oci"
+
+	local jexec_args
+	jexec_args="-l"
+
+	if lib_check_empty "${user}"; then
+		local user_file
+		user_file="${ocidir}/user"
+
+		if [ -f "${user_file}" ]; then
+			user=`head -1 -- "${user_file}"` || exit $?
+		else
+			user=`oci_ociv1_get_user "${container_name}"` || exit $?
+		fi
+	fi
+
+	if ! lib_check_empty "${user}"; then
+		local escape_user
+		escape_user=`lib_escape_string "${user}"`
+
+		jexec_args="${jexec_args} -u \"${escape_user}\""
+	fi
+
+	if lib_check_empty "${workdir}"; then
+		local workdir_file
+		workdir_file="${ocidir}/workdir"
+
+		if [ -f "${workdir_file}" ]; then
+			workdir=`head -1 -- "${workdir_file}"` || exit $?
+		else
+			workdir=`oci_ociv1_get_workingdir "${container_name}"` || exit $?
+		fi
+
+		if lib_check_empty "${workdir}"; then
+			workdir="/"
+		fi
+	fi
+
+	local escape_workdir
+	escape_workdir=`lib_escape_string "${workdir}"`
+
+	jexec_args="${jexec_args} -w \"${escape_workdir}\""
+
+	local escape_jail
+	escape_jail=`lib_escape_string "${jail}"`
+
+	jexec_args="${jexec_args} -- \"${escape_jail}\""
+
+	local default_env
+	default_env=`oci_ociv1_get_env "${container_name}"` || exit $?
+
+	local envdir
+	envdir="${ocidir}/env"
+
+	if [ -d "${envdir}" ] && [ `lib_countfiles "${envdir}"` -gt 0 ]; then
+		local user_env=
+		local envfile
+
+		for envfile in "${envdir}/"*; do
+			local env_name
+			env_name=`basename -- "${envfile}"` || exit $?
+
+			local env_value
+			env_value=`head -1 -- "${envfile}"` || exit $?
+
+			local env_var
+			env_var="${env_name}=${env_value}"
+
+			env_var=`lib_escape_string "${env_var}"`
+
+			if [ -z "${user_env}" ]; then
+				user_env="\"${env_var}\""
+			else
+				user_env="${user_env} \"${env_var}\""
+			fi
+		done
+
+		env="${user_env} ${env}"
+	fi
+
+	jexec_args="${jexec_args} env ${default_env} ${env}"
+
+	if lib_check_empty "${entrypoint}"; then
+		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
+
+		local cmd
+		cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
+
+		if lib_check_empty "${entrypoint}" && lib_check_empty "${cmd}"; then
+			jexec_args="${jexec_args} /bin/sh -i"
+		else
+			jexec_args="${jexec_args} ${entrypoint} ${cmd}"
+		fi
+	else
+		local escape_entrypoint
+		escape_entrypoint=`lib_escape_string "${entrypoint}"`
+
+		jexec_args="${jexec_args} \"${escape_entrypoint}\""
+
+		local arg
+		
+		for arg in "$@"; do
+			local escape_arg
+			escape_arg=`lib_escape_string "${arg}"`
+
+			jexec_args="${jexec_args} \"${escape_arg}\""
+		done
+	fi
+
+	local jexec
+	jexec="${UTILDIR}/jexec/jexec"
+
+	local escape_jexec
+	escape_jexec=`lib_escape_string "${jexec}"`
+
+	local daemon_args logname pid
+
+	if ${opt_detach}; then
+		pid=`oci_get-pid "${jail}"`
+
+		if ! lib_check_empty "${pid}"; then
+			lib_err ${EX_CANTCREAT} "There is a background process currently running as ${pid}"
+		fi
+
+		lib_debug "Running: ${CONTAINERLOG_NAME}"
+
+		logname=`sh -c "${CONTAINERLOG_NAME}"`
+
+		errlevel=$?
+		if [ ${errlevel} -ne 0 ]; then
+			lib_err ${errlevel} "{CONTAINERLOG_NAME} exits with a non-zero exit status."
+		fi
+
+		if lib_check_ispath "${logname}"; then
+			lib_err ${EX_DATAERR} -- "${logname}: invalid log name."
+		fi
+
+		lib_zfs_mklogdir "jails" "${jail}" "container"
+
+		logname="jails/${jail}/container/${logname}"
+
+		local logfile
+		logfile="${LOGDIR}/${logname}"
+
+		local escape_logfile
+		escape_logfile=`lib_escape_string "${logfile}"`
+
+		daemon_args="daemon -f -o \"${escape_logfile}\""
+
+		local escape_jail
+		escape_jail=`lib_escape_string "${jail}"`
+
+		local escape_container_name
+		escape_container_name=`lib_escape_string "${container_name}"`
+
+		daemon_args="${daemon_args} -t \"running ${escape_jail}:${escape_container_name}\""
+
+		local pid_file
+		pid_file="${JAILDIR}/${jail}/conf/boot/oci/pid"
+
+		local escape_pid_file
+		escape_pid_file=`lib_escape_string "${pid_file}"`
+
+		daemon_args="${daemon_args} -p \"${escape_pid_file}\""
+	fi
+
+	lib_debug "Executing: ${daemon_args} ${jexec} ${jexec_args}"
+
+	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}"
+
+	if ${opt_detach}; then
+		pid=`oci_get-pid "${jail}"`
+
+		lib_info "Detached: pid:${pid}, log:${logname}"
+	fi
+}
+
+oci_from()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local image
+	image="$1"
+
+	shift
+
+	local jail
+	jail="$1"
+
+	shift
+
+	"${APPJAIL_PROGRAM}" quick "${jail}" from="${image}" "$@"
+}
+
+oci_get-container-name()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local container_name_file
+	container_name_file="${ocidir}/container_name"
+
+	if [ -f "${container_name_file}" ]; then
+		local container_name
+		container_name=`head -1 -- "${container_name_file}"` || exit $?
+
+		printf "%s\n" "${container_name}"
+	fi
+}
+
+oci_get-env()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local env_name
+	env_name="$2"
+
+	if lib_check_empty "${env_name}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_varname "${env_name}"; then
+		lib_err ${EX_DATAERR} "Invalid environment variable name '${env_name}'"
+	fi
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local envdir="${ocidir}/env"
+	local envfile="${envdir}/${env_name}"
+
+	if [ ! -f "${envfile}" ]; then
+		lib_err ${EX_NOINPUT} "Environment variable '${env_name}' doesn't seem to exist."
+	fi
+
+	local env_value
+	env_value=`head -1 -- "${envfile}"` || exit $?
+
+	printf "%s\n" "${env_value}"
+}
+
+oci_get-pid()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local pid_file
+	pid_file="${ocidir}/pid"
+
+	if [ -f "${pid_file}" ]; then
+		local pid
+		pid=`head -1 -- "${pid_file}"` || exit $?
+
+		if lib_check_proc "${pid}"; then
+			printf "%s\n" "${pid}"
+		fi
+	fi
+}
+
+oci_get-user()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local user_file="${ocidir}/user"
+
+	if [ ! -f "${user_file}" ]; then
+		lib_err ${EX_NOINPUT} "The jail '${jail}' has no user."
+	fi
+	
+	local user
+	user=`head -1 -- "${user_file}"`
+
+	printf "%s\n" "${user}"
+}
+
+oci_get-workdir()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local workdir_file="${ocidir}/workdir"
+
+	if [ ! -f "${workdir_file}" ]; then
+		lib_err ${EX_NOINPUT} "The jail '${jail}' has no working directory."
+	fi
+	
+	local workdir
+	workdir=`head -1 -- "${workdir_file}"` || exit $?
+
+	printf "%s\n" "${workdir}"
+}
+
+oci_kill()
+{
+	local _o
+	local signal=
+
+	while getopts ":s:" _o; do
+		case "${_o}" in
+			s)
+				if lib_check_empty "${OPTARG}"; then
+					oci_usage
+					exit ${EX_USAGE}
+				fi
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail
+	jail="$1"
+
+	local pid
+	pid=`oci_get-pid "${jail}"` || exit $?
+
+	if lib_check_empty "${pid}"; then
+		lib_warn "There is no process to kill."
+		return 0
+	fi
+
+	local container_name
+	container_name=`oci_get-container-name "${jail}"` || exit $?
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	if lib_check_empty "${signal}"; then
+		signal=`oci_ociv1_get_stopsignal "${container_name}"` || exit $?
+
+		if lib_check_empty "${signal}"; then
+			signal="SIGTERM"
+		fi
+	fi
+
+	kill -"${signal}" "${pid}"
+}
+
+oci_ls-env()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local envdir="${ocidir}/env"
+
+	if [ -d "${envdir}" ]; then
+		ls -- "${envdir}"
+	fi
+}
+
+oci_mount()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local container_name
+	container_name=`oci_get-container-name "${jail}"`
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local jaildir="${jail_path}/jail"
+
+	local container_path
+	container_path=`buildah mount "${container_name}"` || exit $?
+
+	lib_debug "Checking for mounted file systems in \`${jaildir}\` ..."
+
+	local mounted
+	mounted=`lib_mountpoint_mounted -F "%2 -> %1" ${tflag} "${jaildir}"`
+	if [ -n "${mounted}" ]; then
+		lib_warn "The jail directory (${jaildir}) has one or more mounted file systems:"
+		printf "%s\n" "${mounted}" | while IFS= read -r line; do
+			lib_warn "    - ${line}"
+		done
+	fi
+
+	lib_debug "Mounting: mount_nullfs \"${container_path}\" \"${jaildir}\""
+
+	if ! mount_nullfs "${container_path}" "${jaildir}"; then
+		lib_err ${EX_SOFTWARE} "Error mounting \`${container_path}\` in \`${jaildir}\`"
+	fi
+}
+
+oci_run()
+{
+	local _o
+	local opt_detach=false
+	local env=
+	local options=
+	local user=
+	local workdir=
+
+	while getopts ":de:o:u:w:" _o; do
+		case "${_o}" in
+			e|o|u|w)
+				if lib_check_empty "${OPTARG}"; then
+					oci_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			d)
+				opt_detach=true
+				;;
+			e)
+				local env_var="${OPTARG}"
+				if ! lib_check_env "${env_var}"; then
+					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
+				fi
+
+				env_var=`lib_escape_string "${env_var}"`
+
+				if [ -z "${env}" ]; then
+					env="-e \"${env_var}\""
+				else
+					env="${env} -e \"${env_var}\""
+				fi
+				;;
+			o)
+				local option="${OPTARG}"
+
+				option=`lib_escape_string "${option}"`
+
+				if [ -z "${options}" ]; then
+					options="\"${option}\""
+				else
+					options="${options} \"${option}\""
+				fi
+				;;
+			u)
+				user="${OPTARG}"
+				;;
+			w)
+				workdir="${OPTARG}"
+				;;
+			*)
+				oci_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local image
+	image="$1"
+
+	if lib_check_empty "${image}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift
+
+	local jail
+	jail="$1"
+
+	if lib_check_empty "${jail}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	shift 
+
+	local escape_image
+	escape_image=`lib_escape_string "${image}"`
+
+	local escape_jail
+	escape_jail=`lib_escape_string "${jail}"`
+
+	local escape_appjail
+	escape_appjail=`lib_escape_string "${APPJAIL_PROGRAM}"`
+
+	local errlevel
+
+	sh -c "\"${escape_appjail}\" oci from \"${escape_image}\" \"${escape_jail}\" start ${options}"
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+
+	local exec_args=
+
+	if ${opt_detach}; then
+		exec_args="-d"
+	fi
+
+	if [ -n "${user}" ]; then
+		local escape_user
+		escape_user=`lib_escape_string "${user}"`
+
+		exec_args="${exec_args} -u \"${escape_user}\""
+	fi
+
+	if [ -n "${workdir}" ]; then
+		local escape_workdir
+		escape_workdir=`lib_escape_string "${workdir}"`
+
+		exec_args="${exec_args} -w \"${escape_workdir}\""
+	fi
+
+	exec_args="${exec_args} ${env}"
+	exec_args="${exec_args} -- \"${escape_jail}\""
+
+	if [ $# -gt 0 ]; then
+		local arg
+		for arg in "$@"; do
+			local escape_arg
+			escape_arg=`lib_escape_string "${arg}"`
+
+			exec_args="${exec_args} \"${escape_arg}\""
+		done
+	fi
+
+	sh -c "\"${escape_appjail}\" oci exec ${exec_args}"
+}
+
+oci_set-boot()
+{
+	local entity="$1"; shift
+	if lib_check_empty "${entity}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	case "${entity}" in
+		off|on) ;;
+		*) oci_usage; exit ${EX_USAGE} ;;
+	esac
+
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local container_name
+	container_name=`oci_get-container-name "${jail}"` || exit $?
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	local ocidir="${JAILDIR}/${jail}/conf/boot/oci"
+	local bootfile="${ocidir}/boot"
+
+	case "${entity}" in
+		off)
+			if [ ! -f "${bootfile}" ]; then
+				return 0
+			fi
+
+			rm -f -- "${bootfile}"
+			;;
+		on)
+			if [ -f "${bootfile}" ]; then
+				return 0
+			fi
+
+			if ! mkdir -p -- "${ocidir}"; then
+				lib_err ${EX_IOERR} "Error creating ${ocidir}"
+			fi
+
+			if ! touch -- "${bootfile}"; then
+				lib_err ${EX_IOERR} "Error creating ${bootfile}"
+			fi
+			;;
+	esac
+}
+
+oci_set-container-name()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local container_name
+	container_name="$1"
+
+	local jail
+	jail="$2"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	if ! oci_check_container_name "${container_name}"; then
+		lib_err ${EX_DATAERR} "Invalid container name \"${container_name}\""
+	fi
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	if ! mkdir -p -- "${ocidir}"; then
+		lib_err ${EX_IOERR} "Error creating ${ocidir}"
+	fi
+
+	local container_name_file
+	container_name_file="${ocidir}/container_name"
+
+	local prev_container_name
+	prev_container_name=`oci_get-container-name "${jail}"` || exit $?
+
+	if ! printf "%s" "${container_name}" > "${container_name_file}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the container name."
+	fi
+
+	if [ -n "${prev_container_name}" ]; then
+		lib_warn "'${prev_container_name}' was the previous container name, now '${container_name}' is the current one."
+	fi
+}
+
+oci_set-env()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local env_name
+	env_name="$2"
+
+	if lib_check_empty "${env_name}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_varname "${env_name}"; then
+		lib_err ${EX_DATAERR} "Invalid environment variable name '${env_name}'"
+	fi
+
+	local env_value
+	env_value="$3"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local envdir="${ocidir}/env"
+
+	if ! mkdir -p -- "${envdir}"; then
+		lib_err ${EX_IOERR} "Error creating ${envdir}"
+	fi
+
+	local envfile
+	envfile="${envdir}/${env_name}"
+
+	if ! printf "%s" "${env_value}" > "${envfile}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the environment variable '${env_name}'."
+	fi
+}
+
+oci_set-user()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local user
+	user="$2"
+
+	if lib_check_empty "${user}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local user_file
+	user_file="${ocidir}/user"
+
+	if ! printf "%s" "${user}" > "${user_file}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the user '${user}'."
+	fi
+}
+
+oci_set-workdir()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local workdir
+	workdir="$2"
+
+	if lib_check_empty "${workdir}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local workdir_file
+	workdir_file="${ocidir}/workdir"
+
+	if ! printf "%s" "${workdir}" > "${workdir_file}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the working the directory '${workdir}'."
+	fi
+}
+
+oci_umount()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local container_name
+	container_name=`oci_get-container-name "${jail}"`
+
+	if ! oci_check_container "${container_name}"; then
+		lib_err ${EX_NOINPUT} "Container '${container_name}' doesn't seem to exist."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local jaildir="${jail_path}/jail"
+	
+	local tflag=
+	if [ "${ENABLE_ZFS}" != 0 ]; then
+		tflag="-t nozfs"
+	fi
+
+	local mounted
+	mounted=`lib_mountpoint_mounted ${tflag} -s "${jaildir}"`
+	
+	if [ -n "${mounted}" ]; then
+		lib_debug "unmounting: umount \"${jaildir}\""
+
+		if ! umount "${jaildir}"; then
+			lib_err ${EX_SOFTWARE} "Error unmounting \`${jaildir}\`"
+		fi
+	else
+		lib_warn "The jail directory (${jaildir}) is not mounted and should be."
+	fi
+
+	local output
+	output=`buildah umount "${container_name}"` || exit $?
+
+	if [ $? -ne 0 ]; then
+		lib_err ${EX_SOFTWARE} "${output}"
+	fi
+}
+
+_oci_chk_jail()
+{
+	local jail_name="$1"
+	if lib_check_empty "${jail_name}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail_name}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
+	fi
+}
+
+oci_help()
+{
+	man 1 appjail-oci
+}
+
+oci_usage()
+{
+	cat << EOF
+usage: oci del-env <jail> <name>
+       oci del-user <jail>
+       oci del-workdir <jail>
+       oci exec [-d] [[-e <name>[=<value>]] ...] [-u <user>] [-w <workdir>] <jail>
+               [<command> [<args> ...]]
+       oci from <image> <jail> [<options> ...]
+       oci get-container-name <jail>
+       oci get-env <jail> <name>
+       oci get-pid <jail>
+       oci get-user <jail>
+       oci get-workdir <jail>
+       oci kill [-s <signal>] <jail>
+       oci ls-env <jail>
+       oci mount <jail>
+       oci run [-d] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
+               [-w <workdir>] <image> <jail> [<command> [<args> ...]]
+       oci set-boot [on|off] <jail>
+       oci set-container-name <container-name> <jail>
+       oci set-env <jail> <name> [<value>]
+       oci set-user <jail> <user>
+       oci set-workdir <jail> <workdir>
+       oci umount <jail>
+EOF
+}

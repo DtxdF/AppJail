@@ -311,6 +311,39 @@ ZFS snapshot name.
 .It
 .Cm clone+release Ns = Ns Qo 140release Qc
 .El
+.It Cm container Ns = Ns Qo Oo Cm boot Oc Oo Cm expose Oc Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm logopts Ns Oo : Ns options Oc Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.Pp
+Changes the behavior of the
+.Cm from
+option.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Parameters ":"
+.Bl -dash -compact
+.It
+.Cm boot Ns :
+Start the process in background using
+.Xr appjail-start 1 Ns "."
+.It
+.Cm expose Ns :
+Expose the ports specified by the OCI image.
+.It
+.Cm name Ns :
+Container name.
+.It
+.Cm ext_if Ns , Cm logopts Ns , Cm on_if Ns :
+See the
+.Cm expose
+option.
+.El
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm container Ns = Ns Qo boot expose name:Rick-Deckard Qc
+.El
 .It Cm copy Ns = Ns Qo Ar jail Qc
 .Pp
 Create a new jail by copying another existing
@@ -646,7 +679,7 @@ is copied.
 .It
 .Cm file Ns = Ns Qo /etc/rc.conf Qc
 .El
-.It Cm files Ns = Ns Qo file Qc
+.It Cm files Ns = Ns Qo Ar file Qc
 .Pp
 Reads
 .Ar file
@@ -662,6 +695,90 @@ for more details.
 .Bl -dash -compact
 .It
 .Cm files Ns = Ns Qo /tmp/files.lst Qc
+.El
+.It Cm from Ns = Ns Qo Ar image Qc
+Creates a jail using an OCI image. It also creates a container linked to the jail, so that if an attempt is made to destroy the jail using
+.Xr appjail-jail 1
+.Cm destroy
+the container is destroyed.
+.Pp
+This option also implicitly sets the
+.Cm empty
+option.
+.Pp
+By default, the container name is randomly generated unless you specify one using the
+.Cm name
+suboption of the
+.Cm container
+option.
+.Pp
+The volumes and labels specified by the OCI image are also created as AppJail volumes and labels. Since the volume name must be unique in AppJail, a bit of magic is performed:
+.Sy _
+character will be
+.Sy __ Ns ,
+.Sy /
+character will be
+.Sy _ Ns ,
+the first character is removed, any character other than
+.Sy "[a-zA-Z0-9_-]"
+will be
+.Sy - Ns ,
+and the resulting string will be concatenated with the string
+.Sy appjail-<short-hash>
+where
+.Sy <short-hash>
+will be a SHA256-HASH of 10 digits created using the mount point of the volume before
+processing, so for example, if the volume specified by the OCI image is
+.Sy /srv
+the resulting volume name will be
+.Sy appjail-48d1ecb1ac-srv Ns "."
+.Pp
+The ports defined by this image that are to be exposed are also set, but by default
+they are not exposed unless the
+.Cm expose
+suboption of the
+.Cm container
+option is specified.
+.Pp
+The jail type will always be
+.Sy thick
+regardless of the operating system, the release is the one specified by the
+.Cm release
+option or the default when none is specified, the architecture and the operating
+system version are also set. For the architecture a
+.Qo translation Qc
+is performed:
+.Sy 386
+will be
+.Sy i386 Ns ,
+.Sy ppc64le|ppc64
+will be
+.Sy powerpc
+and
+.Sy riscv64
+will be
+.Sy riscv Ns "."
+If the operating system is
+.Sy freebsd Ns ,
+AppJail will try to get the FreeBSD version using
+.Xr freebsd-version 1
+without the patch level, and if this fails AppJail will try to get the version using
+.Xr uname 1 Fl r
+without the patch level and if this fails it will use the operating system name
+as the operating system version. It uses
+.Xr uname 1 Fl r
+to get the OS version when it is not
+.Sy freebsd
+and if it fails, the OS name is used as the alternate version.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm from Ns = Ns Qo docker.io/dtxdf007/freebsd Qc
 .El
 .It Cm fstab Ns = Ns Qo Ar device Ar mountpoint Oo type Oc Oo Ar options Oc Oo Ar dump Oc Oo Ar pass Oc Qc
 .Pp
@@ -1075,7 +1192,7 @@ A secondary bridge is created when the bridge name is different from
 .It
 .Cm jng Ns = Ns Qo myjail jext Qc
 .El
-.It Cm label Ns = Ns Qo Ar key Ns : Ns Ar value Qc
+.It Cm label Ns = Ns Qo Ar key Ns Oo Ns : Ns Ar value Oc Qc
 .Pp
 Add a new label to the jail.
 .Pp
@@ -1558,7 +1675,7 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy Yes
-.It slaac
+.It Cm slaac Ns = Ns Qo Ar interface Qc
 Configure
 .Ar interface
 using SLAAC.

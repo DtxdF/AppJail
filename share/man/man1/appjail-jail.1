@@ -154,6 +154,10 @@ Destroy
 .Ar jail
 .Ns "."
 .Pp
+If
+.Ar jail
+is a container, it will be destroyed before the files are removed.
+.Pp
 .Bl -tag -width xx
 .It Fl f
 Forcibly unmount file system. Ignored when ZFS is not enabled.
@@ -500,6 +504,20 @@ Shows
 if the boot flag is enabled,
 .Sy 0
 if it is not.
+.It Sy container
+Displays the name of the container.
+.It Sy container_boot
+Displays
+.Sy 1
+if the program defined in the OCI image is to be executed by
+.Xr appjail-start 1 Ns ,
+.Sy 0
+otherwise.
+.It Sy container_image
+Displays the OCI image used to create the container.
+.It Sy container_pid
+Displays the PID of the program defined in the OCI image running in the background
+if it is running.
 .It Sy created
 Creation date. The
 .Sy CREATED_FORMAT
@@ -533,6 +551,12 @@ parameter in a template.
 Same as
 .Sy ip4
 but for IPv6.
+.It Sy is_container
+Displays
+.Sy 1
+if the jail is a container,
+.Sy 0
+otherwise.
 .It Sy locked
 Shows
 .Sy 1

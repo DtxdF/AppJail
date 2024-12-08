@@ -1,0 +1,407 @@
+#
+# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/mksum"
+lib_load "${LIBDIR}/replace"
+
+OCI_DEPENDENCIES="buildah jq"
+
+oci_check_dependencies()
+{
+	local dependency
+
+	for dependency in ${OCI_DEPENDENCIES}; do
+		if ! which -s "${dependency}"; then
+			lib_err ${EX_UNAVAILABLE} "${dependency} is not installed. Cannot continue ..."
+		fi
+	done
+}
+
+oci_check_dependencies_warn()
+{
+	local dependency
+
+	for dependency in ${OCI_DEPENDENCIES}; do
+		if ! which -s "${dependency}"; then
+			lib_warn "${dependency} is not installed!"
+			return ${EX_UNAVAILABLE}
+		fi
+	done
+
+	return 0
+}
+
+oci_rm()
+{
+	local container_name="$1"
+
+	if [ -z "${container_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_rm container_name"
+	fi
+
+	buildah rm "${container_name}"
+}
+
+oci_from()
+{
+	local image="$1" container_name="$2"
+
+	if [ -z "${image}" -o -z "${container_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_from image container_name"
+	fi
+
+	local escape_image
+	escape_image=`lib_escape_string "${image}"`
+
+	local escape_container_name
+	escape_container_name=`lib_escape_string "${container_name}"`
+
+	sh -c "buildah from --name ${escape_container_name} ${BUILDAH_FROM_ARGS} \"${escape_image}\""
+}
+
+oci_check_container_name()
+{
+	local container_name="$1"
+
+	if [ -z "${container_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_check_container_name container_name"
+	fi
+
+	printf "%s" "${container_name}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$'
+}
+
+oci_check_container()
+{
+	local container_name="$1"
+
+	if [ -z "${container_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_check_container container_name"
+	fi
+
+	local info
+	info=`oci_get_container_info "${container_name}"`
+
+	if [ -n "${info}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+oci_get_container_info()
+{
+	local container_name="$1"
+
+	if [ -z "${container_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_get_container_info container_name"
+	fi
+
+	local info
+	info=`buildah containers --json` || exit $?
+
+	if [ "${info}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${info}" | jq -r --arg container "${container_name}" '.[] | select(.containername == $container)'
+}
+
+oci_ociv1_get_arch()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_arch container"
+	fi
+
+	local arch
+	arch=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["architecture"]'` || exit $?
+
+	if [ "${arch}" = "null" ]; then
+		return 0
+	fi
+
+	case "${arch}" in
+		386) arch="i386" ;;
+		ppc64le|ppc64) arch="powerpc" ;;
+		riscv64) arch="riscv" ;;
+	esac
+
+	printf "%s\n" "${arch}"
+}
+
+oci_ociv1_get_os()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_os container"
+	fi
+
+	local os
+	os=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["os"]'` || exit $?
+
+	if [ "${os}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${os}"
+}
+
+oci_ociv1_get_user()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_user container"
+	fi
+
+	local user
+	user=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["User"]'` || exit $?
+
+	if [ "${user}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${user}"
+}
+
+oci_ociv1_get_workingdir()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_workingdir container"
+	fi
+
+	local workingdir
+	workingdir=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["WorkingDir"]'` || exit $?
+
+	if [ "${workingdir}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${workingdir}"
+}
+
+oci_ociv1_get_stopsignal()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_stopsignal container"
+	fi
+
+	local stopsignal
+	stopsignal=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["StopSignal"]'` || exit $?
+
+	if [ "${stopsignal}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${stopsignal}"
+}
+
+oci_ociv1_get_entrypoint()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_entrypoint container"
+	fi
+
+	local entrypoint
+	entrypoint=`buildah inspect -t container "${container}" | jq '.["OCIv1"].["config"].["Entrypoint"]'` || exit $?
+
+	if [ "${entrypoint}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${entrypoint}" | jq -M ".[]"
+}
+
+oci_ociv1_get_cmd()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_cmd container"
+	fi
+
+	local cmd
+	cmd=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Cmd"]'` || exit $?
+
+	if [ "${cmd}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${cmd}" | jq -M '.[]'
+}
+
+oci_ociv1_get_env()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_env container"
+	fi
+
+	local env
+	env=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Env"]'` || exit $?
+
+	if [ "${env}" = "null" ]; then
+		return 0
+	fi
+
+	printf "%s\n" "${env}" | jq -M '.[]'
+}
+
+oci_ociv1_get_exposedports()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_exposedports container"
+	fi
+
+	local exposedports
+	exposedports=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["ExposedPorts"]'` || exit $?
+
+	if [ "${exposedports}" = "null" ] || [ "${exposedports}" = "{}" ]; then
+		return 0
+	fi
+
+	exposedports=`printf "%s\n" "${exposedports}" | jq -r 'keys_unsorted.[]'` || exit $?
+
+	printf "%s\n" "${exposedports}"
+}
+
+oci_ociv1_get_volumes()
+{
+
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_volumes container"
+	fi
+
+	local volumes
+	volumes=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Volumes"]'` || exit $?
+
+	if [ "${volumes}" = "null" ] || [ "${volumes}" = "{}" ]; then
+		return 0
+	fi
+
+	volumes=`printf "%s\n" "${volumes}" | jq -r 'keys_unsorted.[]'` || exit $?
+
+	printf "%s\n" "${volumes}"
+}
+
+oci_ociv1_get_labels()
+{
+	local container="$1"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_labels container"
+	fi
+
+	local labels
+	labels=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Labels"]'` || exit $?
+
+	if [ "${labels}" = "null" ] || [ "${labels}" = "{}" ]; then
+		return 0
+	fi
+
+	labels=`printf "%s\n" "${labels}" | jq -r 'keys_unsorted.[]'` || exit $?
+
+	printf "%s\n" "${labels}"
+}
+
+oci_ociv1_get_label_value()
+{
+	local container="$1" label="$2"
+
+	if [ -z "${container}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_ociv1_get_label_value container label"
+	fi
+
+	local value
+	value=`buildah inspect -t container "${container}" | jq -r --arg label "${label}" '.["OCIv1"].["config"].["Labels"].[$label]'` || exit $?
+
+	printf "%s\n" "${value}"
+}
+
+oci_get_osversion()
+{
+	local container="$1" jail="$2"
+
+	if [ -z "${container}" -o -z "${jail}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_get_osversion container jail"
+	fi
+
+	local os
+	os=`oci_ociv1_get_os "${container}"` || exit $?
+
+	local jaildir="${JAILDIR}/${jail}/jail"
+
+	local osversion
+
+	case "${os}" in
+		freebsd)
+			osversion=`chroot "${jaildir}" freebsd-version 2> /dev/null | grep -Eo '[0-9]+\.[0-9]+-[a-zA-Z0-9]+'`
+			
+			if [ -z "${osversion}" ]; then
+				osversion=`chroot "${jaildir}" uname -r 2> /dev/null | grep -Eo '[0-9]+\.[0-9]+-[a-zA-Z0-9]+'`
+			fi
+			;;
+		*)
+			osversion=`chroot "${jaildir}" uname -r 2> /dev/null`
+			;;
+	esac
+
+	if [ -z "${osversion}" ]; then
+		osversion="${os}" # fallback
+	fi
+
+	printf "%s\n" "${osversion}"
+}
+
+oci_translate_volume()
+{
+	local volume_name="$1"
+
+	if [ -z "${volume_name}" ]; then
+		lib_err ${EX_USAGE} "usage: oci_translate_volume volume_name"
+	fi
+
+	local shortsum
+	shortsum=`lib_mksum_str "${volume_name}" | cut -c-10`
+
+	printf "%s" "${volume_name}" | sed -Ee 's/_/__/g' -e 's#/#_#g' -e 's#^_##' -e "s/^(.+)$/appjail-${shortsum}-\1/g" -e 's/[^a-zA-Z0-9_-]/-/g'
+}

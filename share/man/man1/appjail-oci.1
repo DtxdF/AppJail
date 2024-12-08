@@ -1,0 +1,272 @@
+.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd December 07, 2024
+.Dt APPJAIL-OCI 1
+.Os
+.Sh NAME
+.Nm appjail-oci
+.Nd Commands for interpreting OCI images
+.Sh SYNOPSIS
+.Nm appjail oci
+.Cm del-env
+.Ar jail
+.Ar name
+.Nm appjail oci
+.Cm del-user
+.Ar jail
+.Nm appjail oci
+.Cm del-workdir
+.Ar jail
+.Nm appjail oci
+.Cm exec
+.Op Fl d
+.Oo
+.Op Fl e Ar name Ns Oo = Ns Ar value Oc
+.Ns "..."
+.Oc
+.Op Fl u Ar user
+.Op Fl w Ar workdir
+.Ar jail
+.Op Ar command Op Ar args Ns " " Ns "..."
+.Nm appjail oci
+.Cm from
+.Ar image
+.Ar jail
+.Op Ar options No "..."
+.Nm appjail oci
+.Cm get-container-name
+.Ar jail
+.Nm appjail oci
+.Cm get-env
+.Ar jail
+.Ar name
+.Nm appjail oci
+.Cm get-pid
+.Ar jail
+.Nm appjail oci
+.Cm get-user
+.Ar jail
+.Nm appjail oci
+.Cm get-workdir
+.Ar jail
+.Nm appjail oci
+.Cm kill
+.Op Fl s Ar signal
+.Ar jail
+.Nm appjail oci
+.Cm ls-env
+.Ar jail
+.Nm appjail oci
+.Cm mount
+.Ar jail
+.Nm appjail oci
+.Cm run
+.Op Fl d
+.Oo
+.Op Fl e Ar name Ns Oo = Ns Ar value Oc
+.Ns "..."
+.Oc
+.Oo
+.Op Fl o Ar option
+.Ns "..."
+.Oc
+.Op Fl u Ar user
+.Op Fl w Ar workdir
+.Ar image
+.Ar jail
+.Op Ar command Op Ar args Ns " " Ns "..."
+.Nm appjail oci
+.Cm set-boot
+.Op Cm off Ns | Ns Cm on
+.Ar jail
+.Nm appjail oci
+.Cm set-container-name
+.Ar container-name
+.Ar jail
+.Nm appjail oci
+.Cm set-env
+.Ar jail
+.Ar name
+.Op Ar value
+.Nm appjail oci
+.Cm set-user
+.Ar jail
+.Ar user
+.Nm appjail oci
+.Cm set-workdir
+.Ar jail
+.Ar workdir
+.Nm appjail oci
+.Cm umount
+.Ar jail
+.Sh DESCRIPTION
+The
+.Sy appjail oci
+utility provides support for interpreting OCI images, this includes creating a
+jail using an image, executing the process defined by the image, and so on.
+.Pp
+.Sy You must install Em sysutils/buildah Sy and Em textproc/jq Sy before using this command.
+.Pp
+The options are as follows:
+.Bl -tag -width xxx
+.It Cm del-env Ar jail Ar name
+Removes a user-defined environment variable that was previously specified by
+.Cm set-env Ns "."
+.It Cm del-user Ar jail
+Removes a user-defined username that was previously specified by
+.Cm set-user Ns "."
+.It Cm del-workdir Ar jail
+Removes a user-defined working directory that was previously specified by
+.Cm set-workdir Ns "."
+.It Cm exec Oo Fl d Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar command Oo Ar args No "..." Oc Oc
+Executes the command specified by the OCI image. The command to be executed is a combination of the entrypoint and its arguments. Environment variables are also set if the OCI image contains them. If the OCI image specifies a user, the process is executed as such, and if the working directory is specified by the OCI image, the process is executed in that directory
+.Po which should exist Pc Ns "."
+.Pp
+The command can be changed if positional arguments are defined, the working directory
+can be changed using the
+.Fl w
+parameter, the user to run the process as can be changed using the
+.Fl u
+parameter and more environment variables can be specified using the
+.Fl e
+parameter.
+.Pp
+The working directory, user and environment variables can also be specified using
+.Cm set-workdir Ns ,
+.Cm set-user
+and
+.Cm set-env Ns "."
+Command-line arguments take precedence over these subcommands. If no parameters
+are specified using command-line arguments or the aforementioned subcommands,
+the values depend entirely on those specified by the OCI image. If the OCI
+image has no such values, the working directory will be
+.Sy / Ns ,
+the user will be
+.Sy root Ns ,
+and no environment variables will be specified except those specified by the
+.Xr jexec 8 Ns 's Fl l
+parameter.
+.Pp
+Note that a Linux image will probably not work if you or the image itself specifies a user because the
+.Xr getpwent 3
+function does not work in such an environment. Also some Linux images may specify a user as
+.Sy UID Ns : Ns Sy GID
+which is not valid by
+.Xr jexec 8
+because it expects a user as
+.Sy USERNAME Ns ,
+which has the advantage of being more human readable and should also exist in the
+environment.
+.Pp
+If the
+.Fl d
+parameter is specified, the process runs in the background.
+.It Cm from Ar image Ar jail Oo Ar options No "..." Oc
+This is a wrapper for the
+.Cm from
+option of the
+.Xr appjail-quick 1
+command.
+.It Cm get-container-name Ar jail
+Get the container assigned to
+.Ar jail Ns "."
+.It Cm get-env Ar jail Ar name
+Gets the value of an environment variable previously specified by
+.Cm set-env Ns "."
+.It Cm get-pid Ar jail
+If the
+.Fl d
+parameter was specified when executing
+.Cm exec
+or
+.Xr appjail-start 1
+executes the process, this subcommand displays the PID of that process only
+if it is running.
+.It Cm get-user Ar jail
+Gets the user previously specified by
+.Cm set-user Ns "."
+.It Cm get-workdir Ar jail
+Gets the working directory previously specified by
+.Cm set-workdir Ns "."
+.It Cm kill Oo Fl s Ar signal Oc Ar jail
+If the process executed in the background by
+.Cm exec
+is running, this subcommand will kill it using the signal specified by the OCI
+image. The signal can be overwritten by the
+.Fl s
+parameter and if none is specified,
+.Sy SIGTERM
+will be used. This is used by
+.Xr appjail-stop 1
+to stop the process.
+.It Cm ls-env Ar jail
+Lists all environment variables previously specified by
+.Cm set-env Ns "."
+.It Cm mount Ar jail
+Mount the container directory in the jail directory.
+.It Cm run Oo Fl d Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl o Ar option Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar command Oo Ar args No "..." Oc Oc
+This subcommand first calls
+.Cm from
+with the options specified by
+.Fl o Ns ,
+then calls
+.Cm exec Ns "."
+The
+.Xr appjail-quick 1 Ns 's
+.Cm start
+option is always used.
+.It Cm set-boot Oo Cm off Ns | Ns Cm on Oc Ar jail
+Specify
+.Cm on
+to start the process in background using
+.Xr appjail-start 1
+or
+.Cm off
+otherwise.
+.It Cm set-container-name Ar container-name Ar jail
+Sets the container that will be linked to this jail.
+.It Cm set-env Ar jail Ar name Oo Ar value Oc
+Sets an environment variable or overwrites a previously existing one.
+.It Cm set-user Ar jail Ar user
+Sets the user or overwrites a previously existing one.
+.It Cm set-workdir Ar jail Ar workdir
+Sets the working directory or overwrites a previously existing one.
+.It Cm umount Ar jail
+Unmount the container directory previously mounted by
+.Cm mount Ns "."
+.El
+.Sh SEE ALSO
+.Xr appjail-jail 1
+.Xr appjail-start 1
+.Xr appjail-stop 1
+.Xr appjail-quick 1
+.Xr getpwent 3
+.Xr appjail.conf 5
+.Xr jexec 8
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org

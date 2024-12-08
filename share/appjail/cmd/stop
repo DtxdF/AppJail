@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@ stop_main()
 	local jail_name
 	local jail_path
 	local errlevel=0
+	local is_container
 	local jail_stop_args="-r"
 
 	if [ $# -eq 0 ]; then
@@ -218,6 +219,23 @@ stop_main()
 
 	local config_file
 	config_file=`lib_escape_string "${CONFIG}"`
+	
+	# is a container?
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail_name}" is_container` || exit $?
+
+	# kill the process gracefully
+	if [ ${is_container} -eq 1 ]; then
+		local container_pid
+		container_pid=`"${APPJAIL_PROGRAM}" oci get-pid "${jail_name}"`
+
+		if [ -n "${container_pid}" ]; then
+			lib_debug "Killing the process '${container_pid}'"
+
+			if ! "${APPJAIL_PROGRAM}" oci kill "${jail_name}"; then
+				lib_warn "Error killing the process '${container_pid}'"
+			fi
+		fi
+	fi
 
 	local jail_pid
 
@@ -242,6 +260,14 @@ stop_main()
 	rm -f "${fifo_filename}"
 
 	stop_jail "${jail_name}"
+
+	if [ ${is_container} -eq 1 ]; then
+		"${APPJAIL_PROGRAM}" oci umount "${jail_name}"
+
+		if [ ${errlevel} -ne 0 ]; then
+			errlevel=$?
+		fi
+	fi
 
 	if [ ${errlevel} -ne 0 ]; then
 		lib_err ${errlevel} "An error has occurred while stopping ${jail_name} jail."

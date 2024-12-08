@@ -36,6 +36,7 @@ lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/network"
+lib_load "${LIBDIR}/oci"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/strlen"
@@ -1550,6 +1551,31 @@ jail_destroy()
 		return ${errlevel}
 	fi
 
+	local is_container
+	is_container=`jail_get -I -- "${jail_name}" is_container` || exit $?
+
+	if [ ${is_container} -eq 1 ]; then
+		local container
+		container=`jail_get -I -- "${jail_name}" container`
+
+		if ! lib_check_empty "${container}"; then
+			lib_debug "${jail_name} is a container (${container})"
+			lib_debug "Destroying container ${container}"
+
+			if oci_check_dependencies_warn; then
+				if oci_check_container "${container}"; then
+					if ! oci_rm "${container}"; then
+						lib_warn "Error destroying container '${container}'"
+					fi
+				else
+					lib_debug "Container '${container}' doesn't seem to exist."
+				fi
+			else
+				lib_warn "One or more dependencies are not installed, container '${container}' will not be destroyed!"
+			fi
+		fi
+	fi
+
 	lib_debug "Removing \`${jail_name}\` jail..."
 
 	if [ "${ENABLE_ZFS}" != "0" ]; then
@@ -1670,6 +1696,10 @@ jail_get()
 	local flag_appjail_version=0
 	local flag_arch=0
 	local flag_boot=0
+	local flag_container=0
+	local flag_container_boot=0
+	local flag_container_image=0
+	local flag_container_pid=0
 	local flag_created=0
 	local flag_dirty=0
 	local flag_devfs_ruleset=0
@@ -1678,6 +1708,7 @@ jail_get()
 	local flag_inet6=0
 	local flag_ip4=0
 	local flag_ip6=0
+	local flag_is_container=0
 	local flag_locked=0
 	local flag_name=0
 	local flag_network_ip4=0
@@ -1794,6 +1825,56 @@ jail_get()
 
 				flag_boot=1
 				;;
+			container)
+				if [ ${flag_container} -eq 1 ]; then
+					continue
+				fi
+
+				local container_name_file
+				container_name_file="${JAILDIR}/${jail_name}/conf/boot/oci/container_name"
+
+				if [ -f "${container_name_file}" ]; then
+					value=`head -1 -- "${container_name_file}"`
+				fi
+
+				flag_container=1
+				;;
+			container_boot)
+				if [ ${flag_container_boot} -eq 1 ]; then
+					continue
+				fi
+
+				local container_boot_file
+				container_boot_file="${JAILDIR}/${jail_name}/conf/boot/oci/boot"
+
+				if [ -f "${container_boot_file}" ]; then
+					value=1
+				else
+					value=0
+				fi
+
+				flag_container_boot=1
+				;;
+			container_image)
+				if [ ${flag_container_image} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni container_image`
+				fi
+
+				flag_container_image=1
+				;;
+			container_pid)
+				if [ ${flag_container_pid} -eq 1 ]; then
+					continue
+				fi
+
+				value=`"${APPJAIL_PROGRAM}" oci get-pid "${jail_name}"`
+
+				flag_container_pid=1
+				;;
 			created)
 				if [ ${flag_created} -eq 1 ]; then
 					continue
@@ -1899,6 +1980,35 @@ jail_get()
 				fi
 
 				flag_ip6=1
+				;;
+			is_container)
+				if [ ${flag_is_container} -eq 1 ]; then
+					continue
+				fi
+
+				if [ ${status_config} -eq 1 ]; then
+					value=`lib_ajconf get -t "${config_file}" -Vni container`
+
+					if lib_check_empty "${value}"; then
+						value=0
+					else
+						local valid=0
+
+						if lib_check_number "${value}"; then
+							case "${value}" in
+								0|1) valid=1 ;;
+							esac
+						fi
+
+						if [ ${valid} -eq 0 ]; then
+							value=0
+
+							lib_warn "Invalid value '${value}' in the 'container' parameter."
+						fi
+					fi
+				fi
+
+				flag_is_container=1
 				;;
 			locked)
 				if [ ${flag_locked} -eq 1 ]; then

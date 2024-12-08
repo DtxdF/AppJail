@@ -309,7 +309,20 @@ network_assign()
 
 		jexec -l "${jail_name}" \
 			route add default "${network_gateway}" >&2
-		sysrc -j "${jail_name}" defaultrouter="${network_gateway}" >&2
+
+		local etcdir
+		etcdir="${jail_path}/jail/etc"
+
+		if [ ! -d "${etcdir}" ]; then
+			if ! mkdir -p -- "${etcdir}"; then
+				lib_err ${EX_IOERR} "Error creating ${etcdir}"
+			fi
+		fi
+
+		local rc_conf
+		rc_conf="${etcdir}/rc.conf"
+
+		sysrc -f "${rc_conf}" defaultrouter="${network_gateway}" >&2
 	fi
 }
 

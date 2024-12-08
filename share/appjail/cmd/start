@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -54,6 +54,7 @@ start_main()
 	local jail_path
 	local line
 	local errlevel=0
+	local is_container
 	# Depend
 	local escape_depends depends depend
 	# Jail parameters
@@ -279,6 +280,15 @@ start_main()
 
 		lib_debug -- "devfs_ruleset: ${devfs_ruleset}"
 	fi
+	
+	# is a container?
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail_name}" is_container` || exit $?
+
+	if [ ${is_container} -eq 1 ]; then
+		lib_debug "Jail '${jail_name}' is a container."
+
+		"${APPJAIL_PROGRAM}" oci mount "${jail_name}" || exit $?
+	fi
 
 	for jail_param in \
 		exec.consolelog \
@@ -381,7 +391,7 @@ start_main()
 	# config.conf
 	lib_debug "Inspecting config.conf:"
 	lib_debug_read "${jail_path}/conf/config.conf"
-
+	
 	start_jail "${jail_name}"
 
 	if [ ${opt_run_initscript} -eq 1 ]; then
@@ -446,7 +456,13 @@ start_main()
 	fi
 
 	if [ ${opt_run_initscript} -eq 0 ]; then
-		exit 0
+		if [ ${is_container} -eq 1 ]; then
+			start_container "${jail_name}"
+
+			errlevel=$?
+		fi
+
+		exit ${errlevel}
 	fi
 
 	# *start functions
@@ -464,9 +480,36 @@ start_main()
 		lib_warn "The ${jail_name} jail will be stopped..."
 
 		stop_safe -- "${jail_name}"
+	else
+		if [ ${is_container} -eq 1 ]; then
+			start_container "${jail_name}"
+		fi
+
+		errlevel=$?
 	fi
 
 	return ${errlevel}
+}
+
+start_container()
+{
+	local jail_name
+	jail_name="$1"
+
+	if [ -z "${jail_name}" ]; then
+		lib_err ${EX_USAGE} "start_container jail_name"
+	fi
+
+	local container_boot
+	container_boot=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail_name}" container_boot` || exit $?
+
+	if [ ${container_boot} -eq 0 ]; then
+		return 0
+	fi
+
+	"${APPJAIL_PROGRAM}" oci exec -d -- "${jail_name}"
+
+	return $?
 }
 
 stop_safe()
