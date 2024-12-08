@@ -132,7 +132,9 @@ enable_start()
 	done
 
 	if [ ${opt_run_initscript} -eq 0 ]; then
-		touch "${bootdir}/norun_initscript"
+		if [ ! -f "${bootdir}/norun_initscript" ]; then
+			touch -- "${bootdir}/norun_initscript" || exit ${EX_IOERR}
+		fi
 	fi
 
 	if ! lib_check_empty "${create_args}"; then
