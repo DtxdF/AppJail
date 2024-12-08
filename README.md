@@ -40,6 +40,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 * Healthcheckers - Monitor your jails and make sure they are healthy!
 * Images - Your jail in a single file!
 * DEVFS support - Dynamic device management!
+* OCI support - Containers everywhere!
 * ...
 
 ## Documentation
