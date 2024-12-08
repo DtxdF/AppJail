@@ -270,7 +270,7 @@ stop_main()
 	fi
 
 	if [ ${errlevel} -ne 0 ]; then
-		lib_err ${errlevel} "An error has occurred while stopping ${jail_name} jail."
+		lib_err ${errlevel} "An error has occurred while stopping the jail '${jail_name}'"
 	fi
 }
 

@@ -447,22 +447,34 @@ start_main()
 	rm -f "${fifo_filename}"
 
 	if [ ${errlevel} -ne 0 ]; then
-		lib_warn "An error has occurred while starting ${jail_name} jail."
-		lib_warn "The ${jail_name} jail will be stopped..."
+		lib_warn "An error has occurred while starting the jail '${jail_name}'"
+		lib_warn "The jail '${jail_name}' will be stopped..."
 		
 		stop_safe -- "${jail_name}"
 
-		lib_err ${errlevel} "An error has occurred while starting ${jail_name} jail."
+		lib_err ${errlevel} "An error has occurred while starting the jail '${jail_name}'"
+	fi
+
+	"${APPJAIL_PROGRAM}" status -q -- "${jail_name}"
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_warn "The jail has not started and it should. If your template does not start a long-running"
+		lib_warn "process, perhaps you are missing the 'persist' parameter."
+		lib_warn
+		lib_warn "Run 'appjail fstab jail \"${jail_name}\" mounted' to see if there are file systems to"
+		lib_warn "unmount before starting the jail again."
+
+		lib_err ${errlevel} "An error has occurred while starting the jail '${jail_name}'"
 	fi
 
 	if [ ${opt_run_initscript} -eq 0 ]; then
 		if [ ${is_container} -eq 1 ]; then
 			start_container "${jail_name}"
-
-			errlevel=$?
 		fi
 
-		exit ${errlevel}
+		exit 0
 	fi
 
 	# *start functions
@@ -477,15 +489,13 @@ start_main()
 
 	if [ ${errlevel} -ne 0 ]; then
 		lib_warn "An error has occurred while executing the *start functions in the initscript."
-		lib_warn "The ${jail_name} jail will be stopped..."
+		lib_warn "The jail '${jail_name}' will be stopped..."
 
 		stop_safe -- "${jail_name}"
 	else
 		if [ ${is_container} -eq 1 ]; then
 			start_container "${jail_name}"
 		fi
-
-		errlevel=$?
 	fi
 
 	return ${errlevel}
@@ -507,9 +517,24 @@ start_container()
 		return 0
 	fi
 
+	lib_debug "Executing the process specified by the container ..."
+
+	local errlevel
+
 	"${APPJAIL_PROGRAM}" oci exec -d -- "${jail_name}"
 
-	return $?
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_warn "An error has occurred while executing the process specified by the container ..."
+		lib_warn "The jail '${jail_name}' will be stopped..."
+
+		stop_safe -- "${jail_name}"
+
+		exit ${errlevel}
+	fi
+
+	return 0
 }
 
 stop_safe()
