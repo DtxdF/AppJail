@@ -462,7 +462,7 @@ quick_set_container()
 				QUICK_OPTION_CONTAINER="${value}"
 				;;
 			on_if)
-				QUICK_OPTION_ON_IF="${value}"
+				QUICK_OPTION_CONTAINER_ON_IF="${value}"
 				;;
 			*)
 				lib_err ${EX_DATAERR} -- "${parameter} (container): parameter not found."
