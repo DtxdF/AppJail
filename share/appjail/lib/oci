@@ -243,7 +243,7 @@ oci_ociv1_get_entrypoint()
 		return 0
 	fi
 
-	printf "%s\n" "${entrypoint}" | jq -M ".[]"
+	echo `printf "%s\n" "${entrypoint}" | jq -M ".[]"`
 }
 
 oci_ociv1_get_cmd()
@@ -261,7 +261,7 @@ oci_ociv1_get_cmd()
 		return 0
 	fi
 
-	printf "%s\n" "${cmd}" | jq -M '.[]'
+	echo `printf "%s\n" "${cmd}" | jq -M '.[]'`
 }
 
 oci_ociv1_get_env()
@@ -279,7 +279,7 @@ oci_ociv1_get_env()
 		return 0
 	fi
 
-	printf "%s\n" "${env}" | jq -M '.[]'
+	echo `printf "%s\n" "${env}" | jq -M '.[]'`
 }
 
 oci_ociv1_get_exposedports()
@@ -299,7 +299,7 @@ oci_ociv1_get_exposedports()
 
 	exposedports=`printf "%s\n" "${exposedports}" | jq -r 'keys_unsorted.[]'` || exit $?
 
-	printf "%s\n" "${exposedports}"
+	echo ${exposedports}
 }
 
 oci_ociv1_get_volumes()
@@ -320,7 +320,7 @@ oci_ociv1_get_volumes()
 
 	volumes=`printf "%s\n" "${volumes}" | jq -r 'keys_unsorted.[]'` || exit $?
 
-	printf "%s\n" "${volumes}"
+	echo ${volumes}
 }
 
 oci_ociv1_get_labels()
@@ -340,7 +340,7 @@ oci_ociv1_get_labels()
 
 	labels=`printf "%s\n" "${labels}" | jq -r 'keys_unsorted.[]'` || exit $?
 
-	printf "%s\n" "${labels}"
+	echo ${labels}
 }
 
 oci_ociv1_get_label_value()
