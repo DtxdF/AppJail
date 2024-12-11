@@ -308,6 +308,37 @@ oci_exec()
 	local default_env
 	default_env=`oci_ociv1_get_env "${container_name}"` || exit $?
 
+	local params total_items current_index
+
+	if [ -n "${default_env}" ]; then
+		params=`lib_split_jailparams "${default_env}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local _default_env=
+
+		local arg
+		while [ ${current_index} -lt ${total_items} ]; do
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			local env_var
+			env_var=`lib_escape_string "${arg}"`
+
+			if [ -z "${_default_env}" ]; then
+				_default_env="\"${env_var}\""
+			else
+				_default_env="${_default_env} \"${env_var}\""
+			fi
+		done
+
+		default_env="${_default_env}"
+	fi
+
 	local envdir
 	envdir="${ocidir}/env"
 
@@ -342,8 +373,64 @@ oci_exec()
 	if lib_check_empty "${entrypoint}"; then
 		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
 
+		if [ -n "${entrypoint}" ]; then
+			params=`lib_split_jailparams "${entrypoint}"` || exit $?
+			total_items=`printf "%s\n" "${params}" | wc -l`
+			current_index=0
+
+			local _entrypoint=
+
+			local arg
+			while [ ${current_index} -lt ${total_items} ]; do
+				current_index=$((current_index+1))
+
+				arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${arg}"; then
+					continue
+				fi
+
+				arg=`lib_escape_string "${arg}"`
+
+				if [ -z "${_entrypoint}" ]; then
+					_entrypoint="\"${arg}\""
+				else
+					_entrypoint="${_entrypoint} \"${arg}\""
+				fi
+			done
+
+			entrypoint="${_entrypoint}"
+		fi
+
 		local cmd
 		cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
+
+		if [ -n "${cmd}" ]; then
+			params=`lib_split_jailparams "${cmd}"` || exit $?
+			total_items=`printf "%s\n" "${params}" | wc -l`
+			current_index=0
+
+			local _cmd=
+
+			local arg
+			while [ ${current_index} -lt ${total_items} ]; do
+				current_index=$((current_index+1))
+
+				arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${arg}"; then
+					continue
+				fi
+
+				arg=`lib_escape_string "${arg}"`
+
+				if [ -z "${_cmd}" ]; then
+					_cmd="\"${arg}\""
+				else
+					_cmd="${_cmd} \"${arg}\""
+				fi
+			done
+
+			cmd="${_cmd}"
+		fi
 
 		if lib_check_empty "${entrypoint}" && lib_check_empty "${cmd}"; then
 			jexec_args="${jexec_args} /bin/sh -i"

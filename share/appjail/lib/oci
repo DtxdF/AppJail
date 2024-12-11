@@ -243,7 +243,7 @@ oci_ociv1_get_entrypoint()
 		return 0
 	fi
 
-	echo `printf "%s\n" "${entrypoint}" | jq -M ".[]"`
+	printf "%s\n" "${entrypoint}" | jq -M ".[]"
 }
 
 oci_ociv1_get_cmd()
@@ -261,7 +261,7 @@ oci_ociv1_get_cmd()
 		return 0
 	fi
 
-	echo `printf "%s\n" "${cmd}" | jq -M '.[]'`
+	printf "%s\n" "${cmd}" | jq -M '.[]'
 }
 
 oci_ociv1_get_env()
@@ -279,7 +279,7 @@ oci_ociv1_get_env()
 		return 0
 	fi
 
-	echo `printf "%s\n" "${env}" | jq -M '.[]'`
+	printf "%s\n" "${env}" | jq -M '.[]'
 }
 
 oci_ociv1_get_exposedports()
