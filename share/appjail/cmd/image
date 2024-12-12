@@ -582,7 +582,7 @@ _image_getajspec()
 	fi	
 
 	case "${method}" in
-		cmd|git|fetch|file)
+		cmd|git|fetch|file|reproduce)
 			;;
 		gh|github)
 			method="github"
@@ -682,6 +682,44 @@ _image_getajspec_fetch()
 	fi
 
 	cat -- "${output}"
+}
+
+_image_getajspec_reproduce()
+{
+	local project="$1"
+
+	if ! which -s "appjail-reproduce"; then
+		lib_err ${EX_UNAVAILABLE} "appjail-reproduce is not installed. Cannot continue ..."
+	fi
+
+	local extra_flags=
+
+	if [ "${ENABLE_DEBUG}" != 0 ]; then
+		extra_flags="-d"
+	fi
+
+	local errlevel
+
+	lib_debug "Building '${project}' ..."
+
+	local image
+
+	image=`appjail-reproduce ${extra_flags} -sfb -- "${project}"`
+
+	errlevel=$?
+
+	if lib_check_empty "${image}" || [ ${errlevel} -ne 0 ]; then
+		lib_err ${EX_SOFTWARE} "Error building '${project}'"
+	fi
+
+	local ajspec_file
+	ajspec_file="${IMAGESDIR}/${image}/.ajspec"
+
+	if [ ! -f "${ajspec_file}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the ajspec \`${ajspec_file}\`"
+	fi
+
+	cat -- "${ajspec_file}"
 }
 
 _image_getajspec_file()

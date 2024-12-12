@@ -542,6 +542,16 @@ Wrapper for the
 method but using
 .Sy git@gitlab.com:
 as URL prefix.
+.It Sy reproduce
+Build a project using
+.Sy appjail-reproduce
+and use the generated
+.Xr appjail-ajspec 5
+file. Useful for when you don't want to rely on the server to download the image.
+.Pp
+This method accepts the
+.Sy appjail-reproduce
+syntax, so you can build a specific tag and/or for a specific architecture.
 .El
 .Sh EXIT STATUS
 .Ex -std "appjail image"
