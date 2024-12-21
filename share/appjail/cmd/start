@@ -406,7 +406,12 @@ start_main()
 		errlevel=$?
 
 		if [ ${errlevel} -ne 0 ]; then
-			lib_err ${errlevel} "An error has occurred while executing the *create functions in the initscript."
+			lib_warn "An error has occurred while executing the *create functions in the initscript."
+			lib_warn "The jail '${jail_name}' will be stopped..."
+
+			stop_safe -- "${jail_name}" || exit $?
+
+			exit ${EX_SOFTWARE}
 		fi
 	fi
 
@@ -491,7 +496,9 @@ start_main()
 		lib_warn "An error has occurred while executing the *start functions in the initscript."
 		lib_warn "The jail '${jail_name}' will be stopped..."
 
-		stop_safe -- "${jail_name}"
+		stop_safe -- "${jail_name}" || exit $?
+
+		exit ${EX_SOFTWARE}
 	else
 		if [ ${is_container} -eq 1 ]; then
 			start_container "${jail_name}"
