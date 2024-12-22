@@ -52,15 +52,14 @@ main()
 
 	value=`lib_jailparam_value "${label}" =`
 
-	if lib_check_empty "${value}"; then
-		main
-	fi
-
 	local escape_chars
 	escape_chars='`"\'
 
 	key=`lib_escape_string "${key}" "" "${escape_chars}"`
-	value=`lib_escape_string "${value}" "" "${escape_chars}"`
+
+	if ! lib_check_empty "${value}"; then
+		value=`lib_escape_string "${value}" "" "${escape_chars}"`
+	fi
 
 	echo "\${APPJAIL_SCRIPT} label add \"\${APPJAIL_JAILNAME}\" \"${key}\" \"${value}\""
 }
