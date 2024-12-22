@@ -50,7 +50,7 @@ main()
 	if lib_check_empty "${args}"; then
 		lib_err - "usage: MOUNT --nopersist <device> <mountpoint> [<type>] [<options>] [<dump>] [<pass>]"
 		lib_err - "       MOUNT [--nomount] [--nro [auto|<nro>]] <device> <mountpoint> [<type>] [<options>]"
-		lib_err - "               [<dump>] [<dump>]"
+		lib_err - "               [<dump>] [<pass>]"
 		exit ${EX_USAGE}
 	fi
 	
