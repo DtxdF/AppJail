@@ -123,6 +123,164 @@ stage will receive the same parameters as the main stage.
 See
 .Sx EXAMPLES
 for more details.
+.Sh SUBROUTINES
+An
+.Sy InitScript
+is as powerful as any other
+.Xr sh 1
+script, the problem is that although the built-in environment variables can help, they are not enough for some common tasks, that's why there is a
+.Dq library
+with some subroutines you can use, inspired by
+.Xr appjail-makejail 5 "."
+.Pp
+.Bl -tag -width xxx
+.It Cm INITENV
+After this function finishes executing, commands such as
+.Cm CMD
+will use the environment variables according to the
+.Fl V
+parameter in commands such as
+.Xr appjail-start 1 Ns ,
+.Xr appjail-stop 1
+and
+.Xr appjail-run 1 Ns "."
+.Pp
+If you want to respect the environment variables provided by the user, you must call this function after
+.Cm ENV Ns ,
+in case you call the last function.
+.It Cm ENV Ar name Oo Ar value Oc
+Sets another environment variable for use in commands such as
+.Cm CMD Ns "."
+.It Cm CMD Oo Fl l Oc Oo Oo Fl e Ar name Ns = Ns Oo Ar value Oc Oc No "..." Oc Oo Fl u Ar username Oc Oo Fl w Ar workdir Oc Ar command Oo Ar args No "..." Oc
+Execute a command inside the jail.
+.Bl -tag -width xxxx
+.It Fl l
+Unlike
+.Xr jexec 8 Ns "'s" Fl l Ns ,
+this indicates not to clean the environment.
+.It Fl e Ar name Ns = Ns Oo Ar value Oc
+Sets an environment variable only for the call to this function. Environment variables defined by this parameter take precedence over
+.Cm INITENV
+or
+.Cm ENV Ns "."
+.It Fl u Ar username
+Username to execute the command as.
+.It Fl w Ar workdir
+Working directory. See also
+.Cm WORKDIR Ns "."
+.El
+.It Cm LOCAL Oo Oo Fl j Ns | Ns Fl r Oc Oc Ar command Oo Ar args No "..." Oc
+Execute a command from the host but within the jail directory
+.Pq Fl j
+or the root directory of the jail
+.Po Fl r Pc Ns "."
+.It Cm CHROOT Ar command Oo Ar args No "..." Oc
+Execute a command using
+.Xr appjail-cmd 1 Cm chroot Ns "."
+.It Cm JAILDIR Ar command Oo Ar args No "..." Oc
+Execute a command using
+.Xr appjail-cmd 1 Cm jaildir Ns "."
+.It Cm PKG Oo Oo Fl c Ns | Ns Fl j Oc Oc Ar args No "..."
+Manipulate packages within a jail.
+.Pp
+By default,
+.Xr appjail-pkg 1 Cm jail
+is used, but you can change it to
+.Xr appjail-pkg 1 Cm chroot
+when using
+.Fl c
+instead. Use
+.Fl j
+to use
+.Xr pkg 8
+from inside the jail instead of the host.
+.It Cm ARG Ar name Oo Ar default-value Oc
+Defines a new parameter that can be parsed using
+.Cm PARSE Ns "."
+Unlike the
+.Cm ARG
+instruction of
+.Xr appjail-makejail 5 Ns ,
+there is no such thing as a required argument, but you can easily check whether a variable is defined or not using utilities like
+.Xr test 1 Ns "."
+.Pp
+You can access variable values using a syntax like
+.Em ${ARG_<name>}
+or
+.Em $ARG_<name> Ns "."
+.It Cm PARSE Oo Ar args No "..." Oc
+Parse the arguments. You must pass the arguments of the stage as arguments to this function.
+.It Cm VOLUME Oo Fl g Ar group Oc Oo Fl m Ar mountpoint Oc Oo Fl o Ar owner Oc Oo Fl p Ar perm Oc Oo Fl t Ar type Oc Ar name
+See
+.Xr appjail-volume 1 Ns "."
+.It Cm DEVICE:SET Ar args No "..."
+See
+.Xr appjail-devfs 1 Cm set Ns "."
+.It Cm DEVICE:APPLYSET
+See
+.Xr appjail-devfs 1 Cm applyset Ns "."
+.It Cm LABEL:ADD Ar name Oo Ar value Oc
+See
+.Xr appjail-label 1 Cm add Ns "."
+.It Cm LABEL:GET Ar name
+Get the value of a label. If the label does not exist, an empty value is returned
+and the exit status is modified accordingly.
+.It Cm MOUNT Oo Fl MP Oc Oo Fl n Ar nro Oc Ar device Ar mountpoint Oo Ar type Oo Ar options Oo Ar dump Oo Ar pass Oc Oc Oc Oc
+Use
+.Xr appjail-fstab 1
+to create a new entry in the
+.Xr fstab 5
+of the jail and, unless the
+.Fl M
+parameter is set, the file will be compiled and the entries mounted. If the
+.Fl P
+parameter is specified,
+.Xr mount 8
+is used instead.
+.It Cm UMOUNT Ar mountpoint
+See
+.Xr umount 8 Ns "."
+.Pp
+.Ar mountpoint
+is a mount point relative to the jail directory.
+.It Cm REPLACE Ar file Ar keyword Oo Ar value Oc Oo Ar output Oc
+Replace a given
+.Ar keyword
+.Pq without being enclosed in Sy %{ No and Sy }
+with a
+.Ar value
+.Pq or empty, if not defined
+in a
+.Ar file Ns "." Keywords begin with the
+.Sy %
+character and then the keyword name enclosed in curly braces. Use
+.Sy %
+twice to escape, for example
+.Sy %%{KEYWORD}
+will be converted to
+.Sy %{KEYWORD} Ns ,
+but will not be replaced by any value. A different file can be used as
+.Ar output
+for the replaced keywords.
+.It Cm SERVICE Ar args No "..."
+See
+.Xr appjail-service 1 Ns "."
+.It Cm SYSRC Oo Fl l Oc Ar args No "..."
+See
+.Xr appjail-sysrc 1 Ns "."
+.Pp
+If
+.Fl l
+is specified,
+.Xr appjail-sysrc 1 Cm local
+is used instead of
+.Xr appjail-sysrc 1 Cm jail Ns "."
+.It Cm WORKDIR Ar directory
+Sets the working directory of commands such as
+.Cm REPLACE
+and
+.Cm CMD Ns "."
+.El
 .Sh ENVIRONMENT
 .Bl -tag -width xxxx
 .It Ev APPJAIL_CONFIG
@@ -135,6 +293,11 @@ Jail name.
 Root directory of the jail.
 .It Ev APPJAIL_SCRIPT
 Pathname to the AppJail script.
+.El
+.Sh FILES
+.Bl -tag -width xxxx
+.It Pa ${LIBDIR}/initscript
+File with some common subroutines.
 .El
 .Sh EXAMPLES
 .Ss Arguments

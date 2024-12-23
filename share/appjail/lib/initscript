@@ -1,0 +1,778 @@
+#
+# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+set -T
+
+. "${APPJAIL_CONFIG}"
+. "${LIBDIR}/load"
+
+lib_load "${LIBDIR}/sysexits"
+lib_load "${LIBDIR}/atexit"
+lib_load "${LIBDIR}/log"
+lib_load "${LIBDIR}/replace"
+lib_load "${LIBDIR}/check_func"
+
+lib_atexit_init
+
+trap '' SIGINT
+
+__APPJAIL_RUN_ENVIRONMENT__=
+__APPJAIL_RUN_ARGS__=
+__APPJAIL_RUN_WORKDIR__="/"
+
+INITENV()
+{
+	local __APPJAIL_RUN_ENVIRONMENT_FILE__
+
+	__APPJAIL_RUN_ENVIRONMENT_FILE__=`lib_generate_tempfile` || exit $?
+	__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__=`lib_escape_string "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"`
+
+	lib_atexit_add "rm -f \"${__APPJAIL_RUN_ENVIRONMENT_FILE_ESCAPED__}\""
+
+	env | grep -Ee '^__APPJAIL_RUN_ENVIRONMENT_VAR__[a-zA-Z_][a-zA-Z0-9_]*(=.*)?$' | sed -Ee 's/__APPJAIL_RUN_ENVIRONMENT_VAR__(.+)/\1/' | while IFS= read -r env_var; do
+		name=`lib_jailparam_name "${env_var}" "="`
+		value=`lib_jailparam_value "${env_var}" "="`
+
+		env="${name}=${value}"
+
+		escape_env=`lib_escape_string "${env}"`
+		escape_env="\"${escape_env}\""
+
+		printf "%s " "${escape_env}" >> "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" || exit $?
+	done || exit $?
+
+	local environ
+	environ=`head -1 -- "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"` || exit $?
+
+	if [ -z "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" ]; then
+		__APPJAIL_RUN_ENVIRONMENT__="${environ}"
+	else
+		__APPJAIL_RUN_ENVIRONMENT__="${__APPJAIL_RUN_ENVIRONMENT__} ${environ}"
+	fi
+
+	rm -f -- "${__APPJAIL_RUN_ENVIRONMENT_FILE__}"
+}
+
+ENV()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: ENV <name> [<value>]"
+	fi
+
+	local env_name
+	env_name="$1"
+
+	if lib_check_empty "${env_name}"; then
+		ENV # usage
+	fi
+
+	if ! lib_check_varname "${env_name}"; then
+		lib_err ${EX_DATAERR} -- "${env_name}: Invalid environment variable."
+	fi
+
+	local env_value
+	env_value="$2"
+
+	local env
+	env="${env_name}=${env_value}"
+
+	local escape_env
+	escape_env=`lib_escape_string "${env}"`
+
+	if [ -z "${__APPJAIL_RUN_ENVIRONMENT__}" ]; then
+		__APPJAIL_RUN_ENVIRONMENT__="\"${escape_env}\""
+	else
+		__APPJAIL_RUN_ENVIRONMENT__="${__APPJAIL_RUN_ENVIRONMENT__} \"${escape_env}\""
+	fi
+}
+
+CMD()
+{
+	local _o
+	local opt_l=true
+	local opt_u=false
+	local user=
+	local environ="${__APPJAIL_RUN_ENVIRONMENT__}"
+	local workdir="${__APPJAIL_RUN_WORKDIR__}"
+
+	if [ $# -eq 0 ]; then
+		lib_err - "usage: CMD [-l] [[-e <name>=[<value>]] ...] [-u <username>] [-w <workdir>]"
+		lib_err - "               <command> [<args> ...]"
+		exit ${EX_USAGE}
+	fi
+
+	local errlevel errmsg
+
+	errmsg=`"${APPJAIL_SCRIPT}" status -- "${APPJAIL_JAILNAME}" 2>&1`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		printf "%s\n" "${errmsg}" >&2
+		return ${errlevel}
+	fi
+
+	while getopts ":e:u:w:" _o; do
+		case "${_o}" in
+			e|u|w)
+				if lib_check_empty "${OPTARG}"; then
+					CMD # usage
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			l)
+				opt_l=false
+				;;
+			e)
+				local env_var
+				env_var="${OPTARG}"
+
+				if ! lib_check_env "${env_var}"; then
+					lib_err ${EX_DATAERR} -- "${env_var} Invalid environment variable."
+				fi
+
+				local escape_env_var
+				escape_env_var=`lib_escape_string "${env_var}"`
+
+				if [ -z "${environ}" ]; then
+					environ="\"${escape_env_var}\""
+				else
+					environ="${environ} \"${escape_env_var}\""
+				fi
+				;;
+			u)
+				opt_u=true
+				user="${OPTARG}"
+				;;
+			w)
+				workdir="${OPTARG}"
+				;;
+			*)
+				CMD # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -eq 0 ]; then
+		CMD # usage
+	fi
+
+	local args=
+
+	if ${opt_l}; then
+		args="-l"
+	fi
+
+	local escape_user
+
+	if ! lib_check_empty "${user}";  then
+		escape_user=`lib_escape_string "${user}"`
+	fi
+
+	if ${opt_u}; then
+		args="${args} -u \"${escape_user}\""
+	fi
+
+	local escape_workdir
+	escape_workdir=`lib_escape_string "${workdir}"`
+
+	args="${args} -w \"${escape_workdir}\""
+
+	local escape_jailname
+	escape_jailname=`lib_escape_string "${APPJAIL_JAILNAME}"`
+
+	args="${args} \"${escape_jailname}\""
+
+	args="${args} env ${environ}"
+
+	local arg
+
+	for arg in "$@"; do
+		arg=`lib_escape_string "${arg}"`
+
+		if [ -z "${args}" ]; then
+			args="\"${arg}\""
+		else
+			args="${args} \"${arg}\""
+		fi
+	done
+
+	local jexec
+	jexec="${UTILDIR}/jexec/jexec"
+
+	local escape_jexec
+	escape_jexec=`lib_escape_string "${jexec}"`
+
+	sh -c "\"${escape_jexec}\" ${flags} ${args}"
+
+	return $?
+}
+
+LOCAL()
+{
+	local opt_j=false
+	local opt_r=false
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: LOCAL [[-j|-r]] <command> [<args> ...]"
+	fi
+	
+	while getopts "jr" _o; do
+		case "${_o}" in
+			j)
+				opt_j=true
+				;;
+			r)
+				opt_r=true
+				;;
+			*)
+				LOCAL # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -eq 0 ]; then
+		LOCAL # usage
+	fi
+
+	if ${opt_j} && ${opt_r}; then
+		LOCAL # usage
+	fi
+
+	local flags=
+
+	if ${opt_j}; then
+		flags="-j"
+	elif ${opt_r}; then
+		flags="-r"
+	fi
+
+	"${APPJAIL_SCRIPT}" cmd local "${APPJAIL_JAILNAME}" ${flags} "$@"
+
+	return $?
+}
+
+CHROOT()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: CHROOT <command> [<args> ...]"
+	fi
+
+	"${APPJAIL_SCRIPT}" cmd chroot "${APPJAIL_JAILNAME}" "$@"
+
+	return $?
+}
+
+JAILDIR()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: JAILDIR <command> [<args> ...]"
+	fi
+
+	"${APPJAIL_SCRIPT}" cmd jaildir "$@"
+
+	return $?
+}
+
+PKG()
+{
+	local _o
+	local opt_chroot=true
+	local opt_jail=false
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: PKG [[-c|-j]] <args> ..."
+	fi
+
+	while getopts ":cj" _o; do
+		case "${_o}" in
+			c)
+				opt_chroot=true
+				;;
+			j)
+				opt_jail=true
+				;;
+			*)
+				PKG # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -eq 0 ]; then
+		PKG # usage
+	fi
+
+	if ${opt_chroot}; then
+		"${APPJAIL_SCRIPT}" pkg chroot "${APPJAIL_JAILNAME}" "$@"
+	else
+		local flags=
+
+		if ${opt_jail}; then
+			flags="-j"
+		fi
+
+		"${APPJAIL_SCRIPT}" pkg jail "${APPJAIL_JAILNAME}" ${flags} "$@"
+	fi
+
+	return $?
+}
+
+ARG()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: ARG <name> [<default-value>]"
+	fi
+
+	local arg_name
+	arg_name="$1"
+
+	if lib_check_empty "${arg_name}"; then
+		ARG # usage
+	fi
+
+	if ! lib_check_varname "${arg_name}"; then
+		lib_err ${EX_DATAERR} -- "${arg_name}: Invalid variable name."
+	fi
+
+	local arg_default_value
+	arg_default_value="$2"
+
+	setvar "ARG_${arg_name}" "${arg_default_value}"
+
+	if [ -z "${__APPJAIL_RUN_ARGS__}" ]; then
+		__APPJAIL_RUN_ARGS__="${arg_name}"
+	else
+		__APPJAIL_RUN_ARGS__="${__APPJAIL_RUN_ARGS__} ${arg_name}"
+	fi
+}
+
+PARSE()
+{
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--)
+				if [ $# -gt 0 ]; then
+					shift $#
+				fi
+				break
+				;;
+			--*)
+				if [ $# -lt 2 ]; then
+					shift $#
+					break
+				fi
+
+				local arg valid=false
+
+				for arg in ${__APPJAIL_RUN_ARGS__}; do
+					if [ "$1" = "--${arg}" ]; then
+						setvar "ARG_${arg}" "$2"
+						valid=true
+						break
+					fi
+				done
+
+				if ! ${valid}; then
+					lib_err ${EX_USAGE} -- "$1: Invalid option."
+				fi
+
+				shift
+				;;
+			*)
+				if [ $# -gt 0 ]; then
+					shift $#
+				fi
+				break
+				;;
+		esac
+
+		shift
+	done
+}
+
+VOLUME()
+{
+	local _o
+	local group=
+	local mountpoint=
+	local owner=
+	local perm=
+	local type=
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: VOLUME [-g <group>] [-m <mountpoint>] [-o <owner>] [-p <perm>] [-t <type>] <name>"
+	fi
+
+	while getopts ":g:m:o:p:t:" _o; do
+		case "${_o}" in
+			g|m|o|p|t)
+				if lib_check_empty "${OPTARG}"; then
+					VOLUME # usage
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			g)
+				group="${OPTARG}"
+				;;
+			m)
+				mountpoint="${OPTARG}"
+				;;
+			o)
+				owner="${OPTARG}"
+				;;
+			p)
+				perm="${OPTARG}"
+				;;
+			t)
+				type="${OPTARG}"
+				;;
+			*)
+				VOLUME # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local name
+	name="$1"
+
+	if lib_check_empty "${name}"; then
+		VOLUME # usage
+	fi
+
+	local args=
+
+	if ! lib_check_empty "${group}"; then
+		local escape_group
+		escape_group=`lib_escape_string "${group}"`
+
+		args="-g \"${escape_group}\""
+	fi
+
+	if ! lib_check_empty "${mountpoint}"; then
+		local escape_mountpoint
+		escape_mountpoint=`lib_escape_string "${mountpoint}"`
+
+		args="-m \"${escape_mountpoint}\""
+	fi
+
+	if ! lib_check_empty "${owner}"; then
+		local escape_owner
+		escape_owner=`lib_escape_string "${owner}"`
+
+		args="-o \"${escape_owner}\""
+	fi
+
+	if ! lib_check_empty "${perm}"; then
+		local escape_perm
+		escape_perm=`lib_escape_string "${perm}"`
+
+		args="-p \"${escape_perm}\""
+	fi
+
+	if ! lib_check_empty "${type}"; then
+		local escape_type
+		escape_type=`lib_escape_string "${type}"`
+
+		args="-t \"${escape_type}\""
+	fi
+
+	local escape_appjail
+	escape_appjail=`lib_escape_string "${APPJAIL_SCRIPT}"`
+
+	local escape_jailname
+	escape_jailname=`lib_escape_string "${APPJAIL_JAILNAME}"`
+
+	local escape_name
+	escape_name=`lib_escape_string "${name}"`
+
+	sh -c "\"${escape_appjail}\" volume add ${args} -- \"${escape_jailname}\" \"${escape_name}\""
+
+	return $?
+}
+
+DEVICE:SET()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: DEVICE:SET <args> ..."
+	fi
+
+	"${APPJAIL_SCRIPT}" devfs set -- "${APPJAIL_JAILNAME}" "$@"
+}
+
+DEVICE:APPLYSET()
+{
+	"${APPJAIL_SCRIPT}" devfs applyset "${APPJAIL_JAILNAME}"
+}
+
+LABEL:ADD()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: LABEL:ADD <name> [<value>]"
+	fi
+
+	local name
+	name="$1"
+
+	if lib_check_empty "${name}"; then
+		LABEL:ADD # usage
+	fi
+
+	local value
+	value="$2"
+
+	"${APPJAIL_SCRIPT}" label add "${APPJAIL_JAILNAME}" "${name}" "${value}"
+
+	return $?
+}
+
+LABEL:GET()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: LABEL:GET <name>"
+	fi
+
+	local name
+	name="$1"
+
+	if lib_check_empty "${name}"; then
+		LABEL:GET # usage
+	fi
+
+	"${APPJAIL_SCRIPT}" label get -I -l "${name}" -- "${APPJAIL_JAILNAME}" value 2> /dev/null
+
+	return $?
+}
+
+MOUNT()
+{
+	local _o
+	local automount=true
+	local persist=true
+	local nro="auto"
+	local type="nullfs"
+	local options="rw"
+	local dump=0
+	local pass=0
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: MOUNT [-MP] [-n <nro>] <device> <mountpoint> [<type> [<options> [<dump> [<pass>]]]]"
+	fi
+
+	while getopts ":MPn:" _o; do
+		case "${_o}" in
+			M)
+				automount=false
+				;;
+			P)
+				persist=false
+				;;
+			n)
+				nro="${OPTARG}"
+				;;
+			*)
+				MOUNT # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $# -lt 2 ]; then
+		MOUNT # usage
+	fi
+
+	local device="$1"
+
+	if lib_check_empty "${device}"; then
+		MOUNT # usage
+	fi
+
+	local mountpoint="$2"
+
+	if lib_check_empty "${mountpoint}"; then
+		MOUNT # usage
+	fi
+
+	local type="$3"
+
+	if ! lib_check_empty "${type}"; then
+		options="$4"
+
+		if ! lib_check_empty "${options}"; then
+			dump="$5"
+
+			if ! lib_check_empty "${dump}"; then
+				pass="$6"
+
+				if lib_check_empty "${pass}"; then
+					pass=0
+				fi
+			else
+				dump=0
+			fi
+		else
+			options="rw"
+		fi
+	else
+		type="nullfs"
+	fi
+
+	if ${persist}; then
+		"${APPJAIL_SCRIPT}" fstab jail "${APPJAIL_JAILNAME}" set -n "${nro}" -d "${device}" -m "${mountpoint}" -t "${type}" -o "${options}" -D "${dump}" -P "${pass}"
+		
+		if ${automount}; then
+			"${APPJAIL_SCRIPT}" fstab jail "${APPJAIL_JAILNAME}" compile
+			"${APPJAIL_SCRIPT}" fstab jail "${APPJAIL_JAILNAME}" mount -a
+		fi
+	else
+		mount -t "${type}" -o "${options}" -- "${device}" "${APPJAIL_JAILDIR}/${mountpoint}"
+	fi
+}
+
+UMOUNT()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: UMOUNT <mountpoint>"
+	fi
+
+	local mountpoint
+	mountpoint="$1"
+
+	if ! lib_check_empty "${mountpoint}"; then
+		UMOUNT # usage
+	fi
+
+	umount "${APPJAIL_JAILDIR}/${mountpoint}"
+}
+
+REPLACE()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: REPLACE <file> <keyword> [<value>] [<output>]"
+	fi
+
+	local file
+	file="$1"
+
+	if lib_check_empty "${file}"; then
+		REPLACE # usage
+	fi
+
+	file="${__APPJAIL_RUN_WORKDIR__}/${file}"
+
+	local keyword
+	keyword="$2"
+
+	if lib_check_empty "${keyword}"; then
+		REPLACE # usage
+	fi
+
+	local value
+	value="$3"
+
+	local output
+	output="$4"
+
+	if lib_check_empty "${output}"; then
+		output="${file}"
+	fi
+
+	lib_mk_replace_var "${APPJAIL_JAILDIR}${file}" "${keyword}" "${value}" "${APPJAIL_JAILDIR}${output}"
+}
+
+SERVICE()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: SERVICE <args> ..."
+	fi
+
+	"${APPJAIL_SCRIPT}" service jail "${APPJAIL_JAILNAME}" "$@"
+
+	return $?
+}
+
+SYSRC()
+{
+	local _o
+	local opt_l=false
+
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: SYSRC [-l] <args> ..."
+	fi
+
+	while getopts ":l" _o; do
+		case "${_o}" in
+			l)
+				opt_l=true
+				;;
+			*)
+				SYSRC # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local target
+	
+	if ${opt_l}; then
+		target="local"
+	else
+		target="jail"
+	fi
+
+	"${APPJAIL_SCRIPT}" sysrc "${target}" "${APPJAIL_JAILNAME}" "$@"
+
+	return $?
+}
+
+WORKDIR()
+{
+	if [ $# -eq 0 ]; then
+		lib_err ${EX_USAGE} "usage: WORKDIR <directory>"
+	fi
+
+	local workdir
+	workdir="$1"
+
+	if lib_check_empty "${workdir}"; then
+		WORKDIR # usage
+	fi
+
+	mkdir -p -- "${APPJAIL_JAILDIR}/${workdir}" || return $?
+
+	__APPJAIL_RUN_WORKDIR__="${workdir}"
+
+	return $?
+}
