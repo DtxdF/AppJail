@@ -105,22 +105,22 @@ lib_humanize_number()
 		result="${number}"
 		unit="B"
 	elif [ ${number} -ge ${kib} -a ${number} -lt ${mib} ]; then
-		result=$((number/kib))
+		result=`echo "${number} / ${kib}" | bc -S 2`
 		unit="KiB"
 	elif [ ${number} -ge ${mib} -a ${number} -lt ${gib} ]; then
-		result=$((number/mib))
+		result=`echo "${number} / ${mib}" | bc -S 2`
 		unit="MiB"
 	elif [ ${number} -ge ${gib} -a ${number} -lt ${tib} ]; then
-		result=$((number/gib))
+		result=`echo "${number} / ${gib}" | bc -S 2`
 		unit="GiB"
 	elif [ ${number} -ge ${tib} -a ${number} -lt ${pib} ]; then
-		result=$((number/tib))
+		result=`echo "${number} / ${tib}" | bc -S 2`
 		unit="TiB"
 	elif [ ${number} -ge ${pib} -a ${number} -lt ${eib} ]; then
-		result=$((number/pib))
+		result=`echo "${number} / ${pib}" | bc -S 2`
 		unit="PiB"
 	else
-		result=$((number/eib))
+		result=`echo "${number} / ${eib}" | bc -S 2`
 		unit="EiB"
 	fi
 
