@@ -35,7 +35,6 @@ lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mount"
 lib_load "${LIBDIR}/random"
 lib_load "${LIBDIR}/replace"
-lib_load "${LIBDIR}/repeat"
 lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/tempfile"
 lib_load "${LIBDIR}/zfs"
@@ -461,7 +460,7 @@ start_main()
 		lib_err ${errlevel} "An error has occurred while starting the jail '${jail_name}'"
 	fi
 
-	lib_repeat_run -s random "${APPJAIL_PROGRAM}" status -q -- "${jail_name}"
+	"${APPJAIL_PROGRAM}" status -q -- "${jail_name}"
 
 	errlevel=$?
 
