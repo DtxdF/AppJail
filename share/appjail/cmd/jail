@@ -1871,7 +1871,9 @@ jail_get()
 					continue
 				fi
 
-				value=`"${APPJAIL_PROGRAM}" oci get-pid "${jail_name}"`
+				if oci_check_dependencies_warn 2> /dev/null; then
+					value=`"${APPJAIL_PROGRAM}" oci get-pid "${jail_name}"`
+				fi
 
 				flag_container_pid=1
 				;;
