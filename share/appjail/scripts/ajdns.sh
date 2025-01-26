@@ -97,7 +97,10 @@ main()
 
 		if [ `${algo} -q "${hosts}"` != ${current_hosts_sum} ]; then
 			printf "%s\n" "${current_hosts}" > "${hosts}" || exit $?
-			"${hook}" "${hosts}" || exit $?
+
+			if [ -x "${hook}" ]; then
+				"${hook}" "${hosts}" || exit $?
+			fi
 		fi
 
 		sleep "${interval}" &

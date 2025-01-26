@@ -79,9 +79,10 @@ file against the output of
 .Nm
 at intervals
 .Po Em appjail_dns_interval Ns : Ns " " Ns 60 Pc
-using a checksum; if it detects a change it will execute the hook
+using a checksum; if it detects a change it will write the new content to the
+.Xr hosts 5 Ns -like file and execute the hook
 .Po Em appjail_dns_hook Ns : Ns " " Ns %%PREFIX%%/share/appjail/scripts/dnsmasq-hook.sh Pc
-.Ns "."
+only if it has the execution bit set.
 .Pp
 A hook is simply an external program that has two responsibilities: filtering the
 .Xr hosts 5 Ns -like
