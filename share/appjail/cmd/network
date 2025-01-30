@@ -304,23 +304,25 @@ network_assign()
 			netmask "${network_netmask}" \
 			broadcast "${network_broadcast}" up || exit $?
 
+	local etcdir
+	etcdir="${jail_path}/jail/etc"
+
+	if [ ! -d "${etcdir}" ]; then
+		if ! mkdir -p -- "${etcdir}"; then
+			lib_err ${EX_IOERR} "Error creating ${etcdir}"
+		fi
+	fi
+
+	local rc_conf
+	rc_conf="${etcdir}/rc.conf"
+
+	sysrc -f "${rc_conf}" ifconfig_eb_${ether_name}="inet ${address} netmask ${network_netmask} broadcast ${network_broadcast}"
+
 	if [ ${opt_default} -eq 1 ]; then
 		local network_gateway=`network_get -I -- "${network_name}" gateway`
 
 		jexec -l "${jail_name}" \
 			route add default "${network_gateway}" >&2
-
-		local etcdir
-		etcdir="${jail_path}/jail/etc"
-
-		if [ ! -d "${etcdir}" ]; then
-			if ! mkdir -p -- "${etcdir}"; then
-				lib_err ${EX_IOERR} "Error creating ${etcdir}"
-			fi
-		fi
-
-		local rc_conf
-		rc_conf="${etcdir}/rc.conf"
 
 		sysrc -f "${rc_conf}" defaultrouter="${network_gateway}" >&2
 	fi
