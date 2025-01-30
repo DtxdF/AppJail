@@ -362,6 +362,11 @@ is enabled, the jail name is used as secondary hostname for the network specifie
 by the
 .Sy NETWORK_TO_SHORTEN
 parameter.
+.Pp
+An additional hostname will be added if the current jail has the
+.Sy appjail.dns.alt-name
+label. This is useful especially when a third-party tool creates a random name
+but you want to use a human-readable hostname.
 .It Cm list Oo Fl eHIpt Oc Oo Fl n Ar network Oc Oo Ar keyword Ns " " Ns "..." Oc
 .No Similar to Cm get No but shows each Ar keyword No for each network in a nice table.
 .Pp

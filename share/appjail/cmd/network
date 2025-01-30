@@ -1121,7 +1121,15 @@ network_hosts()
 				continue
 			fi
 
-			reserved_addr=`head -1 "${reserved_addr_file}"`
+			reserved_addr=`head -1 "${reserved_addr_file}"` || exit $?
+
+			alt_name_file="${JAILDIR}/${jail_name}/conf/labels/appjail.dns.alt-name/value"
+
+			if [ -f "${alt_name_file}" ]; then
+				alt_name=`head -1 "${alt_name_file}"` || exit $?
+			else
+				alt_name=
+			fi
 
 			if [ ${opt_names} -eq 1 ]; then
 				printf "%s\t%s\n" "${reserved_addr}" "${jail_name}"
@@ -1131,14 +1139,18 @@ network_hosts()
 					jail_hostname="${jail_name}${HOST_DOMAIN}"
 				fi
 
-				printf "%s\t%s\n" "${reserved_addr}" "${jail_hostname}"
+				hostnames="${alt_name} ${jail_hostname}"
+
+				printf "%s\t%s\n" "${reserved_addr}" "${hostnames}"
 			elif [ ${opt_hostname} -ge 2 ]; then
 				if [ "${NETWORK_TO_SHORTEN}" = "${network_name}" ] && \
 						[ ${opt_short_names} -eq 1 -o "${SHORTEN_DOMAIN_NAMES}" != "0" ]; then
-					printf "%s\t%s %s\n" "${reserved_addr}" "${jail_name}" "${jail_name}.${network_name}${HOST_DOMAIN}"
+					hostnames="${alt_name} ${jail_name} ${jail_name}.${network_name}${HOST_DOMAIN}"
 				else
-					printf "%s\t%s\n" "${reserved_addr}" "${jail_name}.${network_name}${HOST_DOMAIN}"
+					hostnames="${alt_name} ${jail_name}.${network_name}${HOST_DOMAIN}"
 				fi
+
+				printf "%s\t%s\n" "${reserved_addr}" "${hostnames}"
 			else
 				printf "%s\n" "${reserved_addr}"
 			fi
