@@ -78,6 +78,12 @@ method in a Makejail file.
 .br
 Default:
 .Em ${CACHEDIR}/git
+.It HOOKSDIR
+Location of hooks. This directory must have two subdirectories,
+.Sy pre.d
+for executables to be run before executing the subcommand, and
+.Sy post.d
+for executables to be run after executing the subcommand.
 .El
 .Sh SYSTEM DIRECTORIES PARAMETERS
 .Bl -tag -width xxxxx

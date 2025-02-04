@@ -118,7 +118,57 @@ main()
 		lib_atexit_add "\"${kill_tree_cmd}\" -c \"${config_file}\" -p $$ > /dev/null 2>&1"
 	fi
 
-	${cmd}_main "$@"
+	if [ -n "${HOOKSDIR}" ] && [ -d "${HOOKSDIR}/pre.d" ]; then
+		for hook in "${HOOKSDIR}/pre.d"/*; do
+			if [ "${hook}" = "${HOOKSDIR}/pre.d/*" ]; then
+				break
+			fi
+
+			if [ ! -x "${hook}" ]; then
+				lib_debug "Missing execution bit permission for hook '${hook}'"
+				continue
+			fi
+
+			local errlevel
+
+			env \
+				APPJAIL_CONFIG="${CONFIG}" \
+				"${hook}" "${cmd}" "$@"
+
+			errlevel=$?
+
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "Hook '${hook}' exits with a non-zero exit status (pre)"
+			fi
+		done
+	fi
+
+	${cmd}_main "$@" || return $?
+
+	if [ -d "${HOOKSDIR}" ]; then
+		for hook in "${HOOKSDIR}/post.d"/*; do
+			if [ "${hook}" = "${HOOKSDIR}/post.d/*" ]; then
+				break
+			fi
+
+			if [ ! -x "${hook}" ]; then
+				lib_debug "Missing execution bit permission for hook '${hook}'"
+				continue
+			fi
+
+			local errlevel
+
+			env \
+				APPJAIL_CONFIG="${CONFIG}" \
+				"${hook}" "${cmd}" "$@"
+
+			errlevel=$?
+
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "Hook '${hook}' exits with a non-zero exit status (post)"
+			fi
+		done
+	fi
 }
 
 usage()
