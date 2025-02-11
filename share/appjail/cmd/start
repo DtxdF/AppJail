@@ -347,6 +347,16 @@ start_main()
 
 	lib_debug "Path: ${jail_path}/jail"
 
+	if lib_check_number "${jail_name}"; then
+		# If the jail name consists only of numbers, it is necessary to explicitly define
+		# a name since only `jid` will be defined and `name` will be undefined given in an
+		# error.
+
+		lib_ajconf set -Vt "${template_temp}" "name=\"${jail_name}\""
+
+		lib_debug "Name: ${jail_name}"
+	fi
+
 	# It is not necessary since the start command starts the jails.
 	lib_ajconf del -Pit "${template_temp}" depend
 
