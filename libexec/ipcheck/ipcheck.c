@@ -40,7 +40,6 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-static int	check_ip(int af, const char *address);
 static int	check_ipv4(const char *address);
 static int	check_ipv6(const char *address);
 static void	usage(void);
@@ -85,12 +84,12 @@ main(int argc, char **argv)
 }
 
 static int
-check_ip(int af, const char *address)
+check_ipv4(const char *address)
 {
 	int rc = 0;
 	struct in_addr addr;
 
-	switch ((rc = inet_pton(af, address, &addr))) {
+	switch ((rc = inet_pton(AF_INET, address, &addr))) {
 	case 1:
 		/* Valid */
 		rc = 0;
@@ -109,15 +108,27 @@ check_ip(int af, const char *address)
 }
 
 static int
-check_ipv4(const char *address)
-{
-	return check_ip(AF_INET, address);
-}
-
-static int
 check_ipv6(const char *address)
 {
-	return check_ip(AF_INET6, address);
+	int rc = 0;
+	struct in6_addr addr;
+
+	switch ((rc = inet_pton(AF_INET6, address, &addr))) {
+	case 1:
+		/* Valid */
+		rc = 0;
+		break;
+	case 0:
+		/* Invalid */
+		rc = 1;
+		break;
+	case -1:
+		/* Error */
+		err(EX_SOFTWARE, "inet_pton()");
+		break;
+	}
+
+	return rc;
 }
 
 static void
