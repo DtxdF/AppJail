@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -1693,6 +1693,7 @@ jail_get()
 	local _o
 	local jail_name
 
+	local flag_alt_name=0
 	local flag_appjail_version=0
 	local flag_arch=0
 	local flag_boot=0
@@ -1790,6 +1791,20 @@ jail_get()
 		local value=
 
 		case "${keyword}" in
+			alt_name)
+				if [ ${flag_alt_name} -eq 1 ]; then
+					continue
+				fi
+
+				local alt_name
+				alt_name="${JAILDIR}/${jail_name}/conf/labels/appjail.dns.alt-name/value"
+
+				if [ -f "${alt_name}" ]; then
+					value=`head -1 -- "${alt_name}"`
+				fi
+
+				flag_alt_name=1
+				;;
 			appjail_version)
 				if [ ${flag_appjail_version} -eq 1 ]; then
 					continue
