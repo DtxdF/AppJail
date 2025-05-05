@@ -82,7 +82,7 @@ oci_from()
 	local escape_container_name
 	escape_container_name=`lib_escape_string "${container_name}"`
 
-	sh -c "buildah from --name ${escape_container_name} ${buildah_from_args:-${BUILDAH_FROM_ARGS}} \"${escape_image}\""
+	sh -c "buildah from --name \"${escape_container_name}\" ${buildah_from_args:-${BUILDAH_FROM_ARGS}} \"${escape_image}\""
 }
 
 oci_check_container_name()
