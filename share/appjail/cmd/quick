@@ -103,6 +103,7 @@ QUICK_OPTION_BRIDGE=0
 QUICK_OPTION_CLONE_JAIL=0
 QUICK_OPTION_CLONE_RELEASE=0
 QUICK_OPTION_CONTAINER=
+QUICK_OPTION_CONTAINER_BUILDAH_ARGS="${BUILDAH_FROM_ARGS}"
 QUICK_OPTION_CONTAINER_BOOT=0
 QUICK_OPTION_CONTAINER_EXPOSE=0
 QUICK_OPTION_CONTAINER_EXT_IF=
@@ -417,7 +418,7 @@ quick_set_container()
 {
 	local params="$1"
 	if lib_check_empty "${params}"; then
-		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [ext_if:external_interface] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
+		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [args:buildah_args] [ext_if:external_interface] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
 	fi
 
 	params=`lib_split_jailparams "${params}"` || exit $?
@@ -437,7 +438,7 @@ quick_set_container()
 		value=`lib_jailparam_value "${arg}" :`
 
 		case "${parameter}" in
-			ext_if|name|on_if)
+			args|ext_if|name|on_if)
 				if lib_check_empty "${value}"; then
 					quick_set_container # usage
 				fi
@@ -450,6 +451,9 @@ quick_set_container()
 				;;
 			expose)
 				QUICK_OPTION_CONTAINER_EXPOSE=1
+				;;
+			args)
+				QUICK_OPTION_CONTAINER_BUILDAH_ARGS="${value}"
 				;;
 			ext_if)
 				QUICK_OPTION_CONTAINER_EXT_IF="${value}"
@@ -501,10 +505,10 @@ quick_run_from()
 		lib_err ${EX_DATAERR} "Invalid container name \"${container_name}\""
 	fi
 
-	lib_debug "Creating a container (name:${container_name}) from ${QUICK_OPTION_FROM_IMAGE} ..."
+	lib_debug "Creating a container (name:${container_name}) from ${QUICK_OPTION_FROM_IMAGE} (args:${QUICK_OPTION_CONTAINER_BUILDAH_ARGS}) ..."
 
-	if ! oci_from "${QUICK_OPTION_FROM_IMAGE}" "${container_name}"; then
-		lib_err ${EX_SOFTWARE} "Error creating container ${container_name} from ${QUICK_OPTION_FROM_IMAGE}"
+	if ! oci_from "${QUICK_OPTION_FROM_IMAGE}" "${container_name}" "${QUICK_OPTION_CONTAINER_BUILDAH_ARGS}"; then
+		lib_err ${EX_SOFTWARE} "Error creating container ${container_name} from ${QUICK_OPTION_FROM_IMAGE} (args:${QUICK_OPTION_CONTAINER_BUILDAH_ARGS})"
 	fi
 
 	appjail oci set-container-name "${container_name}" "${QUICK_JAILNAME}" || exit $?

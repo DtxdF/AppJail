@@ -70,10 +70,10 @@ oci_rm()
 
 oci_from()
 {
-	local image="$1" container_name="$2"
+	local image="$1" container_name="$2" buildah_from_args="$3"
 
 	if [ -z "${image}" -o -z "${container_name}" ]; then
-		lib_err ${EX_USAGE} "usage: oci_from image container_name"
+		lib_err ${EX_USAGE} "usage: oci_from image container_name [buildah_from_args]"
 	fi
 
 	local escape_image
@@ -82,7 +82,7 @@ oci_from()
 	local escape_container_name
 	escape_container_name=`lib_escape_string "${container_name}"`
 
-	sh -c "buildah from --name ${escape_container_name} ${BUILDAH_FROM_ARGS} \"${escape_image}\""
+	sh -c "buildah from --name ${escape_container_name} ${buildah_from_args:-${BUILDAH_FROM_ARGS}} \"${escape_image}\""
 }
 
 oci_check_container_name()
