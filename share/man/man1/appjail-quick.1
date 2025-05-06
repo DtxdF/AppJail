@@ -311,7 +311,7 @@ ZFS snapshot name.
 .It
 .Cm clone+release Ns = Ns Qo 140release Qc
 .El
-.It Cm container Ns = Ns Qo Oo Cm boot Oc Oo Cm expose Oc Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm args Ns : Ns Ar args Oc Oo Cm logopts Ns Oo : Ns options Oc Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.It Cm container Ns = Ns Qo Oo Cm boot Oc Oo Cm expose Oc Oo Cm ext_if Ns : Ns Ar interface Oc Oo ext_ip Ns : Ns Ar address Oc Oo Cm args Ns : Ns Ar args Oc Oo Cm logopts Ns Oo : Ns options Oc Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
 .Pp
 Changes the behavior of the
 .Cm from
@@ -337,7 +337,7 @@ parameter.
 .Cm name Ns :
 Container name.
 .It
-.Cm ext_if Ns , Cm logopts Ns , Cm on_if Ns :
+.Cm ext_if Ns , Cm ext_ip Ns , Cm logopts Ns , Cm on_if Ns :
 See the
 .Cm expose
 option.
@@ -566,7 +566,7 @@ Create an empty jail.
 .It
 .Sy zfs+import+root
 .El
-.It Cm expose Ns = Ns Qo Ar hport Ns Oo : Ns Ar jport Oc Oo Cm descr Ns : Ns Ar description Oc Oo Cm ext_if Ns : Ns interface Oc Oo Cm logopts Ns Oo Ns : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Oo Cm proto Ns : Ns Ar protocol Oc Qc
+.It Cm expose Ns = Ns Qo Ar hport Ns Oo : Ns Ar jport Oc Oo Cm descr Ns : Ns Ar description Oc Oo Cm ext_if Ns : Ns interface Oc Oo Cm ext_ip Ns : Ns Ar address Oc Oo Cm logopts Ns Oo Ns : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Oo Cm proto Ns : Ns Ar protocol Oc Qc
 .Pp
 Perform port forwarding.
 .Pp
@@ -601,6 +601,10 @@ Service description.
 Interface to obtain the external IPv4 address. If not set, the interface specified by the
 .Sy EXT_IF
 parameter is used.
+.It
+.Cm ext_ip Ns :
+Uses the specified IPv4 address instead of the first matching one. The specified
+IPv4 address must exist on the specified external interface.
 .It
 .Cm logopts Ns :
 Firewall-specific logging options. Logging can be enabled without providing any arguments.
@@ -1368,7 +1372,7 @@ will assign a ruleset number automatically.
 .It
 .Sy linuxfs
 .El
-.It Cm nat | Cm nat Ns = Ns Qo Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm logopts Ns Oo : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.It Cm nat | Cm nat Ns = Ns Qo Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm ext_ip Ns : Ns Ar address Oc Oo Cm logopts Ns Oo : Ns Ar options Oc Oc Oo Cm network Ns : Ns Ar network Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
 .Pp
 Mask the jail's IPv4 address using the
 .Ar ext_if Ns 's
@@ -1385,6 +1389,10 @@ interface.
 Interface to obtain the external IPv4 address. If not set, the interface specified by the
 .Sy EXT_IF
 parameter is used.
+.It
+.Cm ext_ip Ns :
+Uses the specified IPv4 address instead of the first matching one. The specified
+IPv4 address must exist on the specified external interface.
 .It
 .Cm logopts Ns :
 Firewall-specific logging options. Logging can be enabled without providing any arguments.

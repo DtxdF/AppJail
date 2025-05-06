@@ -110,13 +110,14 @@ nat_add_jail()
 	local _o
 	local opt_nonat=0
 	local ext_if="${EXT_IF}"
+	local ext_ip="${EXT_IP}"
 	local opt_log=0 log_options=
 	local network_name=
 	local on_if="${ON_IF}"
 
-	while getopts ":Ne:l:n:o:" _o; do
+	while getopts ":Ne:I:l:n:o:" _o; do
 		case "${_o}" in
-			e|l|n|o)
+			e|I|l|n|o)
 				if lib_check_empty "${OPTARG}"; then
 					nat_usage
 					exit ${EX_USAGE}
@@ -130,6 +131,9 @@ nat_add_jail()
 				;;
 			e)
 				ext_if="${OPTARG}"
+				;;
+			I)
+				ext_ip="${OPTARG}"
 				;;
 			l)
 				opt_log=1
@@ -195,14 +199,25 @@ nat_add_jail()
 
 	local nat_conf="${natdir}/${USE_FIREWALL}-nat.conf"
 
+	local ext_addr=
+	if lib_check_empty "${ext_ip}"; then
+		ext_addr="(\"${ext_if}:0\")"
+	else
+		if ! lib_check_addr "${ext_if}" "${ext_ip}"; then
+			lib_err ${EX_NOINPUT} "The IPv4 address ${ext_ip} is not found on the ${ext_if} interface."
+		fi
+
+		ext_addr="${ext_ip}"
+	fi
+
 	local raw_rule=
 	case "${USE_FIREWALL}" in
 		pf)
 			if [ ${opt_nonat} -eq 0 ]; then
 				if [ ${opt_log} -eq 1 ]; then
-					raw_rule="nat log ${log_options} on \"${on_if}\" from ${jaddr} to any -> (\"${ext_if}:0\")"
+					raw_rule="nat log ${log_options} on \"${on_if}\" from ${jaddr} to any -> ${ext_addr}"
 				else
-					raw_rule="nat on \"${on_if}\" from ${jaddr} to any -> (\"${ext_if}:0\")"
+					raw_rule="nat on \"${on_if}\" from ${jaddr} to any -> ${ext_addr}"
 				fi
 			else
 				raw_rule="no nat on \"${on_if}\" from ${jaddr} to any"
@@ -223,13 +238,14 @@ nat_add_network()
 {
 	local _o
 	local ext_if="${EXT_IF}"
+	local ext_ip=
 	local opt_log=0 log_options=
 	local on_if="${ON_IF}"
 	local errlevel=0
 
-	while getopts ":e:l:o:" _o; do
+	while getopts ":e:I:l:o:" _o; do
 		case "${_o}" in
-			e|l|o)
+			e|I|l|o)
 				if lib_check_empty "${OPTARG}"; then
 					nat_usage
 					exit ${EX_USAGE}
@@ -240,6 +256,9 @@ nat_add_network()
 		case "${_o}" in
 			e)
 				ext_if="${OPTARG}"
+				;;
+			I)
+				ext_ip="${OPTARG}"
 				;;
 			l)
 				opt_log=1
@@ -287,13 +306,24 @@ nat_add_network()
 	local natdir="${NETWORKDIR}/${network_name}"
 	local nat_conf="${natdir}/${USE_FIREWALL}-nat.conf"
 
+	local ext_addr=
+	if lib_check_empty "${ext_ip}"; then
+		ext_addr="(\"${ext_if}:0\")"
+	else
+		if ! lib_check_addr "${ext_if}" "${ext_ip}"; then
+			lib_err ${EX_NOINPUT} "The IPv4 address ${ext_ip} is not found on the ${ext_if} interface."
+		fi
+
+		ext_addr="${ext_ip}"
+	fi
+
 	local raw_rule=
 	case "${USE_FIREWALL}" in
 		pf)
 			if [ ${opt_log} -eq 1 ]; then
-				raw_rule="nat log ${log_options} on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> (\"${ext_if}:0\")"
+				raw_rule="nat log ${log_options} on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> ${ext_addr}"
 			else
-				raw_rule="nat on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> (\"${ext_if}:0\")"
+				raw_rule="nat on \"${on_if}\" from ${network_addr}/${network_cidr} to any -> ${ext_addr}"
 			fi
 
 			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
@@ -1175,8 +1205,8 @@ nat_help()
 nat_usage()
 {
 	cat << EOF
-usage: nat add jail -n <network> [-e <interface>] [-l [-|<options>]]
-               [-o <interface>] <jail>
+usage: nat add jail -n <network> [-e <interface>] [-I <address>]
+               [-l [-|<options>]] [-o <interface>] <jail>
        nat add jail -N -n <network> [-e <interface>] [-o <interface>] <jail>
        nat get jail [-eHIpt] -n <network> <jail> [<keyword> ...]
        nat list jail [-eHIpt] [-n <network>] <jail> [<keyword> ...]
@@ -1185,8 +1215,8 @@ usage: nat add jail -n <network> [-e <interface>] [-l [-|<options>]]
        nat remove jail -n <network> <jail>
        nat status jail <jail>
 
-usage: nat add network [-e <interface>] [-l [-|<options>]] [-o <interface>]
-               <network>
+usage: nat add network [-e <interface>] [-I <address>] [-l [-|<options>]]
+               [-o <interface>] <network>
        nat boot [off|on] network <network>
        nat get network [-eHIpt] <network> [<keyword> ...]
        nat list network [-eHIpt] [-n <network>] [<keyword> ...]

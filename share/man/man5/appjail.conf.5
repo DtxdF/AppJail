@@ -498,6 +498,12 @@ Network interface or group name to transmit packets on.
 .br
 Default:
 .Em ${EXT_IF}
+.It EXT_IP
+Use this value as the specified IPv4 address. This is useful for the
+.Xr appjail-expose 1
+and
+.Xr appjail-nat 1
+commands. Note that this IPv4 address must exist in the specified external address.
 .It SHARED_BRIDGE
 Shared bridge to be created by the
 .Sy attach

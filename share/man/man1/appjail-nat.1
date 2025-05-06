@@ -37,6 +37,7 @@
 .Cm jail
 .Fl n Ar network
 .Op Fl e Ar interface
+.Op Fl I Ar address
 .Op Fl l Oo - Ns | Ns Ar options Oc
 .Op Fl o Ar interface
 .Ar jail
@@ -84,6 +85,7 @@
 .Cm add
 .Cm network
 .Op Fl e Ar interface
+.Op Fl I Ar address
 .Op Fl l Oo - Ns | Ns Ar options Oc
 .Op Fl o Ar interface
 .Ar network
@@ -135,7 +137,7 @@ apply a rule known as
 .Pp
 The options are as follows:
 .Bl -tag -width xxx
-.It Cm add Cm jail Fl n Ar network Oo Fl e Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar jail
+.It Cm add Cm jail Fl n Ar network Oo Fl e Ar interface Oc Oo Fl I Ar address Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar jail
 Configure a new rule to perform NAT.
 .Pp
 .Bl -tag -width xx
@@ -147,6 +149,11 @@ Interface to obtain the external IPv4 address. If not set, the interface specifi
 by the
 .Sy EXT_IF
 parameter is used.
+.It Fl I Ar address
+Use
+.Ar address
+as the external IPv4 address instead of the first matching IPv4 address. The IPv4
+address must exist on the specified external interface before executing this command.
 .It Fl l Oo - Ns | Ns Ar options Oc
 Firewall-specific logging options. Use a minus sign to enable logging, but without options.
 .It Fl o Ar interface
@@ -226,7 +233,7 @@ Load enabled rules configured by
 Remove the given rule.
 .It Cm status Cm jail Ar jail
 Shows the rule that is currently in use or an error if it is not yet applied.
-.It Cm add Cm network Oo Fl e Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar network
+.It Cm add Cm network Oo Fl e Ar interface Oc Oo Fl I Ar address Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl o Ar interface Oc Ar network
 Same as
 .Cm add
 .Cm jail

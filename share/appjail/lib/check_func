@@ -592,6 +592,78 @@ _lib_check_ifacegrp()
 	done
 }
 
+lib_check_addr()
+{
+	local iface="$1"
+	local addr="$2"
+
+	if [ -z "${iface}" -o -z "${addr}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_addr iface addr"
+	fi
+
+	local match
+	match=`_lib_check_addr "${iface}" "${addr}"`
+
+	if [ -n "${match}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_addr()
+{
+	local iface="$1"
+	local addr="$2"
+
+	if [ -z "${iface}" -o -z "${addr}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_addr iface addr"
+	fi
+
+	lib_network_getaddr "${iface}" | while IFS= read -r _addr; do
+		if [ "${addr}" = "${_addr}" ]; then
+			printf "%s\n" "${addr}"
+			break
+		fi
+	done
+}
+
+lib_check_addr6()
+{
+	local iface="$1"
+	local addr6="$2"
+
+	if [ -z "${iface}" -o -z "${addr6}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_addr6 iface addr6"
+	fi
+
+	local match
+	match=`_lib_check_addr6 "${iface}" "${addr6}"`
+
+	if [ -n "${match}" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+_lib_check_addr6()
+{
+	local iface="$1"
+	local addr6="$2"
+
+	if [ -z "${iface}" -o -z "${addr6}" ]; then
+		lib_err ${EX_USAGE} "usage: _lib_check_addr6 iface addr6"
+	fi
+
+	lib_network_getaddr6 "${iface}" | while IFS= read -r _addr6; do
+		if [ "${addr6}" = "${_addr6}" ]; then
+			printf "%s\n" "${addr6}"
+			break
+		fi
+	done
+}
+
 lib_check_iface()
 {
 	local iface="$1"

@@ -107,6 +107,7 @@ QUICK_OPTION_CONTAINER_BUILDAH_ARGS="${BUILDAH_FROM_ARGS}"
 QUICK_OPTION_CONTAINER_BOOT=0
 QUICK_OPTION_CONTAINER_EXPOSE=0
 QUICK_OPTION_CONTAINER_EXT_IF=
+QUICK_OPTION_CONTAINER_EXT_IP=
 QUICK_OPTION_CONTAINER_LOGOPTS=0
 QUICK_OPTION_CONTAINER_LOGOPTS_OPTS=
 QUICK_OPTION_CONTAINER_ON_IF=
@@ -418,7 +419,7 @@ quick_set_container()
 {
 	local params="$1"
 	if lib_check_empty "${params}"; then
-		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [args:buildah_args] [ext_if:external_interface] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
+		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [args:buildah_args] [ext_if:external_interface] [ext_ip:external_address] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
 	fi
 
 	params=`lib_split_jailparams "${params}"` || exit $?
@@ -457,6 +458,9 @@ quick_set_container()
 				;;
 			ext_if)
 				QUICK_OPTION_CONTAINER_EXT_IF="${value}"
+				;;
+			ext_ip)
+				QUICK_OPTION_CONTAINER_EXT_IP="${value}"
 				;;
 			logopts)
 				QUICK_OPTION_CONTAINER_LOGOPTS=1
@@ -654,6 +658,16 @@ quick_run_from()
 				expose_parameters="${expose_parameters} \"ext_if:${escape_ext_if}\""
 			fi
 
+			local ext_ip
+			ext_ip="${QUICK_OPTION_CONTAINER_EXT_IP}"
+
+			if [ -n "${ext_ip}" ]; then
+				local escape_ext_ip
+				escape_ext_ip=`lib_escape_string "${ext_ip}"`
+
+				expose_parameters="${expose_parameters} \"ext_ip:${escape_ext_ip}\""
+			fi
+
 			local on_if
 			on_if="${QUICK_OPTION_CONTAINER_ON_IF}"
 
@@ -818,6 +832,13 @@ quick_run_nat()
 		# ext_if
 		ext_if=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "ext_if"`
 		nat_add_cmd="${nat_add_cmd} -e \"${ext_if}\""
+		
+		# ext_ip
+		ext_ip=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "ext_ip"`
+
+		if ! lib_check_empty "${ext_ip}"; then
+			nat_add_cmd="${nat_add_cmd} -I \"${ext_ip}\""
+		fi
 
 		# logopts
 		use_logopts=`lib_keys_get "${QUICK_KEY_NAT}" "${network}" "use_logopts"`
@@ -869,6 +890,7 @@ quick_set_nat()
 
 	local network_name=
 	local ext_if=
+	local ext_ip=
 	local use_logopts=0 logopts=
 	local on_if=
 
@@ -887,6 +909,9 @@ quick_set_nat()
 		case "${parameter}" in
 			ext_if)
 				ext_if="${value}"
+				;;
+			ext_ip)
+				ext_ip="${value}"
 				;;
 			logopts)
 				use_logopts=1
@@ -929,6 +954,7 @@ quick_set_nat()
 	fi
 
 	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "ext_if" "${ext_if}"
+	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "ext_ip" "${ext_ip}"
 	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "use_logopts" "${use_logopts}"
 	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "logopts" "${logopts}"
 	lib_keys_set "${QUICK_KEY_NAT}" "${network_name}" "on_if" "${on_if}"
@@ -1173,6 +1199,13 @@ quick_run_expose()
 		ext_if=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "ext_if"`
 		expose_set_cmd="${expose_set_cmd} -i \"${ext_if}\""
 
+		# ext_ip
+		ext_ip=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "ext_ip"`
+
+		if ! lib_check_empty "${ext_ip}"; then
+			expose_set_cmd="${expose_set_cmd} -I \"${ext_ip}\""
+		fi
+
 		# logopts
 		use_logopts=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "use_logopts"`
 		if [ ${use_logopts} -eq 1 ]; then
@@ -1212,7 +1245,7 @@ quick_run_expose()
 		fi
 
 		# debugging
-		lib_debug "Setting expose rule#${nro}: network:${network} port:${port}/${proto} ext_if:${ext_if} logopts:${use_logopts} (${logopts}) on_if:${on_if} descr:${description}"
+		lib_debug "Setting expose rule#${nro}: network:${network} port:${port}/${proto} ext_if:${ext_if} ext_ip:${ext_ip} logopts:${use_logopts} (${logopts}) on_if:${on_if} descr:${description}"
 
 		# tail
 		expose_set_cmd="${expose_set_cmd} -- \"${QUICK_JAILNAME}\""
@@ -1240,7 +1273,7 @@ quick_set_expose()
 
 	params="$1"
 	if lib_check_empty "${params}"; then
-		lib_err ${EX_DATAERR} "expose syntax: hport[:jport] [descr:description] [ext_if:external_interface] [logopts:firewall_logopts] [network:network_name] [on_if:interface] [proto:protocol]"
+		lib_err ${EX_DATAERR} "expose syntax: hport[:jport] [descr:description] [ext_if:external_interface] [ext_ip:external_address] [logopts:firewall_logopts] [network:network_name] [on_if:interface] [proto:protocol]"
 	fi
 
 	local params
@@ -1253,6 +1286,7 @@ quick_set_expose()
 	local port=
 	local description=
 	local ext_if=
+	local ext_ip=
 	local use_logopts=0 logopts=
 	local proto=
 	local network_name=
@@ -1281,6 +1315,9 @@ quick_set_expose()
 				;;
 			ext_if)
 				ext_if="${value}"
+				;;
+			ext_ip)
+				ext_ip="${value}"
 				;;
 			logopts)
 				use_logopts=1
@@ -1347,6 +1384,7 @@ quick_set_expose()
 	lib_keys_mk "${QUICK_KEY_EXPOSE}"
 	nro=`lib_keys_append "${QUICK_KEY_EXPOSE}" "description" "${description}"`
 	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "ext_if" "${ext_if}"
+	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "ext_ip" "${ext_ip}"
 	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "use_logopts" "${use_logopts}"
 	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "logopts" "${logopts}"
 	lib_keys_set "${QUICK_KEY_EXPOSE}" "${nro}" "proto" "${proto}"

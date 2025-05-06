@@ -60,6 +60,7 @@
 .Fl p Ar hport Ns Op : Ns Ar jport
 .Op Op Fl E Ns | Ns Fl e
 .Op Op Fl t Ns | Ns Fl u
+.Op Fl I Ar address
 .Op Fl i Ar interface
 .Op Fl l Op - Ns | Ns Ar options
 .Op Fl N Ar name
@@ -147,7 +148,7 @@ Remove the rule specified by
 .Ar nro
 .Ns "."
 .El
-.It Cm set Fl k Ar network Fl p Ar hport Ns Oo : Ns Ar jport Oc Oo Oo Fl E Ns | Ns Fl e Oc Oc Oo Fl t Ns | Ns Fl u Oc Oo Fl i Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Oo Fl o Ar interface Oc Oc Ar jail
+.It Cm set Fl k Ar network Fl p Ar hport Ns Oo : Ns Ar jport Oc Oo Oo Fl E Ns | Ns Fl e Oc Oc Oo Fl t Ns | Ns Fl u Oc Oo Fl I Ar address Oc Oo Fl i Ar interface Oc Oo Fl l Oo - Ns | Ns Ar options Oc Oc Oo Fl N Ar name Oc Oo Fl n Oo Cm auto Ns | Ns Ar nro Oc Oc Oo Fl o Ar interface Oc Oc Ar jail
 Configure a new or existing rule.
 .Pp
 .Bl -tag -width xx
@@ -194,6 +195,11 @@ or UDP
 .Pq Fl u
 .Ns "."
 By default is TCP
+.It Fl I Ar address
+Use
+.Ar address
+as the external IPv4 address instead of the first matching IPv4 address. The IPv4
+address must exist on the specified external interface before executing this command.
 .It Fl i Ar interface
 Interface to obtain the external IPv4 address. If not set, the interface specified
 by the

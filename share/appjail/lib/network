@@ -117,5 +117,25 @@ lib_network_getinet6_from_jail()
 		lib_err ${EX_USAGE} "usage: lib_network_getinet6_from_jail jail"
 	fi
 
-	jexec -l "${jail}" ifconfig -f inet:cidr 2> /dev/null | grep -Ee 'inet6' | cut -d' ' -f2
+	jexec -l "${jail}" ifconfig -f inet:cidr 2> /dev/null | grep -Ee 'inet6 ' | cut -d' ' -f2
+}
+
+lib_network_getaddr()
+{
+	local iface="$1"
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_getaddr iface"
+	fi
+
+	ifconfig -- "${iface}" 2> /dev/null | grep -Ee 'inet ' | cut -d' ' -f2
+}
+
+lib_network_getaddr6()
+{
+	local iface="$1"
+	if [ -z "${iface}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_getaddr6 iface"
+	fi
+
+	ifconfig -- "${iface}" 2> /dev/null | grep -Ee 'inet6 ' | cut -d' ' -f2
 }

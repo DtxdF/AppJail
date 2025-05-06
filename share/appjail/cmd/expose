@@ -92,6 +92,7 @@ expose_get()
 
 	local flag_enabled=0
 	local flag_ext_if=0
+	local flag_ext_ip=0
 	local flag_hport=0
 	local flag_jport=0
 	local flag_name=0
@@ -205,7 +206,7 @@ expose_get()
 					value=`head -1 -- "${basedir}/${USE_FIREWALL}-rule"`
 				fi
 				;;
-			enabled|ext_if|hport|jport|name|network_name|on_if|protocol)
+			enabled|ext_if|ext_ip|hport|jport|name|network_name|on_if|protocol)
 				if [ -f "${basedir}/${keyword}" ]; then
 					value=`head -1 -- "${basedir}/${keyword}"`
 				fi
@@ -469,6 +470,7 @@ expose_set()
 	local opt_enabled=
 	local opt_tcp=0
 	local opt_udp=0
+	local ext_ip="${EXT_IP}"
 	local ext_if=
 	local network_name=
 	local opt_name=0 name=
@@ -478,9 +480,9 @@ expose_set()
 	local ports=
 	local protocol=
 
-	while getopts ":Eetui:k:l:N:n:o:p:" _o; do
+	while getopts ":EetuI:i:k:l:N:n:o:p:" _o; do
 		case "${_o}" in
-			i|k|l|n|o|p)
+			I|i|k|l|n|o|p)
 				if lib_check_empty "${OPTARG}"; then
 					expose_usage
 					exit ${EX_USAGE}
@@ -500,6 +502,9 @@ expose_set()
 				;;
 			u)
 				opt_udp=1
+				;;
+			I)
+				ext_ip="${OPTARG}"
 				;;
 			i)
 				ext_if="${OPTARG}"
@@ -678,13 +683,24 @@ expose_set()
 		index=$((index+1))
 	done
 
+	local ext_addr=
+	if lib_check_empty "${ext_ip}"; then
+		ext_addr="(\"${ext_if}:0\")"
+	else
+		if ! lib_check_addr "${ext_if}" "${ext_ip}"; then
+			lib_err ${EX_NOINPUT} "The IPv4 address ${ext_ip} is not found on the ${ext_if} interface."
+		fi
+
+		ext_addr="${ext_ip}"
+	fi
+
 	local raw_rule=
 	case "${USE_FIREWALL}" in
 		pf)
 			if [ ${opt_log} -eq 1 ]; then
-				raw_rule="rdr pass log ${log_options} on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port ${hport} -> ${jaddr} port ${jport}"
+				raw_rule="rdr pass log ${log_options} on \"${on_if}\" inet proto ${protocol} from any to ${ext_addr} port ${hport} -> ${jaddr} port ${jport}"
 			else
-				raw_rule="rdr pass on \"${on_if}\" inet proto ${protocol} from any to (\"${ext_if}:0\") port ${hport} -> ${jaddr} port ${jport}"
+				raw_rule="rdr pass on \"${on_if}\" inet proto ${protocol} from any to ${ext_addr} port ${hport} -> ${jaddr} port ${jport}"
 			fi
 
 			if ! printf "%s\n" "${raw_rule}" | pfctl -nf -; then
@@ -721,6 +737,7 @@ expose_set()
 	printf "%s\n" "${protocol}" > "${basedir}/protocol" || exit ${EX_IOERR}
 	printf "%s\n" "${ext_if}" > "${basedir}/ext_if" || exit ${EX_IOERR}
 	printf "%s\n" "${on_if}" > "${basedir}/on_if" || exit ${EX_IOERR}
+	printf "%s\n" "${ext_ip}" > "${basedir}/ext_ip" || exit ${EX_IOERR}
 }
 
 expose_status()
@@ -771,8 +788,8 @@ usage: expose get [-eHIipt] -n <nro> <jail> [<keyword> ...]
        expose on <jail>
        expose remove [all|nro <nro>] <jail>
        expose set -k <network> -p <hport>[:<jport>] [[-E|-e]] [[-t|-u]]
-               [-i <interface>] [-l [-|<options>]] [-N <name>] [-n [auto|<nro>]]
-	       [-o <interface>] <jail>
+               [-I <address>] [-i <interface>] [-l [-|<options>]] [-N <name>]
+	       [-n [auto|<nro>]] [-o <interface>] <jail>
        expose status <jail>
 EOF
 }
