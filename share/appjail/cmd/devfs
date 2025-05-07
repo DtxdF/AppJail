@@ -877,7 +877,7 @@ devfs_help()
 devfs_usage()
 {
     cat << EOF
-usage: devfs append <jail>
+usage: devfs append <jail> <file>
        devfs apply [-r [auto|<ruleset>]] <jail> [<rulenum>|<rulespec> ...]
        devfs applyset [-r [auto|<ruleset>]] <jail>
        devfs del <jail> <rulenum>

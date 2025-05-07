@@ -35,7 +35,7 @@
 .Nm appjail devfs
 .Cm append
 .Ar jail
-.AR file
+.Ar file
 .Nm appjail devfs
 .Cm apply
 .Op Fl r Oo Cm auto Ns | Ns Ar ruleset Oc
@@ -134,7 +134,7 @@ parameter.
 The options are as follows:
 .Pp
 .Bl -tag -width xxx
-.It Cm append Ar jail
+.It Cm append Ar jail Ar file
 Read a file line by line to add new rules. This subcommand calls the
 .Cm set
 subcommand to add a rule for each line.
