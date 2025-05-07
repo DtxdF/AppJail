@@ -117,7 +117,11 @@ Use
 .Cm all
 to run a command on all jails or
 .Cm jail
-to run a command on a single jail.
+to run a command on a single jail. If the
+.Fl e
+parameter of
+.Cm all
+is specified, this command exits when an error is detected.
 .Pp
 When no command is specified, the default is
 .Cm list Ns , but of course you must use it explicitly if you want to use any of its arguments.
