@@ -957,7 +957,7 @@ usage: fstab [all [-e]|jail <jail>] compile
        fstab [all [-e]|jail <jail>] [list] [-eHIpt] [-n <nro>] [<keyword> ...]
        fstab [all [-e]|jail <jail>] mounted
        fstab [all [-e]|jail <jail>] mount [<args> ...]
-       fstab [all [-e]|jail <jail>] remove [all|jail <jail>]
+       fstab [all [-e]|jail <jail>] remove [all|nro <nro>]
        fstab [all [-e]|jail <jail>] set -d <device> -m <mountpoint> [-E|-e]
                [-p] [-D <dump>] [-N <name>] [-n [auto|<nro>]] [-o <options>] [-P <pass>]
 	       [-t <type>]
