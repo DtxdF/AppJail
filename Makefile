@@ -71,6 +71,7 @@ install: utils-strip
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail"
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc"
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc/rc.d"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/etc/bash_completion.d"
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}"
 	# Sections used by manual pages.
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man1"
@@ -88,6 +89,9 @@ install: utils-strip
 	${INSTALL} -m 555 etc/rc.d/${rc_script}.sh "${DESTDIR}${PREFIX}/etc/rc.d/${rc_script}"
 	${SED} -i '' -e 's|%%PREFIX%%|${PREFIX}|' "${DESTDIR}${PREFIX}/etc/rc.d/${rc_script}"
 .endfor
+
+	# completion scripts.
+	${INSTALL} -m 555 share/appjail/scripts/appjail-completion.bash "${DESTDIR}${PREFIX}/etc/bash_completion.d/_appjail.bash"
 
 	# Main script.
 	${INSTALL} -m 555 appjail.sh "${DESTDIR}${PREFIX}/bin/appjail"
