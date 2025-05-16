@@ -1546,7 +1546,7 @@ _network_chk_network()
 	_network_chk_basicnet "${network_name}"
 	
 	if ! lib_check_iface "${network_name}"; then
-		lib_err ${EX_NOINPUT} "The ${network_name} network does not exist."
+		lib_err ${EX_NOINPUT} "The ${network_name} bridge does not exist."
 	fi
 
 	if ! lib_check_ifacegrp "${network_name}" "${DEFAULT_NETWORK_GRPBRG}"; then
