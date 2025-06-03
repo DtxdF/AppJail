@@ -739,10 +739,10 @@ fstab_set()
 
 		case "${_o}" in
 			E)
-				opt_enabled=0
+				opt_enabled=1
 				;;
 			e)
-				opt_enabled=1
+				opt_enabled=0
 				;;
 			p)
 				opt_path_traversal=0
