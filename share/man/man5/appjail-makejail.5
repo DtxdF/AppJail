@@ -254,7 +254,7 @@ and
 can use a temporary Makejail defined by
 .Cm GLOBAL Ns "."
 .Pp
-.It Cm FROM Oo Fl Fl ajspec Ar name Oc Oo Fl Fl entrypoint Oo Ar entrypoint Ns | Ns Cm none Oc Oc Oo Fl Fl platform Ar platform Oc Ar image Ns Oo : Ns Ar tag Oc
+.It Cm FROM Oo Fl Fl ajspec Ar name Oc Oo Fl Fl branch Ar branch Oc Oo Fl Fl entrypoint Oo Ar entrypoint Ns | Ns Cm none Oc Oc Oo Fl Fl platform Ar platform Oc Ar image Ns Oo : Ns Ar tag Oc
 Import an image to create a jail.
 .Pp
 .Fl Fl ajspec No is equivalent to Xr appjail-image 1 Cm import Fl N Ns "."
@@ -268,6 +268,8 @@ describes. If set to
 it is assumed that the image is currently installed, so this instruction will not
 attempt to download it. See
 .Xr appjail-image 1 Cm import No for more details.
+.Pp
+.Fl Fl branch No is equivalent to Xr appjail-image 1 Cm import Fl b Ns "."
 .Pp
 .Fl Fl platform No is equivalent to Xr appjail-image 1 Cm import Fl a Ns "."
 .Pp
@@ -459,10 +461,12 @@ sign.
 .It Cm cmd Ns + Ns Ar command Oo Ar args No "..." Oc
 Use the output of a command as the Makejail file.
 .Pp
-.It Cm git Ns + Ns Ar url Oo Fl Fl baseurl Ar url Oc Oo Fl Fl cachedir Oc Oo Fl Fl file Ar makejail Oc Oo Fl Fl global Ns | Ns Fl Fl local Oo Fl Fl cachedir Ar directory Oc Ns | Ns Fl Fl tmp Oc
+.It Cm git Ns + Ns Ar url Oo Fl Fl baseurl Ar url Oc Oo Fl Fl branch Ar branch Oc Oo Fl Fl file Ar makejail Oc Oo Fl Fl global Ns | Ns Fl Fl local Oo Fl Fl cachedir Ar directory Oc Ns | Ns Fl Fl tmp Oc
 Clone a
 .Xr git 1
-repository. With
+repository.
+.Pp
+With
 .Fl Fl global Ns ,
 the
 .Xr git 1
@@ -489,6 +493,10 @@ which by default is
 is executed.
 .Pp
 .Fl Fl basedir No is intended for other git-like methods.
+.Pp
+By default no branch is specified, but with
+.Fl Fl branch
+you can specify a specific branch.
 .Pp
 This instruction requires that
 .Em devel/git

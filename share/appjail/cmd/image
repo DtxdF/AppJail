@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -302,13 +302,14 @@ image_import()
 	local _o
 	local opt_force=0
 	local arch="host"
+	local branch=
 	local ajspec_name="${IMAGE_DEFAULT_AJSPEC}"
 	local name=
 	local tag="${IMAGE_TAG}"
 
-	while getopts ":fa:N:n:t:" _o; do
+	while getopts ":fa:b:N:n:t:" _o; do
 		case "${_o}" in
-			a|N|n|t)
+			a|b|N|n|t)
 				if lib_check_empty "${OPTARG}"; then
 					image_usage
 					exit ${EX_USAGE}
@@ -322,6 +323,9 @@ image_import()
 				;;
 			a)
 				arch="${OPTARG}"
+				;;
+			b)
+				branch="${OPTARG}"
 				;;
 			N)
 				ajspec_name="${OPTARG}"
@@ -351,7 +355,7 @@ image_import()
 	fi
 
 	local ajspec_file
-	ajspec_file=`_image_getajspec "${ajspec}" "${ajspec_name}"` || exit $?
+	ajspec_file=`_image_getajspec "${ajspec}" "${ajspec_name}" "${branch}"` || exit $?
 
 	if ! _image_chktag "${tag}" "${ajspec_file}"; then
 		lib_err ${EX_NOINPUT} "Cannot find tag \`${tag}\`"
@@ -569,7 +573,7 @@ _image_chkarch()
 
 _image_getajspec()
 {
-	local ajspec="$1" ajspec_name="$2"
+	local ajspec="$1" ajspec_name="$2" branch="$3"
 	if [ -z "${ajspec}" -o -z "${ajspec_name}" ]; then
 		image_usage
 		exit ${EX_USAGE}
@@ -616,8 +620,16 @@ _image_getajspec()
 
 	lib_atexit_add "rm -f \"${escape_output}\""
 
-	_image_getajspec_${method} "${file}" "${ajspec_name}" > "${output}" &&
-		printf "%s\n" "${output}"
+	case "${method}" in
+		git|github|github_ssh|gitlab|gitlab_ssh)
+			_image_getajspec_${method} "${file}" "${ajspec_name}" "${branch}" > "${output}" &&
+			printf "%s\n" "${output}"
+			;;
+		*)
+			_image_getajspec_${method} "${file}" "${ajspec_name}" > "${output}" &&
+			printf "%s\n" "${output}"
+			;;
+	esac
 }
 
 _image_getajspec_cmd()
@@ -631,7 +643,7 @@ _image_getajspec_cmd()
 
 _image_getajspec_git()
 {
-	local repo="$1" ajspec="$2"
+	local repo="$1" ajspec="$2" branch="$3"
 
 	if ! which -s "git"; then
 		lib_err ${EX_UNAVAILABLE} "git(1) is not installed. Cannot continue ..."
@@ -649,7 +661,11 @@ _image_getajspec_git()
 
 	local errlevel
 
-	git clone --depth 1 -q -o origin -- "${repo}" "${repodir}" >&2
+	if [ -z "${branch}" ]; then
+		git clone --depth 1 -q -o origin -- "${repo}" "${repodir}" >&2
+	else
+		git clone --depth 1 -q -o origin -b "${branch}" -- "${repo}" "${repodir}" >&2
+	fi
 
 	errlevel=$?
 	if [ ${errlevel} -ne 0 ]; then
@@ -742,30 +758,30 @@ _image_getajspec_file()
 
 _image_getajspec_github()
 {
-	local repo="$1" ajspec="$2"
+	local repo="$1" ajspec="$2" branch="$3"
 
-	_image_getajspec_git "https://github.com/${repo}" "${ajspec}"
+	_image_getajspec_git "https://github.com/${repo}" "${ajspec}" "${branch}"
 }
 
 _image_getajspec_github_ssh()
 {
-	local repo="$1" ajspec="$2"
+	local repo="$1" ajspec="$2" branch="$3"
 
-	_image_getajspec_git "git@github.com:${repo}" "${ajspec}"
+	_image_getajspec_git "git@github.com:${repo}" "${ajspec}" "${branch}"
 }
 
 _image_getajspec_gitlab()
 {
-	local repo="$1" ajspec="$2"
+	local repo="$1" ajspec="$2" branch="$3"
 
-	_image_getajspec_git "https://gitlab.com/${repo}" "${ajspec}"
+	_image_getajspec_git "https://gitlab.com/${repo}" "${ajspec}" "${branch}"
 }
 
 _image_getajspec_gitlab_ssh()
 {
-	local repo="$1" ajspec="$2"
+	local repo="$1" ajspec="$2" branch="$3"
 
-	_image_getajspec_git "git@gitlab.com:${repo}" "${ajspec}"
+	_image_getajspec_git "git@gitlab.com:${repo}" "${ajspec}" "${branch}"
 }
 
 image_jail()

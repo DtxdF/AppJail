@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,8 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err - "usage: FROM [--ajspec <name>] [--entrypoint [<entrypoint>|none]] [--platform"
-		lib_err - "               <platform>] <image>[:<tag>]"
+		lib_err - "usage: FROM [--ajspec <name>] [--branch <branch>] [--entrypoint [<entrypoint>|none]]"
+		lib_err - "            [--platform <platform>] <image>[:<tag>]"
 		exit ${EX_USAGE}
 	fi
 
@@ -51,6 +51,7 @@ main()
 	
 	# Options
 	local ajspec=".ajspec"
+	local branch=
 	local entrypoint=
 	local platform="${IMAGE_ARCH}"
 	
@@ -72,7 +73,7 @@ main()
 
 		local optarg=
 		case "${arg}" in
-			--ajspec|--entrypoint|--platform)
+			--ajspec|--branch|--entrypoint|--platform)
 				current_index=$((current_index+1))
 				if [ ${current_index} -eq ${total_items} ]; then
 					main # usage
@@ -88,6 +89,9 @@ main()
 		case "${arg}" in
 			--ajspec)
 				ajspec="${optarg}"
+				;;
+			--branch)
+				branch="${optarg}"
 				;;
 			--entrypoint)
 				entrypoint="${optarg}"
@@ -161,7 +165,15 @@ main()
 		ajspec=`lib_escape_string "${ajspec}" "" "${escape_chars}"`
 		entrypoint=`lib_escape_string "${entrypoint}" "" "${escape_chars}"`
 
-		echo "\"\${APPJAIL_SCRIPT}\" image import -a \"${platform}\" -N "${ajspec}" -n \"${escape_name}\" -t \"${tag}\" -- \"${entrypoint}\""
+		printf "%s " "\"\${APPJAIL_SCRIPT}\" image import -a \"${platform}\" -N "${ajspec}" -n \"${escape_name}\" -t \"${tag}\""
+
+		if [ -n "${branch}" ]; then
+			branch=`lib_escape_string "${branch}" "" "${escape_chars}"`
+
+			printf "%s " "-b \"${branch}\""
+		fi
+
+		printf "%s\n" "-- \"${entrypoint}\""
 	fi
 }
 

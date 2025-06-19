@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -304,10 +304,8 @@ makejail_delete()
 		makejail_delete # usage
 	fi
 
-	if ! lib_check_hexnumber "${repoid}"; then
-		lib_err ${EX_DATAERR} -- "${repoid}: invalid ID."
-	fi
-	
+	repoid=`_get_repoid "${repoid}"` || exit $?
+
 	local use_glob="*"
 	if [ ${opt_exact_match} -eq 1 ]; then
 		use_glob=
@@ -338,6 +336,40 @@ makejail_delete()
 		done
 		exit ${EX_NOPERM}
 	fi
+}
+
+_get_repoid()
+{
+	local repoid
+
+	repoid="$1"
+	if [ -z "${repoid}" ]; then
+		lib_err ${EX_USAGE} "usage: _get_repoid repoid"
+	fi
+
+	local branch=`lib_jailparam_name "${repoid}" "+"`
+	local hexid=`lib_jailparam_value "${repoid}" "+"`
+
+	if lib_check_empty "${hexid}"; then
+		hexid="${branch}"
+		branch=
+	fi
+
+	if ! lib_check_hexnumber "${hexid}"; then
+		lib_err ${EX_DATAERR} -- "${hexid}: invalid ID."
+	fi
+
+	repoid="${hexid}"
+
+	if ! lib_check_empty "${branch}"; then
+		if lib_check_ispath "${branch}"; then
+			lib_err ${EX_DATAERR} -- "${branch}: invalid branch."
+		fi
+
+		repoid="${branch}+${repoid}"
+	fi
+	
+	printf "%s\n" "${repoid}"
 }
 
 makejail_list()
@@ -391,10 +423,8 @@ makejail_update()
 	if [ "${repoid}" = "*" ]; then
 		opt_match_all=1
 		repoid=
-	fi
-
-	if [ ${opt_match_all} -eq 0 ] && ! lib_check_hexnumber "${repoid}"; then
-		lib_err ${EX_DATAERR} -- "${repoid}: invalid ID."
+	else
+		repoid=`_get_repoid "${repoid}"` || exit $?
 	fi
 
 	local use_glob="*"
@@ -1468,7 +1498,9 @@ makejail_getinclude_git()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: INCLUDE git+<url> [--baseurl <url>] [--file <makejail>] [--global|--local [--cachedir <directory>]|--tmp]"
+		lib_err - "usage: INCLUDE git+<url> [--baseurl <url>] [--branch <branch>] [--file <makejail>]"
+		lib_err - "                   [--global|--local [--cachedir <directory>]|--tmp]"
+		exit ${EX_USAGE}
 	fi
 
 	# Arguments
@@ -1489,6 +1521,7 @@ makejail_getinclude_git()
 	# options
 	local gitdir
 	local makejail_filename="${DEFAULT_MAKEJAIL_FILE}"
+	local branch=
 	local global=1
 	local local=0
 	local tmp=0
@@ -1503,7 +1536,7 @@ makejail_getinclude_git()
 
 		local optarg=
 		case "${arg}" in
-			--baseurl|--cachedir|--file)
+			--baseurl|--branch|--cachedir|--file)
 				current_index=$((current_index+1))
 				if [ ${current_index} -eq ${total_items} ]; then
 					makejail_getinclude_git # usage
@@ -1528,6 +1561,9 @@ makejail_getinclude_git()
 				;;
 			--baseurl)
 				url="${optarg}${url}"
+				;;
+			--branch)
+				branch="${optarg}"
 				;;
 			--cachedir)
 				cachedir="${optarg}"
@@ -1571,20 +1607,24 @@ makejail_getinclude_git()
 		fi
 	fi
 
-	_makejail_git_clone "${url}" "${gitdir}" "${makejail_filename}"
+	_makejail_git_clone "${url}" "${gitdir}" "${makejail_filename}" "${branch}"
 }
 
 _makejail_git_clone()
 {
-	local url="$1" gitdir="$2" mk_file="$3"
+	local url="$1" gitdir="$2" mk_file="$3" branch="$4"
 	if [ -z "${url}" -o -z "${gitdir}" -o -z "${mk_file}" ]; then
-		lib_err ${EX_USAGE} "_makejail_git_clone url gitdir mk_file"
+		lib_err ${EX_USAGE} "_makejail_git_clone url gitdir mk_file [branch]"
 	fi
 
 	_makejail_check_git # check
 
 	local reponame
 	reponame=`lib_mksum_str "${url}"`
+
+	if [ -n "${branch}" ]; then
+		reponame="${branch}+${reponame}"
+	fi
 
 	local repodir
 	repodir="${gitdir}/${reponame}"
@@ -1595,6 +1635,7 @@ _makejail_git_clone()
 		"${SCRIPTSDIR}/git.sh" \
 			-f "${CONFIG}" \
 			-r "${repodir}" \
+			-b "${branch}" \
 			-u "${url}"
 
 	errlevel=$?

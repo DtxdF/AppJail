@@ -48,6 +48,7 @@
 .Cm import
 .Op Fl f
 .Op Fl a Ar arch
+.Op Fl b Ar branch
 .Op Fl N Ar ajspec-name
 .Op Fl n Ar image-name
 .Op Fl t Ar tag
@@ -171,7 +172,7 @@ Columnate the list.
 .It Fl t
 Tabulate columns and values.
 .El
-.It Cm import Oo Fl f Oc Oo Fl a Ar arch Oc Oo Fl N Ar ajspec-name Oc Oo Fl n Ar image-name Oc Oo Fl t Ar tag Oc Oo Ar method Ns + Oc Ns Ar path
+.It Cm import Oo Fl f Oc Oo Fl a Ar arch Oc Oo Fl b Ar branch Oc Oo Fl N Ar ajspec-name Oc Oo Fl n Ar image-name Oc Oo Fl t Ar tag Oc Oo Ar method Ns + Oc Ns Ar path
 Import an image using an
 .Sy AJSPEC
 file.
@@ -204,6 +205,10 @@ keyword instead of simply using the
 .Sy IMAGE_ARCH
 parameter is for those Makejails that use an image that supports multiple architectures,
 but want to use the host platform instead of a hardcoded one, perhaps via an argument.
+.It Fl b Ar branch
+When using a git-like method to get the
+.Xr appjail-ajspec 5
+file, this parameter specifies the branch to use. By default no branch is specified.
 .It Fl N Ar ajspec-name
 For the
 .Sy git

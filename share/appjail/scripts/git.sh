@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,14 +32,18 @@ main()
 {
 	local _o
 	local opt_force_updates=0
+	local branch
 	local config
 	local repodir
 	local url
 
-	while getopts ":Ff:r:u:" _o; do
+	while getopts ":Fb:f:r:u:" _o; do
 		case "${_o}" in
 			F)
 				opt_force_updates=1
+				;;
+			b)
+				branch="${OPTARG}"
 				;;
 			f)
 				config="${OPTARG}"
@@ -74,13 +78,17 @@ main()
 	if [ ! -d "${repodir}" ]; then
 		lib_debug "Cloning ${url} as ${repodir} ..."
 
-		git clone -q -o origin -- "${url}" "${repodir}" >&2
+		if [ -z "${branch}" ]; then
+			git clone -q -o origin -- "${url}" "${repodir}" >&2
+		else
+			git clone -q -o origin -b "${branch}" -- "${url}" "${repodir}" >&2
+		fi
 	else
 		if [ ${opt_force_updates} -eq 1 ] || [ "${AUTO_GIT_UPDATE}" != 0 ]; then
 			lib_debug "Updating ${repodir} ..."
 
-			git -C "${repodir}" fetch -q origin >&2 &&
-			git -C "${repodir}" reset -q --hard origin >&2
+			git -C "${repodir}" reset -q --hard origin >&2 &&
+			git -C "${repodir}" pull -q >&2
 		else
 			local repoid
 			repoid=`basename -- "${repodir}"` || exit $?
