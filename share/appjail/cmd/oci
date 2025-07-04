@@ -827,6 +827,11 @@ oci_mount()
 		fi
 	fi
 
+	local tflag=
+	if [ "${ENABLE_ZFS}" != 0 ]; then
+		tflag="-t nozfs"
+	fi
+
 	local mounted
 	mounted=`lib_mountpoint_mounted -F "%2 -> %1" ${tflag} "${jaildir}"`
 	if [ -n "${mounted}" ]; then
