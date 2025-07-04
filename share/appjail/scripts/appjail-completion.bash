@@ -113,6 +113,7 @@ container_pid \
 created \
 devfs_ruleset \
 dirty \
+ephemeral \
 hostname \
 inet \
 inet6 \
