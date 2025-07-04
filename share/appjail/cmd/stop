@@ -281,7 +281,7 @@ stop_main()
 
 		"${APPJAIL_PROGRAM}" jail destroy -Rf -- "${jail_name}"
 
-		exit $?
+		return $?
 	fi
 }
 
