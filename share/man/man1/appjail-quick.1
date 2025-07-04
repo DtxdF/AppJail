@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -537,6 +537,28 @@ to work without problems.
 .It
 .Cm dhcp Ns = Ns Qo ng0_nginx Qc
 .El
+.It Cm ephemeral
+.Pp
+Mark jail as ephemeral.
+.Pp
+An ephemeral jail is destroyed when
+.Xr appjail-start 1
+or
+.Xr appjail-stop 1
+is executed. Jails marked as ephemeral are very useful for quick tasks
+.Po e.g. compiling software Pc Ns "."
+.Pp
+Note that when destroying an ephemeral jail, the
+.Fl f
+and
+.Fl R
+flags are used by the
+.Xr appjail-jail 1 Cm destroy
+command.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
 .It Cm empty
 .Pp
 Create an empty jail.

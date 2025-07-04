@@ -1616,11 +1616,48 @@ jail_mark()
 	fi
 
 	case "${entity}" in
-		clean|dirty|locked|unlocked) ;;
+		clean|dirty|ephemeral|locked|unlocked|permanent) ;;
 		*) jail_usage; exit ${EX_USAGE} ;;
 	esac
 
 	jail_mark_${entity} "$@"
+}
+
+jail_mark_ephemeral()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local lifetimedir="${JAILDIR}/${jail_name}/conf/boot/lifetime"
+	if ! mkdir -p "${lifetimedir}"; then
+		lib_err ${EX_IOERR} "Error creating ${lifetimedir}"
+	fi
+
+	if [ -f "${lifetimedir}/ephemeral" ]; then
+		return 0
+	fi
+
+	lib_debug "Converting ${jail_name} to an ephemeral jail ..."
+
+	touch -- "${lifetimedir}/ephemeral"
+}
+
+jail_mark_permanent()
+{
+	local jail_name="$1"
+
+	_basic_chk_jail "${jail_name}"
+
+	local lifetimedir="${JAILDIR}/${jail_name}/conf/boot/lifetime"
+
+	if [ ! -f "${lifetimedir}/ephemeral" ]; then
+		return 0
+	fi
+
+	lib_debug "Converting ${jail_name} to a permanent jail ..."
+
+	rm -f -- "${lifetimedir}/ephemeral"
 }
 
 jail_mark_clean()
@@ -1704,6 +1741,7 @@ jail_get()
 	local flag_created=0
 	local flag_dirty=0
 	local flag_devfs_ruleset=0
+	local flag_ephemeral=0
 	local flag_hostname=0
 	local flag_inet=0
 	local flag_inet6=0
@@ -1938,6 +1976,19 @@ jail_get()
 				fi
 
 				flag_devfs_ruleset=1
+				;;
+			ephemeral)
+				if [ ${flag_ephemeral} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/lifetime/ephemeral" ]; then
+					value=1
+				else
+					value=0
+				fi
+
+				flag_ephemeral=1
 				;;
 			hostname)
 				if [ ${flag_hostname} -eq 1 ]; then
@@ -2767,6 +2818,7 @@ usage: jail boot [off|on] <jail>
        jail get [-eHIpt] <jail> [<keyword> ...]
        jail list [-eHIpt] [-j <jail>] [<keyword> ...]
        jail mark [clean|dirty] <jail>
+       jail mark [ephemeral|permanent] <jail>
        jail mark [locked|unlocked] <jail>
        jail priority -p <priority> <jail>
        jail rename <jail> <new-name>

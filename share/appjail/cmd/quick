@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -121,6 +121,7 @@ QUICK_OPTION_DEFNET=
 QUICK_OPTION_DEVFS_RULESET=
 QUICK_OPTION_DEVICE=0
 QUICK_OPTION_DHCP=0
+QUICK_OPTION_EPHEMERAL=0
 QUICK_OPTION_EMPTY=0
 QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
@@ -218,7 +219,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -302,7 +303,7 @@ quick_main()
 	# Options that are executed after starting the jail.
 
 	local other_options
-	other_options="pkg"
+	other_options="ephemeral pkg"
 
 	for option in ${other_options}; do
 		quick_run_${option}
@@ -3926,6 +3927,18 @@ quick_set_copy()
 
 	QUICK_OPTION_INSTALL_METHOD="copy=${jail2copy}"
 	QUICK_OPTION_COPY=1
+}
+
+quick_set_ephemeral()
+{
+	QUICK_OPTION_EPHEMERAL=1
+}
+
+quick_run_ephemeral()
+{
+	if [ ${QUICK_OPTION_EPHEMERAL} -eq 1 ]; then
+		appjail jail mark ephemeral "${QUICK_JAILNAME}" || exit $?
+	fi
 }
 
 quick_set_empty()

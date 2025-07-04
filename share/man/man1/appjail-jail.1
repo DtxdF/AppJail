@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -65,6 +65,10 @@
 .Nm appjail jail
 .Cm mark
 .Op Cm clean Ns | Ns Cm dirty
+.Ar jail
+.Nm appjail jail
+.Cm mark
+.Op Cm ephemeral Ns | Ns Cm permanent
 .Ar jail
 .Nm appjail jail
 .Cm mark
@@ -223,6 +227,23 @@ and its subcommands are free to treat the target jail as incomplete and error-pr
 the
 .Cm clean
 subcommand, and so on.
+.It Cm mark Oo Cm ephemeral Ns | Ns Cm permanent Oc Ar jail
+Mark jail as ephemeral.
+.Pp
+An ephemeral jail is destroyed when
+.Xr appjail-start 1
+or
+.Xr appjail-stop 1
+is executed. Jails marked as ephemeral are very useful for quick tasks
+.Po e.g. compiling software Pc Ns "."
+.Pp
+Note that when destroying an ephemeral jail, the
+.Fl f
+and
+.Fl R
+flags are used by the
+.Cm destroy
+subcommand.
 .It Cm mark Oo Cm locked Ns | Ns Cm unlocked Oc Ar jail
 Used by
 .Xr appjail-start 1

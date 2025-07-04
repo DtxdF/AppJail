@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -153,7 +153,18 @@ start_main()
 		local escape_ajprog
 		escape_ajprog=`lib_escape_string "${APPJAIL_PROGRAM}"`
 
-		lib_atexit_add "\"${escape_ajprog}\" jail mark unlocked \"${jail_name}\""
+		lib_atexit_add "\"${escape_ajprog}\" jail mark unlocked \"${jail_name}\" > /dev/null 2>&1"
+	fi
+
+	local ephemeral
+	ephemeral=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail_name}" ephemeral` || exit $?
+
+	if [ ${ephemeral} -eq 1 ]; then
+		lib_debug "Destroying ephemeral jail ..."
+
+		"${APPJAIL_PROGRAM}" jail destroy -Rf -- "${jail_name}"
+
+		exit $?
 	fi
 
 	lib_info "Starting ${jail_name}..."
