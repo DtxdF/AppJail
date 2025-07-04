@@ -2508,6 +2508,12 @@ _jail_chkjfolder()
 		fi
 	fi
 
+	if [ "${TRY_UMOUNT}" != 0 ]; then
+		if ! lib_mountpoint_umount "${JAILDIR}/${jail_name}/jail"; then
+			lib_warn "An error occurred while trying to unmount the file system mounted on '${JAILDIR}/${jail_name}/jail'"
+		fi
+	fi
+
 	local tflag=
 	if [ "${ENABLE_ZFS}" != 0 ]; then
 		tflag="-t nozfs"

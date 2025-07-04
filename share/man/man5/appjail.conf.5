@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -1347,6 +1347,18 @@ See
 .br
 Default:
 .Em doas
+.It TRY_UMOUNT
+Attempts to unmount any mounted file systems detected by AppJail in some operations.
+.Pp
+For example, AppJail tries to check for mounted file systems on
+.Xr appjail-start 1 Ns ,
+and warns you if so. In some cases this is a simple warning, but it may not be
+desirable to mount a file system on another file system. Or there are even cases
+where AppJail does not warn you but issues an error, such as when trying to mount
+the base directory for thinjails.
+.Pp
+Default:
+.Em 1
 .El
 .Sh FILES
 .Pa %%PREFIX%%/etc/appjail/appjail.conf

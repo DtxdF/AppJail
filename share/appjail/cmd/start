@@ -680,6 +680,12 @@ start_jail()
 				lib_err ${EX_SOFTWARE} "The base directory (${basedir}) does not exist."
 			fi
 
+			if [ "${TRY_UMOUNT}" != 0 ]; then
+				if ! lib_mountpoint_umount "${jail_path}/jail"; then
+					lib_warn "An error occurred while trying to unmount the file system mounted on '${jail_path}/jail'"
+				fi
+			fi
+
 			local tflag=
 			if [ "${ENABLE_ZFS}" != 0 ]; then
 				tflag="-t nozfs"
