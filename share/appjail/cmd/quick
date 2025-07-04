@@ -348,7 +348,18 @@ quick_create_jail()
 		if [ "${QUICK_OPTION_OVERWRITE}" != 0 ]; then
 			lib_warn "Trying to remove ${QUICK_JAILNAME} ..."
 
-			appjail stop -- "${QUICK_JAILNAME}" || exit $?
+			local ephemeral
+			ephemeral=`"${APPJAIL_PROGRAM}" jail get -I -- "${QUICK_JAILNAME}" ephemeral` || exit $?
+
+			local status
+
+			appjail status -q -- "${QUICK_JAILNAME}"
+
+			status=$?
+
+			if [ ${status} -eq 0 ]; then
+				appjail stop -- "${QUICK_JAILNAME}" || exit $?
+			fi
 
 			local destroy_flags=
 			case "${QUICK_OPTION_OVERWRITE}" in
@@ -358,9 +369,11 @@ quick_create_jail()
 				*) QUICK_OPTION_OVERWRITE=; destroy_flags= ;;
 			esac
 
-			lib_debug "Destroy flags: <${QUICK_OPTION_OVERWRITE}>"
+			if [ ${ephemeral} -eq 0 -o ${status} -ne 0 ]; then
+				lib_debug "Destroy flags: <${QUICK_OPTION_OVERWRITE}>"
 
-			appjail jail destroy ${destroy_flags} -- "${QUICK_JAILNAME}" || exit $?
+				appjail jail destroy ${destroy_flags} -- "${QUICK_JAILNAME}" || exit $?
+			fi
 		else
 			lib_err ${EX_CANTCREAT} -- "Jail already created."
 		fi
