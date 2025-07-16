@@ -730,6 +730,16 @@ oci_kill()
 					exit ${EX_USAGE}
 				fi
 		esac
+
+		case "${_o}" in
+			s)
+				signal="${OPTARG}"
+				;;
+			*)
+				oci_usage
+				exit ${EX_USAGE}
+				;;
+		esac
 	done
 	shift $((OPTIND-1))
 
