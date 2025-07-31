@@ -621,7 +621,7 @@ quick_run_from()
 	local exposedports
 	exposedports=`oci_ociv1_get_exposedports "${container_name}"` || exit $?
 
-	if ! lib_check_empty "${exposedports}"; then
+	if [ ${QUICK_OPTION_CONTAINER_EXPOSE} -eq 1 ] && ! lib_check_empty "${exposedports}"; then
 		params=`lib_split_jailparams "${exposedports}"` || exit $?
 		total_items=`printf "%s\n" "${params}" | wc -l`
 		current_index=0
