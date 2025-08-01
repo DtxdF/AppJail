@@ -39,7 +39,7 @@ limits_desc="Display and update resource limits database for jails."
 limits_main()
 {
 	if ! lib_check_racct; then
-		lib_err ${EX_UNAVAILABLE} "You must enable RACCT and reboot: echo \"kern.racct.enable=1\" > /boot/loader.conf && reboot"
+		lib_err ${EX_UNAVAILABLE} "You must enable RACCT and reboot: echo \"kern.racct.enable=1\" >> /boot/loader.conf && reboot"
 	fi
 
 	local entity="$1"; shift
