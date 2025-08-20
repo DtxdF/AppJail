@@ -1,3 +1,5 @@
 liberapay: AppJail
-custom: ["https://paypal.me/DtxdF"]
+custom:
+  - 'https://paypal.me/DtxdF'
+  - 'bitcoin:bc1q7u7jpdx7egjhgfxu2hyrgl8awgvx6lsu35dvxc'
 patreon: AppJail

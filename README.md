@@ -4,6 +4,26 @@
 
 ----
 
+Table of Contents
+=================
+
+* [Table of Contents](#table-of-contents)
+* [AppJail](#appjail)
+   * [Features](#features)
+   * [Documentation](#documentation)
+   * [Comparing AppJail](#comparing-appjail)
+   * [Support](#support)
+   * [Design decisions](#design-decisions)
+   * [TODO](#todo)
+   * [Contributing](#contributing)
+   * [Funding](#funding)
+      * [LiberaPay](#liberapay)
+      * [PayPal](#paypal)
+      * [Patreon](#patreon)
+      * [BTC](#btc)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+
 # AppJail
 
 AppJail is an open-source BSD-3 licensed framework entirely written in `sh(1)` and C to create isolated, portable and easy to deploy environments using FreeBSD jails that behaves like an application.
@@ -94,3 +114,21 @@ There are very interesting projects like `poudriere` or `synth` that can also cr
 ## Contributing
 
 If you have found a bug, have an idea or need help, use the [issue tracker](https://github.com/DtxdF/AppJail/issues/new). Of course, PRs are welcome.
+
+## Funding
+
+### LiberaPay
+
+<img src="https://avatars.githubusercontent.com/u/12560099?s=200&v=4" width="30%" height=auto><br />https://liberapay.com/AppJail
+
+### PayPal
+
+<img src="https://avatars.githubusercontent.com/u/476675?s=200&v=4" width="30%" height="auto"><br />https://paypal.me/DtxdF
+
+### Patreon
+
+<img src="https://avatars.githubusercontent.com/u/6578555?s=200&v=4" width="30%" height="auto"><br />https://patreon.com/AppJail
+
+### BTC
+
+<img src="assets/img/BTC.png" width="30%" height="auto"><br />bitcoin:bc1q7u7jpdx7egjhgfxu2hyrgl8awgvx6lsu35dvxc
