@@ -117,18 +117,20 @@ If you have found a bug, have an idea or need help, use the [issue tracker](http
 
 ## Funding
 
+Help me improve AppJail every day!
+
 ### LiberaPay
 
-<img src="https://avatars.githubusercontent.com/u/12560099?s=200&v=4" width="30%" height=auto><br />https://liberapay.com/AppJail
+<p align="center"><img src="https://avatars.githubusercontent.com/u/12560099?s=200&v=4" width="30%" height=auto><br />https://liberapay.com/AppJail</p>
 
 ### PayPal
 
-<img src="https://avatars.githubusercontent.com/u/476675?s=200&v=4" width="30%" height="auto"><br />https://paypal.me/DtxdF
+<p align="center"><img src="https://avatars.githubusercontent.com/u/476675?s=200&v=4" width="30%" height="auto"><br />https://paypal.me/DtxdF</p>
 
 ### Patreon
 
-<img src="https://avatars.githubusercontent.com/u/6578555?s=200&v=4" width="30%" height="auto"><br />https://patreon.com/AppJail
+<p align="center"><img src="https://avatars.githubusercontent.com/u/6578555?s=200&v=4" width="30%" height="auto"><br />https://patreon.com/AppJail</p>
 
 ### BTC
 
-<img src="assets/img/BTC.png" width="30%" height="auto"><br />bitcoin:bc1q7u7jpdx7egjhgfxu2hyrgl8awgvx6lsu35dvxc
+<p align="center"><img src="assets/img/BTC.png" width="30%" height="auto"><br />bitcoin:bc1q7u7jpdx7egjhgfxu2hyrgl8awgvx6lsu35dvxc</p>
