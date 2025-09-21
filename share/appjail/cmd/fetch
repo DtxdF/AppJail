@@ -442,11 +442,11 @@ fetch_pkgbase()
 		lib_err ${EX_IOERR} "Error creating ${releasedir}"
 	fi
 
+	_fetch_atomic_mid "${releasedir}"
+
 	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${major_version}/${release_name}/release"; then
 		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
 	fi
-
-	_fetch_atomic_mid "${releasedir}"
 
 	if ! touch -- "${releasedir}/.from_pkgbase"; then
 		lib_err ${EX_IOERR} "Error creating ${releasedir}/.from_pkgbase"
@@ -538,10 +538,6 @@ fetch_empty()
 
 	local releasedir="${RELEASEDIR}/${osarch}/${osversion}/${release_name}"
 
-	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}/release"; then
-		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
-	fi
-
 	_fetch_atomic_init -a "${osarch}" -r "${release_name}" -v "${osversion}"
 
 	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}"; then
@@ -549,6 +545,10 @@ fetch_empty()
 	fi
 
 	_fetch_atomic_mid "${releasedir}"
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${osarch}/${osversion}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
+	fi
 
 	touch -- "${releasedir}/.empty"
 
@@ -958,18 +958,16 @@ _fetch_cmd()
 	local componentsdir="${COMPONENTSDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
 	local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
 
-	if ! lib_zfs_mkdir "${componentsdir}" "${ZFS_COMPONENTS_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
-		lib_err ${EX_IOERR} "Error creating ${componentsdir}"
-	fi
-
-	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}/release"; then
-		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
-	fi
-
 	_fetch_atomic_init -a "${freebsd_arch}" -r "${release_name}" -v "${freebsd_version}"
 
 	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
 		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	_fetch_atomic_mid "${releasedir}"
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
 	fi
 
 	# Download the MANIFEST
@@ -992,8 +990,6 @@ _fetch_cmd()
 		if [ ${opt_chk_manifest} -eq 1 ]; then
 			_fetch_chk_manifest "${componentsdir}" "${component}" "${componentsdir}/${FETCH_MANIFEST_FILE}"
 		fi
-
-		_fetch_atomic_mid "${releasedir}"
 
 		lib_debug "Extracting ${component}: tar ${TAR_DECOMPRESS_ARGS} -xf \"${componentsdir}/${component}\" -C \"${releasedir}/release\""
 
