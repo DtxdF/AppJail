@@ -38,6 +38,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 * Parallel startup (Healthcheckers, Jails & NAT).
 * UFS and ZFS support.
 * RACCT/RCTL support.
+* PkgBase support.
 * NAT support.
 * Port expose - network port forwarding into jail.
 * IPv4 and IPv6 support.
