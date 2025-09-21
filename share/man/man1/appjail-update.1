@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 13, 2024
+.Dd September 21, 2025
 .Dt APPJAIL-UPDATE 1
 .Os
 .Sh NAME
@@ -76,6 +76,15 @@ parameters this subcommand uses the release directory, since those parameters ar
 stored there. This is important if you want to export the jail and the release on
 another system.
 .Pp
+If
+.Ar jail
+was created with PkgBase, this subcommand only performs minor updates using
+.Xr pkg 8 Ns ,
+using the directory containing the
+.Xr pkg.conf 5
+files, which have already been copied by
+.Xr appjail-fetch 1 Ns "."
+.Pp
 .Bl -tag -width xx
 .It Fl b
 Build the world and, if the kernel was compiled successfully when building the release
@@ -88,6 +97,10 @@ Force
 .Xr freebsd-update 8 Cm fetch
 to proceed in the case of an unfinished upgrade. Ignored when the jail was created
 using a build from the FreeBSD source tree.
+.Pp
+If the jail was created with PkgBase, then
+.Xr pkg-upgrade 8
+will force the reinstallation or upgrade of the whole set of packages.
 .It Fl K
 By default, this subcommand detects whether a kernel has been compiled successfully
 when the release is created, so it will proceed to install the kernel again and, if
@@ -115,11 +128,24 @@ should be used and, if your workflow requires it, you should also use
 and
 .Xr appjail-deleteOld 1 "."
 .Pp
+If
+.Ar release
+was created with PkgBase, this subcommand only performs minor updates using
+.Xr pkg 8 Ns ,
+using the directory containing the
+.Xr pkg.conf 5
+files, which have already been copied by
+.Xr appjail-fetch 1 Ns "."
+.Pp
 .Bl -tag -width xx
 .It Fl f
 Force
 .Xr freebsd-update 8 Cm fetch
 to proceed in the case of an unfinished upgrade.
+.Pp
+If the release was created with PkgBase, then
+.Xr pkg-upgrade 8
+will force the reinstallation or upgrade of the whole set of packages.
 .It Fl a Ar arch
 Update
 .Ar release
@@ -133,6 +159,12 @@ with the given version.
 .Bl -tag -width xx
 .El
 .El
+.Sh ENVIRONMENT
+.Bl -tag -width xxxx
+.It Ev PKG_DRY_RUN
+When a jail or release was created with PkgBase and this environment variable is set,
+.Xr pkg-upgrade 1
+runs in dry-run mode.
 .Sh EXIT STATUS
 .Ex -std "appjail update"
 .Sh SEE ALSO

@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 12, 2024
+.Dd September 21, 2025
 .Dt APPJAIL-FETCH 1
 .Os
 .Sh NAME
@@ -63,6 +63,14 @@
 .Op Fl u Ar url
 .Op Fl v Ar version
 .Op Ar component Ns " " Ns "..."
+.Nm appjail fetch
+.Cm pkgbase
+.Op Fl a Ar arch
+.Op Fl c Ar directory
+.Op Fl f Ar directory
+.Op Fl v Ar major-version
+.Op Fl r Ar name
+.Op Ar package Ns " " Ns "..."
 .Nm appjail fetch
 .Cm src
 .Op Fl bDIkNR
@@ -223,6 +231,99 @@ to copy the components to be extracted from
 .Ar url Ns "."
 You must explicitly set at least
 .Ar url Ns , as it might not be valid for this method.
+.It Cm pkgbase Oo Fl a Ar arch Oc Oo Fl c Ar directory Oc Oo Fl f Ar directory Oc Oo Fl v Ar major-version Oc Oo Fl r Ar name Oc Oo Ar package Ns " " Ns "..." Oc
+Create a release using PkgBase. By default, when no packages are specified, this
+method uses
+.Sy PKGBASE_PACKAGES Ns ,
+but when this parameter is not defined, some default packages will be used
+depending on the major version being used.
+.Pp
+Packages for
+.Sy FreeBSD:14:*
+.Po when none are explicitly specified Pc Ns :
+.Pp
+.Bl -tag -width xx -compact
+.It
+.Sy FreeBSD-at
+.It
+.Sy FreeBSD-caroot
+.It
+.Sy FreeBSD-certctl
+.It
+.Sy FreeBSD-clibs
+.It
+.Sy FreeBSD-fetch
+.It
+.Sy FreeBSD-inetd
+.It
+.Sy FreeBSD-locales
+.It
+.Sy FreeBSD-newsyslog
+.It
+.Sy FreeBSD-periodic
+.It
+.Sy FreeBSD-pkg-bootstrap
+.It
+.Sy FreeBSD-rc
+.It
+.Sy FreeBSD-runtime
+.It
+.Sy FreeBSD-syslogd
+.It
+.Sy FreeBSD-utilities
+.It
+.Sy FreeBSD-vi
+.It
+.Sy FreeBSD-zoneinfo
+.El
+.Pp
+Packages for
+.Sy FreeBSD:15:*
+or higher:
+.Pp
+.Bl -tag -width xx -compact
+.It
+.Sy FreeBSD-set-minimal-jail
+.El
+.Pp
+.Bl -tag -width xx
+.It Fl a Ar arch
+Specify the architecture to use in the release. If this option is not set, the
+architecture specified by the
+.Sy FREEBSD_ARCH
+parameter is used.
+.It Fl c Ar directory
+Path containing the
+.Xr pkg.conf 5
+files. By default, this value is set to the value of the
+.Sy PKG_CONF_DIR
+parameter.
+.Pp
+This directory is copied to a path in the release directory, so it can be reused by tools such as
+.Xr appjail-update 1 Ns "."
+.It Fl f Ar directory
+Path containing known signatures for the repository. By default, this value is set to the value of the
+.Sy FINGERPRINTS_DIRECTORY
+parameter.
+.Pp
+This directory will be copied as
+.Pa /usr/share/keys/pkg
+inside the jail, so your
+.Xr pkg.conf 5
+should reflect this in the
+.Sy FINGERPRINTS
+parameter.
+.Pp
+If this parameter is set to
+.Sy none Ns ,
+the fingerprint directory will not be copied.
+.It Fl v Ar major-version
+A number indicating the major version of the FreeBSD ABI to be used.
+.It Fl r Ar name
+Release name. If this option is not set, the name specified by the
+.Sy DEFAULT_RELEASE
+parameter is used.
+.El
 .It Cm src Oo Fl bDIkNR Oc Oo Fl a Ar target Ns Oo / Ns Ar target-arch Oc Oc Oo Fl j Ar jobs Oc Oo Fl K Ar kernel Oc Oo Fl s Ar source-tree Oc Oo - Ns | Ns Ar name Oc Oo Ar args Ns " " Ns "..." Oc
 Create a release called
 .Ar name

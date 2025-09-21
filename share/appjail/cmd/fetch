@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@ fetch_main()
 	fi
 
 	case "${entity}" in
-		debootstrap|destroy|empty|list|local|src|www) ;;
+		debootstrap|destroy|empty|list|local|pkgbase|src|www) ;;
 		*) fetch_usage; exit ${EX_USAGE} ;;
 	esac
 
@@ -341,6 +341,148 @@ fetch_destroy()
 	fi
 
 	lib_debug -- "${release_name} was removed."
+}
+
+fetch_pkgbase()
+{
+	local freebsd_arch="${FREEBSD_ARCH}"
+	local pkg_conf_dir="${PKG_CONF_DIR}"
+	local major_version=
+	local fingerprints_directory="${FINGERPRINTS_DIRECTORY}"
+	local release_name="${DEFAULT_RELEASE}"
+	local _o
+
+	while getopts ":a:c:f:r:v:" _o; do
+		case "${_o}" in
+			a|c|f|r)
+				if lib_check_empty "${OPTARG}"; then
+					fetch_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+
+		case "${_o}" in
+			a)
+				freebsd_arch="${OPTARG}"
+				;;
+			c)
+				pkg_conf_dir="${OPTARG}"
+				;;
+			r)
+				release_name="${OPTARG}"
+				;;
+			v)
+				major_version="${OPTARG}"
+				;;
+			*)
+				fetch_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if ! pkg -N 2> /dev/null; then
+		lib_err ${EX_UNAVAILABLE} "pkg(8) is not present on the host. Cannot continue ..."
+	fi
+
+	if [ -z "${major_version}" ]; then
+		major_version=`printf "%s" "${FREEBSD_VERSION}" | grep -Eo '^[0-9]+'` || exit $?
+	fi
+
+	if ! lib_check_number "${major_version}"; then
+		lib_err ${EX_DATAERR} -- "${major_version}: Invalid major version."
+	fi
+
+	if [ ${major_version} -lt 14 ]; then
+		lib_err ${EX_CANTCREAT} -- "${major_version}: PkgBase can only be used starting with 'FreeBSD:14:*' and so on."
+	fi
+
+	if [ $# -eq 0 ]; then
+		local packages
+		
+		if ! lib_check_empty "${PKGBASE_PACKAGES}"; then
+			packages=${PKGBASE_PACKAGES}
+		elif [ ${major_version} = "14" ]; then
+			# Workaround, since FreeBSD-set-minimal-jail doesn't exist in 14:*
+			packages="\
+				FreeBSD-at \
+				FreeBSD-caroot \
+				FreeBSD-certctl \
+				FreeBSD-clibs \
+				FreeBSD-fetch \
+				FreeBSD-inetd \
+				FreeBSD-locales \
+				FreeBSD-newsyslog \
+				FreeBSD-periodic \
+				FreeBSD-pkg-bootstrap \
+				FreeBSD-rc \
+				FreeBSD-runtime \
+				FreeBSD-syslogd \
+				FreeBSD-utilities \
+				FreeBSD-vi \
+				FreeBSD-zoneinfo"
+		else
+			packages="FreeBSD-set-minimal-jail"
+		fi
+
+		set -- ${packages}
+	fi
+
+	if ! lib_zfs_mkdir "${RELEASEDIR}" "${ZFS_RELEASE_NAME}"; then
+		lib_err ${EX_IOERR} "Error creating ${RELEASEDIR}"
+	fi
+
+	local releasedir="${RELEASEDIR}/${freebsd_arch}/${major_version}/${release_name}"
+
+	_fetch_atomic_init -a "${freebsd_arch}" -r "${release_name}" -v "${major_version}"
+
+	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${major_version}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}"
+	fi
+
+	if ! lib_zfs_mkdir "${releasedir}/release" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${major_version}/${release_name}/release"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/release"
+	fi
+
+	_fetch_atomic_mid "${releasedir}"
+
+	if ! touch -- "${releasedir}/.from_pkgbase"; then
+		lib_err ${EX_IOERR} "Error creating ${releasedir}/.from_pkgbase"
+	fi
+
+	local pkg_repos_d
+	pkg_repos_d="${releasedir}/pkg-repos.d"
+
+	if [ -d "${pkg_repos_d}" ]; then
+		if ! rm -rf -- "${pkg_repos_d}"; then
+			lib_err ${EX_IOERR} "Error removing ${pkg_repos_d}"
+		fi
+	fi
+
+	if ! cp -a -- "${pkg_conf_dir}" "${pkg_repos_d}"; then
+		lib_err ${EX_IOERR} "Error copying ${pkg_conf_dir}"
+	fi
+
+	if [ "${fingerprints_directory}" != "none" ]; then
+		if ! mkdir -p -- "${releasedir}/release/usr/share/keys"; then
+			lib_err ${EX_IOERR} "Error creating ${releasedir}/release/usr/share/keys"
+		fi
+
+		if ! cp -a -- "${fingerprints_directory}" "${releasedir}/release/usr/share/keys/pkg"; then
+			lib_err ${EX_IOERR} "Error copying ${fingerprints_directory}"
+		fi
+	fi
+
+	local abi
+	abi="FreeBSD:${major_version}:${freebsd_arch}"
+
+	IGNORE_OSVERSION=yes ABI="${abi}" ASSUME_ALWAYS_YES=yes \
+		pkg --rootdir "${releasedir}/release" --repo-conf-dir "${pkg_repos_d}" \
+			install -- "$@" || exit $?
+
+	_fetch_atomic_end "${releasedir}"
 }
 
 fetch_local()
@@ -1027,6 +1169,8 @@ usage: fetch debootstrap [-A] [-a <arch>] [-c <cache-start>] [-m <mirror>]
        fetch list <arch>[/<version>]
        fetch local [-C] [-a <arch>] [-r <name>] [-u <url>] [-v <version>]
                [<component> ...]
+       fetch pkgbase [-a <arch>] [-c <directory>] [-f <directory>]
+               [-v <major-version>] [-r <name>] [<package> ...]
        fetch src [-bDIkNR] [-a <target>[/<target-arch>]] [-j <jobs>]
                [-K <kernel>] [-s <source-tree>] [-|<name>] [<args> ...]
        fetch www [-C] [-a <arch>] [-r <name>] [-u <url>] [-v <version>]

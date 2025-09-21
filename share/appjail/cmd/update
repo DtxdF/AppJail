@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -256,6 +256,29 @@ update_jail()
 		fi
 
 		lib_info "Done."
+	elif [ -f "${releasedir}/.from_pkgbase" ]; then
+		if ! pkg -N 2> /dev/null; then
+			lib_err ${EX_UNAVAILABLE} "pkg(8) is not present on the host. Cannot continue ..."
+		fi
+
+		local pkg_args
+		if [ ${opt_force} -eq 1 ]; then
+			pkg_args="-f"
+		fi
+
+		if [ -n "${PKG_DRY_RUN}" ]; then
+			pkg_args="${pkg_args} -n"
+		fi
+
+		local abi
+		abi="FreeBSD:${osversion}:${osarch}"
+
+		local pkg_repos_d
+		pkg_repos_d="${releasedir}/pkg-repos.d"
+
+		IGNORE_OSVERSION=yes ABI="${abi}" ASSUME_ALWAYS_YES=yes \
+			pkg --rootdir "${basedir}" --repo-conf-dir "${pkg_repos_d}" \
+				upgrade ${pkg_args} 
 	else
 		local freebsd_update_args
 		if [ ${opt_force} -eq 1 ]; then
@@ -336,21 +359,46 @@ update_release()
 		lib_err ${EX_NOINPUT} "Cannot find the release directory (${basedir})."
 	fi
 
-	local freebsd_update_args
-	if [ ${opt_force} -eq 1 ]; then
-		freebsd_update_args="-F"
+	if [ -f "${releasedir}/.from_pkgbase" ]; then
+		if ! pkg -N 2> /dev/null; then
+			lib_err ${EX_UNAVAILABLE} "pkg(8) is not present on the host. Cannot continue ..."
+		fi
+
+		local pkg_args
+		if [ ${opt_force} -eq 1 ]; then
+			pkg_args="-f"
+		fi
+
+		if [ -n "${PKG_DRY_RUN}" ]; then
+			pkg_args="${pkg_args} -n"
+		fi
+
+		local abi
+		abi="FreeBSD:${freebsd_version}:${freebsd_arch}"
+
+		local pkg_repos_d
+		pkg_repos_d="${releasedir}/pkg-repos.d"
+
+		IGNORE_OSVERSION=yes ABI="${abi}" ASSUME_ALWAYS_YES=yes \
+			pkg --rootdir "${basedir}" --repo-conf-dir "${pkg_repos_d}" \
+				upgrade ${pkg_args} 
+	else
+		local freebsd_update_args
+		if [ ${opt_force} -eq 1 ]; then
+			freebsd_update_args="-F"
+		fi
+
+		local currently_running
+		currently_running=`chroot "${basedir}" freebsd-version`
+
+		freebsd-update \
+			${freebsd_update_args} \
+			-f "${FREEBSD_UPDATE_CONF}" \
+			--not-running-from-cron \
+			-b "${basedir}" \
+			--currently-running "${currently_running}" \
+			fetch install
 	fi
-
-	local currently_running
-	currently_running=`chroot "${basedir}" freebsd-version`
-
-	freebsd-update \
-		${freebsd_update_args} \
-		-f "${FREEBSD_UPDATE_CONF}" \
-		--not-running-from-cron \
-		-b "${basedir}" \
-		--currently-running "${currently_running}" \
-		fetch install
 }
 
 update_help()

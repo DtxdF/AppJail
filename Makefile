@@ -108,7 +108,9 @@ install: utils-strip
 	
 	# files
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail/files"
-	${FIND} share/appjail/files -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail/files/pkgbase"
+	${FIND} share/appjail/files -mindepth 1 -type f -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/appjail/files/pkgbase -mindepth 1 -type f -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
 	
 	# lib
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/appjail/lib"

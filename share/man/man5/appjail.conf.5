@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd March 21, 2024
+.Dd September 21, 2025
 .Dt APPJAIL.CONF 5
 .Os
 .Sh NAME
@@ -1309,6 +1309,24 @@ Default columns for
 .br
 Default:
 .Em nro enabled name ports protocol network_name ext_if on_if
+.El
+.Sh PKGBASE PARAMETERS
+.Bl -tag -width xxxxx
+.It PKG_CONF_DIR
+Location of
+.Xr pkg.conf 5
+files.
+.br
+Default:
+.Em ${FILESDIR}/pkgbase/base.conf
+.It PKGBASE_PACKAGES
+Default packages used when none are explicitly specified. By default this parameter
+is set to an empty value.
+.It FINGERPRINTS_DIRECTORY
+This should be set to a path containing known signatures for the repository.
+.br
+Default:
+.Em /usr/share/keys/pkg
 .El
 .Sh MISCELLANEOUS PARAMETERS
 .Bl -tag -width xxxxx
