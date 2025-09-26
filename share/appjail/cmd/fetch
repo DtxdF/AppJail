@@ -958,6 +958,10 @@ _fetch_cmd()
 	local componentsdir="${COMPONENTSDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
 	local releasedir="${RELEASEDIR}/${freebsd_arch}/${freebsd_version}/${release_name}"
 
+	if ! lib_zfs_mkdir "${componentsdir}" "${ZFS_COMPONENTS_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
+		lib_err ${EX_IOERR} "Error creating ${componentsdir}"
+        fi
+
 	_fetch_atomic_init -a "${freebsd_arch}" -r "${release_name}" -v "${freebsd_version}"
 
 	if ! lib_zfs_mkdir "${releasedir}" "${ZFS_RELEASE_NAME}/${freebsd_arch}/${freebsd_version}/${release_name}"; then
