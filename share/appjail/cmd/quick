@@ -106,6 +106,7 @@ QUICK_OPTION_CONTAINER=
 QUICK_OPTION_CONTAINER_BUILDAH_ARGS="${BUILDAH_FROM_ARGS}"
 QUICK_OPTION_CONTAINER_BOOT=0
 QUICK_OPTION_CONTAINER_EXPOSE=0
+QUICK_OPTION_CONTAINER_EXPORT=0
 QUICK_OPTION_CONTAINER_EXT_IF=
 QUICK_OPTION_CONTAINER_EXT_IP=
 QUICK_OPTION_CONTAINER_LOGOPTS=0
@@ -435,7 +436,7 @@ quick_set_container()
 {
 	local params="$1"
 	if lib_check_empty "${params}"; then
-		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [args:buildah_args] [ext_if:external_interface] [ext_ip:external_address] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
+		lib_err ${EX_DATAERR} "container syntax: [boot] [expose] [import] [args:buildah_args] [ext_if:external_interface] [ext_ip:external_address] [logopts[:firewall_logopts]] [name:container_name] [on_if:interface]"
 	fi
 
 	params=`lib_split_jailparams "${params}"` || exit $?
@@ -469,6 +470,9 @@ quick_set_container()
 			expose)
 				QUICK_OPTION_CONTAINER_EXPOSE=1
 				;;
+			import)
+				QUICK_OPTION_CONTAINER_EXPORT=1
+				;;
 			args)
 				QUICK_OPTION_CONTAINER_BUILDAH_ARGS="${value}"
 				;;
@@ -498,6 +502,10 @@ quick_set_container()
 quick_oci_umount()
 {
 	if [ -z "${QUICK_OPTION_CONTAINER}" ]; then
+		return 0
+	fi
+
+	if [ ${QUICK_OPTION_CONTAINER_EXPORT} -eq 1 ]; then
 		return 0
 	fi
 
@@ -531,15 +539,30 @@ quick_run_from()
 		lib_err ${EX_SOFTWARE} "Error creating container ${container_name} from ${QUICK_OPTION_FROM_IMAGE} (args:${QUICK_OPTION_CONTAINER_BUILDAH_ARGS})"
 	fi
 
-	appjail oci set-container-name "${container_name}" "${QUICK_JAILNAME}" || exit $?
+	if [ ${QUICK_OPTION_CONTAINER_EXPORT} -eq 0 ]; then
+		appjail oci set-container-name "${container_name}" "${QUICK_JAILNAME}" || exit $?
 
-	QUICK_OPTION_CONTAINER="${container_name}"
+		QUICK_OPTION_CONTAINER="${container_name}"
 
-	lib_debug "Mounting container directory into jail directory ..."
+		lib_debug "Mounting container directory into jail directory ..."
 
-	lib_atexit_add "if ! appjail status -q \"${QUICK_JAILNAME}\"; then appjail oci umount \"${QUICK_JAILNAME}\" > /dev/null 2>&1; fi"
+		lib_atexit_add "if ! appjail status -q \"${QUICK_JAILNAME}\"; then appjail oci umount \"${QUICK_JAILNAME}\" > /dev/null 2>&1; fi"
 
-	appjail oci mount "${QUICK_JAILNAME}" || exit $?
+		appjail oci mount "${QUICK_JAILNAME}" || exit $?
+	else
+		local jaildir
+		jaildir="${JAILDIR}/${QUICK_JAILNAME}/jail"
+
+		lib_debug "Copying content from container '${container_name}' to directory '${jaildir}' ..."
+
+		lib_atexit_add "buildah umount \"${container_name}\" > /dev/null 2>&1"
+		lib_atexit_add "buildah rm \"${container_name}\" > /dev/null 2>&1"
+
+		local container_path
+		container_path=`buildah mount "${container_name}"` || exit $?
+
+		lib_copy "${container_path}" . "${jaildir}" || exit $?
+	fi
 
 	local arch
 	arch=`oci_ociv1_get_arch "${container_name}"` || exit $?
@@ -723,11 +746,16 @@ quick_run_from()
 		appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf osversion="${osversion}"  || exit $?
 	fi
 
-	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container=1
-	appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container_image="${QUICK_OPTION_FROM_IMAGE}"
+	if [ ${QUICK_OPTION_CONTAINER_EXPORT} -eq 0 ]; then
+		appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container=1
+		appjail cmd local "${QUICK_JAILNAME}" -r appjail-config set -Vt conf/config.conf container_image="${QUICK_OPTION_FROM_IMAGE}"
 
-	if [ ${QUICK_OPTION_CONTAINER_BOOT} -eq 1 ]; then
-		appjail oci set-boot on "${QUICK_JAILNAME}" || exit $?
+		if [ ${QUICK_OPTION_CONTAINER_BOOT} -eq 1 ]; then
+			appjail oci set-boot on "${QUICK_JAILNAME}" || exit $?
+		fi
+	else
+		buildah umount "${container_name}" || exit $?
+		buildah rm "${container_name}" || exit $?
 	fi
 }
 

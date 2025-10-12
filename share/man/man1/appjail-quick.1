@@ -311,7 +311,7 @@ ZFS snapshot name.
 .It
 .Cm clone+release Ns = Ns Qo 140release Qc
 .El
-.It Cm container Ns = Ns Qo Oo Cm boot Oc Oo Cm expose Oc Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm ext_ip Ns : Ns Ar address Oc Oo Cm args Ns : Ns Ar args Oc Oo Cm logopts Ns Oo : Ns Ar options Oc Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
+.It Cm container Ns = Ns Qo Oo Cm boot Oc Oo Cm expose Oc Oo Cm import Oc Oo Cm ext_if Ns : Ns Ar interface Oc Oo Cm ext_ip Ns : Ns Ar address Oc Oo Cm args Ns : Ns Ar args Oc Oo Cm logopts Ns Oo : Ns Ar options Oc Oc Oo Cm name Ns : Ns Ar name Oc Oo Cm on_if Ns : Ns Ar interface Oc Qc
 .Pp
 Changes the behavior of the
 .Cm from
@@ -328,6 +328,16 @@ Start the process in background using
 .It
 .Cm expose Ns :
 Expose the ports specified by the OCI image.
+.It
+.Cm import Ns :
+By default, the container path is mounted as the root directory of the jail.
+With this option, the contents of that path are copied, so the container is
+not needed after this operation.
+.Pp
+The drawback of this option is that, since the container is not a dependency
+and is therefore removed,
+.Xr appjail-oci 1
+cannot be used.
 .It
 .Cm args Ns :
 .Xr buildah-from 1 Ns 's arguments. This overwrites the arguments defined by the
