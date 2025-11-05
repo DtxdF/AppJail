@@ -145,7 +145,9 @@ install: utils-strip
 	# examples
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/examples/appjail"
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/examples/appjail/templates"
+	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/share/examples/appjail/hooks/pre.d"
 	${FIND} share/examples/appjail/templates -mindepth 1 -exec ${INSTALL} -m 444 {} "${DESTDIR}${PREFIX}/{}" \;
+	${FIND} share/examples/appjail/hooks/pre.d -mindepth 1 -exec ${INSTALL} -m 555 {} "${DESTDIR}${PREFIX}/{}" \;
 	${INSTALL} -m 444 share/examples/appjail/appjail.conf "${DESTDIR}${PREFIX}/share/examples/appjail/appjail.conf"
 
 	# utils
