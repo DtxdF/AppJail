@@ -35,6 +35,12 @@ LABELS=`appjail label list -eHIpt -- "${JAIL}" name` || exit $?
 
 test -n "${LABELS}"  || exit $?
 
+REGEX=`appjail label get -l "security-group.include-only" -- "${JAIL}" value 2> /dev/null`
+
+if [ -z "${REGEX}" ]; then
+    REGEX=".+"
+fi
+
 for name in ${LABELS}; do
     case "${name}" in
         security-group.tables.*) ;;
@@ -45,9 +51,15 @@ for name in ${LABELS}; do
 
     test -n "${table}" || continue
 
-    if [ "${STAGE}" = "start" ]; then
-        pfctl -t "${table}" -T add ${IPADDRS} || exit $?
-    else
-        pfctl -t "${table}" -T delete ${IPADDRS} || exit $?
-    fi
+    for ipaddr in ${IPADDRS}; do
+        if ! printf "%s" "${ipaddr}" | grep -qEe "${REGEX}"; then
+            continue
+        fi
+
+        if [ "${STAGE}" = "start" ]; then
+            pfctl -t "${table}" -T add ${ipaddr} || exit $?
+        else
+            pfctl -t "${table}" -T delete ${ipaddr} || exit $?
+        fi
+    done
 done

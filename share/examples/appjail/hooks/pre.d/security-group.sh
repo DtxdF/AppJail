@@ -27,6 +27,12 @@ JAIL="$1"
 
 appjail label get -l "security-group" -- "${JAIL}" value > /dev/null 2>&1 || exit 0
 
+REGEX=`appjail label get -l "security-group.include-only" -- "${JAIL}" value 2> /dev/null`
+
+if [ -z "${REGEX}" ]; then
+    REGEX=".+"
+fi
+
 if [ "${STAGE}" = "start" ]; then
     LABELS=`appjail label list -eHIpt -- "${JAIL}" name` || exit $?
 
@@ -50,6 +56,10 @@ if [ "${STAGE}" = "start" ]; then
         fi
 
         for ipaddr in ${IPADDRS}; do
+            if ! printf "%s" "${ipaddr}" | grep -qEe "${REGEX}"; then
+                continue
+            fi
+
             rule=`printf "%s" "${rule}" | sed -Ee "s/%i/${ipaddr}/g"` || exit $?
 
             printf "%s\n" "${rule}" || exit $?
