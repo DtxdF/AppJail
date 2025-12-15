@@ -19,7 +19,8 @@
 #
 # dyndns.username          Username.
 #
-# dyndns.password          Password. When this label isn't set, username will be used.
+# dyndns.password          File containing the password. When this label isn't set,
+#                          username will be used.
 #
 # dyndns.on-failure        Failure policy. Set to "fail" (default) to exit with a
 #                          non-zero exit status after all retries have been exhausted.
@@ -96,6 +97,8 @@ PASSWORD=`appjail label get -l "dyndns.password" -- "${JAIL}" value 2> /dev/null
 
 if [ -z "${PASSWORD}" ]; then
     PASSWORD="${USERNAME}"
+else
+    PASSWORD=`head -1 -- "${PASSWORD}"` || exit $?
 fi
 
 ON_FAILURE=`appjail label get -l "dyndns.on-failure" -- "${JAIL}" value 2> /dev/null`
