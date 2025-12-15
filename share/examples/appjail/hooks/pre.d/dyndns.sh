@@ -46,9 +46,19 @@ STAGE="$1"; shift
 test $# -gt 0 || exit 0
 
 case "${STAGE}" in
-    start) ;;
+    start|jail) ;;
     *) exit 0 ;;
 esac
+
+if [ "${STAGE}" = "jail" ]; then
+    test $# -gt 0 || exit 0
+
+    STAGE="$1"; shift
+
+    if [ "${STAGE}" != "destroy" ]; then
+        exit 0
+    fi
+fi
 
 while getopts ":" OPT; do
     case "${OPT}" in
@@ -63,6 +73,13 @@ test $# -gt 0 || exit 0
 JAIL="$1"
 
 appjail label get -l "dyndns" -- "${JAIL}" value > /dev/null 2>&1 || exit 0
+
+#
+# We should not remove the entry if the jail isn't stopped first.
+#
+if [ "${STAGE}" = "destroy" ] && appjail status -q -- "${JAIL}"; then
+    exit 0
+fi
 
 DYN_DOMAIN=`appjail label get -l "dyndns.dyn-domain" -- "${JAIL}" value 2> /dev/null`
 
@@ -84,6 +101,9 @@ INTERFACE=`appjail label get -l "dyndns.interface" -- "${JAIL}" value 2> /dev/nu
 
 test -n "${INTERFACE}" || exit $?
 
+#
+# Even though we are destroying the jail, it's good to check if the interface exists.
+#
 CURRENT_IP=$(ifconfig -- "${INTERFACE}" inet | \
       grep -m 1 -o 'inet.*' | cut -d ' ' -f 2)
 
@@ -128,7 +148,13 @@ else
     SCHEME="http"
 fi
 
-URL="${SCHEME}://${USERNAME}:${PASSWORD}@${DYN_DOMAIN}/nic/update?hostname=${HOSTNAME}&myip=${CURRENT_IP}"
+URL="${SCHEME}://${USERNAME}:${PASSWORD}@${DYN_DOMAIN}/nic/update?hostname=${HOSTNAME}"
+
+if [ "${STAGE}" = "start" ]; then
+    URL="${URL}&myip=${CURRENT_IP}"
+else
+    URL="${URL}&offline=YES"
+fi
 
 USER_AGENT="AppJail/`appjail version` dtxdf@disroot.org"
 
