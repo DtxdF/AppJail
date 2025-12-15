@@ -22,9 +22,9 @@
 # dyndns.password          File containing the password. When this label isn't set,
 #                          username will be used.
 #
-# dyndns.on-failure        Failure policy. Set to "fail" (default) to exit with a
-#                          non-zero exit status after all retries have been exhausted.
-#                          Set to "continue" to exit with a zero exit status.
+# dyndns.on-failure        Failure policy. Set to "fail" to exit with a non-zero exit
+#                          status after all retries have been exhausted. Set to
+#                          "continue" (default) to exit with a zero exit status.
 #
 # dyndns.retry             Number of attempts when fetch(1) fails. Default to 3.
 #
@@ -109,7 +109,7 @@ fi
 
 case "${ON_FAILURE}" in
     fail|continue) ;;
-    *) ON_FAILURE="fail"
+    *) ON_FAILURE="continue"
 esac
 
 TOTAL_RETRY=`appjail label get -l "dyndns.retry" -- "${JAIL}" value 2> /dev/null`
