@@ -164,6 +164,11 @@ for r in `jot "${TOTAL_RETRY}"`; do
     if [ $? -eq 0 ]; then
         exit 0
     fi
+
+    WAIT=`jot -r 1 6 10`
+    WAIT=$((WAIT+r))
+
+    sleep ${WAIT}
 done
 
 if [ "${ON_FAILURE}" = "continue" ]; then
