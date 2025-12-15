@@ -104,7 +104,7 @@ fi
 ON_FAILURE=`appjail label get -l "dyndns.on-failure" -- "${JAIL}" value 2> /dev/null`
 
 if [ -z "${ON_FAILURE}" ]; then
-    ON_FAILURE="fail"
+    ON_FAILURE="continue"
 fi
 
 case "${ON_FAILURE}" in
