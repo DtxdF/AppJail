@@ -8,7 +8,10 @@
 #
 # dyndns                   Set to enable the use of this hook.
 #
-# dyndns.dyn-domain        Host name and dyndnsd port to connect to.
+# dyndns.dyn-domain        Space-separated list of host names (with port optionally
+#                          separated by ":") of dyndnsd instances where this hook
+#                          will update entries.
+#                          Each instance is assumed to be a mirror of the others.
 #
 # dyndns.https             Set to use https when connecting to dyndnsd. When this label
 #                          isn't set, http is used.
@@ -25,6 +28,9 @@
 # dyndns.on-failure        Failure policy. Set to "fail" to exit with a non-zero exit
 #                          status after all retries have been exhausted. Set to
 #                          "continue" (default) to exit with a zero exit status.
+#                          If you use multiple instances, it is considered a success
+#                          when at least one entry is updated correctly, even if the
+#                          others fail.
 #
 # dyndns.retry             Number of attempts when fetch(1) fails. Default to 3.
 #
@@ -148,31 +154,36 @@ else
     SCHEME="http"
 fi
 
-URL="${SCHEME}://${USERNAME}:${PASSWORD}@${DYN_DOMAIN}/nic/update?hostname=${HOSTNAME}"
-
-if [ "${STAGE}" = "start" ]; then
-    URL="${URL}&myip=${CURRENT_IP}"
-else
-    URL="${URL}&offline=YES"
-fi
-
 USER_AGENT="AppJail/`appjail version` dtxdf@disroot.org"
 
-for r in `jot "${TOTAL_RETRY}"`; do
-    fetch -qo - --user-agent="${USER_AGENT}" "${URL}" && echo
+success=false
 
-    if [ $? -eq 0 ]; then
-        exit 0
+for dyn_domain in ${DYN_DOMAIN}; do
+    URL="${SCHEME}://${USERNAME}:${PASSWORD}@${dyn_domain}/nic/update?hostname=${HOSTNAME}"
+
+    if [ "${STAGE}" = "start" ]; then
+        URL="${URL}&myip=${CURRENT_IP}"
+    else
+        URL="${URL}&offline=YES"
     fi
 
-    WAIT=`jot -r 1 6 10`
-    WAIT=$((WAIT+r))
+    for r in `jot "${TOTAL_RETRY}"`; do
+        fetch -qo - --user-agent="${USER_AGENT}" "${URL}" && echo
 
-    sleep ${WAIT}
+        if [ $? -eq 0 ]; then
+            success=true
+            break
+        fi
+
+        WAIT=`jot -r 1 6 10`
+        WAIT=$((WAIT+r))
+
+        sleep ${WAIT}
+    done
 done
 
-if [ "${ON_FAILURE}" = "continue" ]; then
-    exit 0
-else
+if ! ${success} && [ "${ON_FAILURE}" = "fail" ]; then
     exit 1
 fi
+
+exit 0
