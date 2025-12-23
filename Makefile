@@ -60,7 +60,7 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-label.1 \
 	 man1/appjail-oci.1
 
-APPJAIL_VERSION?=4.7.0
+APPJAIL_VERSION?=4.7.1
 
 all: install
 
