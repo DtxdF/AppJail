@@ -556,7 +556,14 @@ makejail_run()
 		makejail_write "${makejail_file}"
 	else
 		if [ -z "${MAKEJAIL_JAILNAME}" ]; then
-			MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+			while :; do
+				MAKEJAIL_JAILNAME=`random_hexstring 11 0 15 | tr -d '\n'`
+
+				# Fix 'jail: <jail>: negative jid'
+				if ! lib_check_number "${MAKEJAIL_JAILNAME}"; then
+					break
+				fi
+			done
 		fi
 
 		lib_set_logprefix " [`random_color`${MAKEJAIL_JAILNAME}${COLOR_DEFAULT}]"
