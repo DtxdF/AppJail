@@ -88,10 +88,9 @@ static void
 raise_atoi_exception(const char *s)
 {
     if (errno != 0) {
-        if (errno != 0)
-            err(EX_SOFTWARE, "atol()");
-        else
-            errx(EX_SOFTWARE, "Could not convert %s to an integer.", s);
+        err(EX_SOFTWARE, "atol()");
+    } else {
+        errx(EX_SOFTWARE, "could not convert %s to an integer", s);
     }
 }
 
