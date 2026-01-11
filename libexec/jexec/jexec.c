@@ -77,7 +77,7 @@ main(int argc, char *argv[])
 			clean = 1;
 			break;
 		case 'e':
-			if (++newenvlen > UINT_MAX)
+			if (++newenvlen >= UINT_MAX)
 				errx(1, "No more memory can be allocated to this environment!");
 			if ((newenv = realloc(newenv, sizeof(char **) * newenvlen)) == NULL)
 				err(1, "realloc");
