@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -369,6 +369,9 @@ fetch_pkgbase()
 			c)
 				pkg_conf_dir="${OPTARG}"
 				;;
+			f)
+				fingerprints_directory="${OPTARG}"
+				;;
 			r)
 				release_name="${OPTARG}"
 				;;
@@ -470,7 +473,7 @@ fetch_pkgbase()
 			lib_err ${EX_IOERR} "Error creating ${releasedir}/release/usr/share/keys"
 		fi
 
-		if ! cp -a -- "${fingerprints_directory}" "${releasedir}/release/usr/share/keys/pkg"; then
+		if ! cp -a -- "${fingerprints_directory}" "${releasedir}/release/usr/share/keys"; then
 			lib_err ${EX_IOERR} "Error copying ${fingerprints_directory}"
 		fi
 	fi
