@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -386,6 +386,7 @@ oci_get_osversion()
 	esac
 
 	if [ -z "${osversion}" ]; then
+		lib_warn "The specific operating system version for container '${container}' (jail:${jail}), so '${os}' is used instead."
 		osversion="${os}" # fallback
 	fi
 
