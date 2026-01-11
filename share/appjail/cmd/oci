@@ -195,9 +195,9 @@ oci_exec()
 				env_var=`lib_escape_string "${env_var}"`
 
 				if [ -z "${env}" ]; then
-					env="\"${env_var}\""
+					env="-e \"${env_var}\""
 				else
-					env="${env} \"${env_var}\""
+					env="${env} -e \"${env_var}\""
 				fi
 				;;
 			u)
@@ -300,11 +300,6 @@ oci_exec()
 
 	jexec_args="${jexec_args} -w \"${escape_workdir}\""
 
-	local escape_jail
-	escape_jail=`lib_escape_string "${jail}"`
-
-	jexec_args="${jexec_args} -- \"${escape_jail}\""
-
 	local default_env
 	default_env=`oci_ociv1_get_env "${container_name}"` || exit $?
 
@@ -330,9 +325,9 @@ oci_exec()
 			env_var=`lib_escape_string "${arg}"`
 
 			if [ -z "${_default_env}" ]; then
-				_default_env="\"${env_var}\""
+				_default_env="-e \"${env_var}\""
 			else
-				_default_env="${_default_env} \"${env_var}\""
+				_default_env="${_default_env} -e \"${env_var}\""
 			fi
 		done
 
@@ -359,16 +354,21 @@ oci_exec()
 			env_var=`lib_escape_string "${env_var}"`
 
 			if [ -z "${user_env}" ]; then
-				user_env="\"${env_var}\""
+				user_env="-e \"${env_var}\""
 			else
-				user_env="${user_env} \"${env_var}\""
+				user_env="${user_env} -e \"${env_var}\""
 			fi
 		done
 
 		env="${user_env} ${env}"
 	fi
 
-	jexec_args="${jexec_args} env ${default_env} ${env}"
+	jexec_args="${jexec_args} ${default_env} ${env}"
+
+	local escape_jail
+	escape_jail=`lib_escape_string "${jail}"`
+
+	jexec_args="${jexec_args} -- \"${escape_jail}\""
 
 	if lib_check_empty "${entrypoint}"; then
 		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?

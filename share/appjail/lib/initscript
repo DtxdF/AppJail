@@ -64,7 +64,7 @@ INITENV()
 		escape_env=`lib_escape_string "${env}"`
 		escape_env="\"${escape_env}\""
 
-		printf "%s " "${escape_env}" >> "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" || exit $?
+		printf "%s " "-e ${escape_env}" >> "${__APPJAIL_RUN_ENVIRONMENT_FILE__}" || exit $?
 	done || exit $?
 
 	local environ
@@ -106,9 +106,9 @@ ENV()
 	escape_env=`lib_escape_string "${env}"`
 
 	if [ -z "${__APPJAIL_RUN_ENVIRONMENT__}" ]; then
-		__APPJAIL_RUN_ENVIRONMENT__="\"${escape_env}\""
+		__APPJAIL_RUN_ENVIRONMENT__="-e \"${escape_env}\""
 	else
-		__APPJAIL_RUN_ENVIRONMENT__="${__APPJAIL_RUN_ENVIRONMENT__} \"${escape_env}\""
+		__APPJAIL_RUN_ENVIRONMENT__="${__APPJAIL_RUN_ENVIRONMENT__} -e \"${escape_env}\""
 	fi
 }
 
@@ -162,9 +162,9 @@ CMD()
 				escape_env_var=`lib_escape_string "${env_var}"`
 
 				if [ -z "${environ}" ]; then
-					environ="\"${escape_env_var}\""
+					environ="-e \"${escape_env_var}\""
 				else
-					environ="${environ} \"${escape_env_var}\""
+					environ="${environ} -e \"${escape_env_var}\""
 				fi
 				;;
 			u)
@@ -209,9 +209,9 @@ CMD()
 	local escape_jailname
 	escape_jailname=`lib_escape_string "${APPJAIL_JAILNAME}"`
 
-	args="${args} \"${escape_jailname}\""
+	args="${args} ${environ}"
 
-	args="${args} env ${environ}"
+	args="${args} \"${escape_jailname}\""
 
 	local arg
 

@@ -60,7 +60,9 @@ main(int argc, char *argv[])
 	int jid;
 	login_cap_t *lcap = NULL;
 	int ch, clean, uflag, wflag;
+	unsigned int newenvlen = 0;
 	char *cleanenv;
+	char **newenv = NULL;
 	const struct passwd *pwd = NULL;
 	const char *username, *shell, *term;
 	const char *workdir;
@@ -74,6 +76,14 @@ main(int argc, char *argv[])
 		case 'l':
 			clean = 1;
 			break;
+		case 'e':
+		if (++newenvlen > UINT_MAX)
+			errx(1, "No more memory can be allocated to this environment!");
+		if ((newenv = realloc(newenv, sizeof(char **) * newenvlen)) == NULL)
+			err(1, "realloc");
+		if ((newenv[newenvlen-1] = strdup(optarg)) == NULL)
+			err(1, "strdup");
+		break;
 		case 'u':
 			username = optarg;
 			uflag = 1;
@@ -132,6 +142,16 @@ main(int argc, char *argv[])
 		endpwent();
 	}
 
+	/* Custom environment */
+	while (newenvlen > 0) {
+		if (putenv(newenv[--newenvlen]) == -1)
+			err(1, "putenv");
+		free(newenv[newenvlen]);
+	}
+	if (newenv != NULL) {
+		free(newenv);
+	}
+
 	/* Run the specified command, or the shell */
 	if (argc > 1) {
 		if (execvp(argv[1], argv + 1) < 0)
@@ -184,6 +204,6 @@ usage(void)
 {
 
 	fprintf(stderr, "%s\n",
-	    "usage: jexec [-l] [-u username] [-w working-directory] jail [command ...]");
+	    "usage: jexec [-l] [[-e name=value] ...] [-u username] [-w working-directory] jail [command ...]");
 	exit(1);
 }
