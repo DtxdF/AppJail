@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 22, 2025
+.Dd January 11, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -137,6 +137,52 @@ See also
 .Xr appjail-jail 1 "."
 .Pp
 .Em Type Ns : Ns " " Ns Sy Boolean
+.br
+.Em Multiple Ns : Ns " " Ns Sy \&No
+.It Cm brandelf Ns = Ns Qo Ar file Ns Oo Ns : Ns Ar abi Oc Qc
+.Pp
+Change the ABI to a binary within the jail.
+.Pp
+.Sy brandelf_abi
+affects this option, whose default value is
+.Sy BRANDELF_DEFAULT_ABI Ns ,
+but a different binary ABI can be specified for a specific binary using
+.Ar abi Ns "."
+.Pp
+Although
+.Xr brandelf 1
+only works with binaries, this option has special behavior. If the file specified
+is a binary, brandelf works as expected, changing the binary ABI, but if the file
+is a directory, this option will recursively change every file with the execute
+bit set. This option does not work with symbolic links or file types other than
+files or directories.
+.Pp
+This is especially useful for OCI images that FreeBSD doesn't correctly detect the ABI for.
+.Pp
+See also
+.Xr brandelf 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm brandelf Ns = Ns Qo /busybox/busybox Qc
+.El
+.It Cm brandelf_abi Ns = Ns Qo Ar abi Qc
+.Pp
+Changes the default binary ABI used by the
+.Sy brandelf
+option. By default,
+.Sy BRANDELF_DEFAULT_ABI
+is used as the value for this option.
+.Pp
+See also
+.Xr appjail.conf 5 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
 .It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc

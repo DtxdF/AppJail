@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 21, 2025
+.Dd January 11, 2026
 .Dt APPJAIL.CONF 5
 .Os
 .Sh NAME
@@ -1336,6 +1336,14 @@ locally, update it.
 .br
 Default:
 .Em 1
+.It BRANDELF_DEFAULT_ABI
+Parameter equivalent to the
+.Sy brandelf_abi
+option in
+.Xr appjail-quick 1 "."
+.br
+Default:
+.Em Linux
 .It BUILDAH_FROM_ARGS
 .Xr buildah-from 1
 arguments. By default this parameter is set to an empty value.

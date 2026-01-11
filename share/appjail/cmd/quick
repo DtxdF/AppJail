@@ -99,6 +99,8 @@ QUICK_JAILPATH=
 QUICK_OPTION_ALIAS=0
 QUICK_OPTION_ALIAS_IFACE=
 QUICK_OPTION_BOOT="${DEFAULT_BOOT}"
+QUICK_OPTION_BRANDELF=
+QUICK_OPTION_BRANDELF_ABI="${BRANDELF_DEFAULT_ABI}"
 QUICK_OPTION_BRIDGE=0
 QUICK_OPTION_CLONE_JAIL=0
 QUICK_OPTION_CLONE_RELEASE=0
@@ -220,7 +222,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -233,6 +235,9 @@ quick_main()
 
 	local oci_options
 	oci_options="from"
+
+	local brandelf_options
+	brandelf_options="brandelf"
 
 	local label_options
 	label_options="label"
@@ -286,7 +291,7 @@ quick_main()
 	args_options="start_env run_env stop_env create_args start_args run_args stop_args"
 
 	local all_options
-	all_options="${oci_options} ${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
+	all_options="${oci_options} ${brandelf_options} ${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
 
 	for option in ${all_options}; do
 		quick_run_${option}
@@ -768,6 +773,72 @@ quick_set_from()
 
 	QUICK_OPTION_FROM=1
 	QUICK_OPTION_FROM_IMAGE="${image}"
+}
+
+quick_run_brandelf()
+{
+	local errlevel
+
+	if [ -z "${QUICK_OPTION_BRANDELF}" ]; then
+		return 0
+	fi
+
+	lib_split_jailparams "${QUICK_OPTION_BRANDELF}" | while IFS= read -r file_abi; do
+		abi=`lib_jailparam_value "${file_abi}" :`
+
+		if lib_check_empty "${abi}"; then
+			abi="${QUICK_OPTION_BRANDELF_ABI}"
+		fi
+
+		file=`lib_jailparam_name "${file_abi}" :`
+
+		if lib_check_empty "${file}"; then
+			continue
+		fi
+
+		lib_debug "Changing binary ABI (abi:${abi}) to ${file} ..."
+
+		pathname="${QUICK_JAILPATH}/jail/${file}"
+
+		if [ -L "${pathname}" ]; then
+			lib_warn "Can't change binary ABI (abi:${abi}) to ${file} because it's a symlink."
+		elif [ -f "${pathname}" ]; then
+			printf "%s\n" "${pathname}"
+		elif [ -d "${pathname}" ]; then
+			find -- "${pathname}" -type f -executable || exit $?
+		elif [ ! -e "${pathname}" ]; then
+			lib_warn "Can't change binary ABI (abi:${abi}) to ${file} because it doesn't exists."
+		else
+			lib_warn "Can't change binary ABI (abi:${abi}) to ${file} because isn't a file or a directory."
+		fi | while IFS= read -r file; do
+			if ! brandelf -t "${abi}" "${file}"; then
+				lib_err ${EX_SOFTWARE} "Error changing binary ABI (abi:${abi}) to ${file}."
+			fi
+		done || exit $?
+	done || exit $?
+}
+
+quick_set_brandelf()
+{
+	local file
+
+	file="$1"; quick_reqoption "brandelf" "${file}"
+	file=`lib_escape_string "${file}" "" '\"' "-"`
+
+	if [ -z "${QUICK_OPTION_BRANDELF}" ]; then
+		QUICK_OPTION_BRANDELF="\"${file}\""
+	else
+		QUICK_OPTION_BRANDELF="${QUICK_OPTION_BRANDELF} \"${file}\""
+	fi
+}
+
+quick_set_brandelf_abi()
+{
+	local abi
+
+	abi="$1"; quick_reqoption "brandelf_abi" "${abi}"
+
+	QUICK_OPTION_BRANDELF_ABI="${abi}"
 }
 
 quick_run_label()
