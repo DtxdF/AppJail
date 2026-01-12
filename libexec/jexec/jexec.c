@@ -50,6 +50,7 @@
 
 extern char **environ;
 
+static void	putenv_copy(char *env);
 static void	get_user_info(const char *username, const struct passwd **pwdp,
     login_cap_t **lcapp);
 static void	usage(void);
@@ -144,8 +145,7 @@ main(int argc, char *argv[])
 
 	/* Custom environment */
 	while (newenvlen > 0) {
-		if (putenv(newenv[--newenvlen]) == -1)
-			err(1, "putenv");
+		putenv_copy(newenv[--newenvlen]);
 		free(newenv[newenvlen]);
 	}
 	if (newenv != NULL) {
@@ -163,6 +163,29 @@ main(int argc, char *argv[])
 			err(1, "execlp: %s", shell);
 	}
 	exit(0);
+}
+
+static void
+putenv_copy(char *env)
+{
+	size_t name_len;
+	char *sign;
+	char *name, *value;
+
+	if ((sign = strchr(env, '=')) == NULL)
+		errx(1, "%s: Invalid environment variable.", env);
+	name_len = sign - env;
+	if ((name = strndup(env, name_len)) == NULL)
+		err(1, "strdup");
+	if ((value = strdup(sign + 1)) == NULL)
+		err(1, "strdup");
+	if (setenv(name, value, 1) == -1) {
+		free(name);
+		free(value);
+		err(1, "setenv");
+	}
+	free(name);
+	free(value);
 }
 
 static void
