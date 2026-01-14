@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003 Mike Barcroft <mike@FreeBSD.org>
  * Copyright (c) 2008 Bjoern A. Zeeb <bz@FreeBSD.org>
- * Copyright (c) 2024 Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+ * Copyright (c) 2024-2026 Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,6 @@
 
 extern char **environ;
 
-static void	putenv_copy(char *env);
 static void	get_user_info(const char *username, const struct passwd **pwdp,
     login_cap_t **lcapp);
 static void	usage(void);
@@ -61,9 +60,9 @@ main(int argc, char *argv[])
 	int jid;
 	login_cap_t *lcap = NULL;
 	int ch, clean, uflag, wflag;
-	unsigned int newenvlen = 0;
+	int env_argc = argc;
+	char **env_argv = argv;
 	char *cleanenv;
-	char **newenv = NULL;
 	const struct passwd *pwd = NULL;
 	const char *username, *shell, *term;
 	const char *workdir;
@@ -78,12 +77,9 @@ main(int argc, char *argv[])
 			clean = 1;
 			break;
 		case 'e':
-			if (++newenvlen >= UINT_MAX)
-				errx(1, "No more memory can be allocated to this environment!");
-			if ((newenv = realloc(newenv, sizeof(char **) * newenvlen)) == NULL)
-				err(1, "realloc");
-			if ((newenv[newenvlen-1] = strdup(optarg)) == NULL)
-				err(1, "strdup");
+			/* Used later. */
+			if (strchr(optarg, '=') == NULL)
+				errx(1, "%s: Invalid environment variable.", optarg);
 			break;
 		case 'u':
 			username = optarg;
@@ -143,13 +139,16 @@ main(int argc, char *argv[])
 		endpwent();
 	}
 
+	optreset = 1;
+	optind = 1;
+
 	/* Custom environment */
-	while (newenvlen > 0) {
-		putenv_copy(newenv[--newenvlen]);
-		free(newenv[newenvlen]);
-	}
-	if (newenv != NULL) {
-		free(newenv);
+	while ((ch = getopt(env_argc, env_argv, ":e:")) != -1) {
+		switch (ch) {
+		case 'e':
+			putenv(env_argv[optind - 1]);
+			break;
+		}
 	}
 
 	/* Run the specified command, or the shell */
@@ -163,29 +162,6 @@ main(int argc, char *argv[])
 			err(1, "execlp: %s", shell);
 	}
 	exit(0);
-}
-
-static void
-putenv_copy(char *env)
-{
-	size_t name_len;
-	char *sign;
-	char *name, *value;
-
-	if ((sign = strchr(env, '=')) == NULL)
-		errx(1, "%s: Invalid environment variable.", env);
-	name_len = sign - env;
-	if ((name = strndup(env, name_len)) == NULL)
-		err(1, "strdup");
-	if ((value = strdup(sign + 1)) == NULL)
-		err(1, "strdup");
-	if (setenv(name, value, 1) == -1) {
-		free(name);
-		free(value);
-		err(1, "setenv");
-	}
-	free(name);
-	free(value);
 }
 
 static void
