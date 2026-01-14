@@ -66,12 +66,13 @@ main(int argc, char *argv[])
 	const struct passwd *pwd = NULL;
 	const char *username, *shell, *term;
 	const char *workdir;
+	const char *jexec_args = "le:u:w:";
 
 	ch = clean = uflag = wflag = 0;
 	username = NULL;
 	workdir = "/";
 
-	while ((ch = getopt(argc, argv, "le:u:w:")) != -1) {
+	while ((ch = getopt(argc, argv, jexec_args)) != -1) {
 		switch (ch) {
 		case 'l':
 			clean = 1;
@@ -143,10 +144,10 @@ main(int argc, char *argv[])
 	optind = 1;
 
 	/* Custom environment */
-	while ((ch = getopt(env_argc, env_argv, ":e:")) != -1) {
+	while ((ch = getopt(env_argc, env_argv, jexec_args)) != -1) {
 		switch (ch) {
 		case 'e':
-			if (putenv(env_argv[optind - 1]) == -1)
+			if (putenv(optarg) == -1)
 				err(1, "putenv");
 			break;
 		}
