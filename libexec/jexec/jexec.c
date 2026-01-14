@@ -146,7 +146,8 @@ main(int argc, char *argv[])
 	while ((ch = getopt(env_argc, env_argv, ":e:")) != -1) {
 		switch (ch) {
 		case 'e':
-			putenv(env_argv[optind - 1]);
+			if (putenv(env_argv[optind - 1]) == -1)
+				err(1, "putenv");
 			break;
 		}
 	}
