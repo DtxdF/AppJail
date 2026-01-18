@@ -70,8 +70,10 @@
  */
 
 const char *template_parameters[] = {
+    "allow.adjtime",
     "allow.chflags",
     "allow.dying",
+    "allow.extattr",
     "allow.mlock",
     "allow.mount",
     "allow.mount.devfs",
@@ -97,6 +99,7 @@ const char *template_parameters[] = {
     "allow.nodying",
     "allow.nomlock",
     "allow.nomount",
+    "allow.nonfsd",
     "allow.noquotas",
     "allow.noraw_sockets",
     "allow.noread_msgbuf",
@@ -111,7 +114,10 @@ const char *template_parameters[] = {
     "allow.raw_sockets",
     "allow.read_msgbuf",
     "allow.reserved_ports",
+    "allow.routing",
     "allow.set_hostname",
+    "allow.setaudit",
+    "allow.settime",
     "allow.socket_af",
     "allow.suser",
     "allow.sysvipc",
@@ -123,6 +129,7 @@ const char *template_parameters[] = {
     "depend",
     "devfs_ruleset",
     "enforce_statfs",
+    "env",
     "exec.clean",
     "exec.consolelog",
     "exec.created",
@@ -163,6 +170,7 @@ const char *template_parameters[] = {
     "linux.osname",
     "linux.osrelease",
     "linux.oss_version",
+    "meta",
     "mount",
     "mount.devfs",
     "mount.fdescfs",
@@ -184,6 +192,7 @@ const char *template_parameters[] = {
     "vnet",
     "vnet.interface",
     "zfs.dataset",
+    "zfs.mount_snapshot",
 };
 
 size_t template_parameters_total = sizeof(template_parameters) / sizeof(template_parameters[0]);

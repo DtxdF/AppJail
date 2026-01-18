@@ -478,6 +478,13 @@ template_checkvar(const char *s)
 bool
 template_checkparam(const char *s)
 {
+    /*
+     * These are special parameters, as they are dynamic by nature, so comparing them
+     * with template_parameters will return false, which is wrong.
+     */
+    if (strncmp("env.", s, 4) == 0 || strncmp("meta.", s, 5) == 0)
+        return true;
+
     return bsearch(
         (const void *)s,
         (const void *)template_parameters,
