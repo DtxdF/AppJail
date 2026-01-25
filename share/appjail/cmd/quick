@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -64,6 +64,7 @@ QUICK_KEY_BRIDGE="bridge"
 QUICK_KEY_DEFAULTROUTER="defaultrouter"
 QUICK_KEY_DEVICE="device"
 QUICK_KEY_DHCP="dhcp"
+QUICK_KEY_ENV="env"
 QUICK_KEY_ETHER="ether"
 QUICK_KEY_EXPOSE="expose"
 QUICK_KEY_FSTAB="fstab"
@@ -74,6 +75,7 @@ QUICK_KEY_IP6="ip6"
 QUICK_KEY_JNG="jng"
 QUICK_KEY_LABELS="labels"
 QUICK_KEY_LIMITS="limits"
+QUICK_KEY_META="meta"
 QUICK_KEY_NAT="nat"
 QUICK_KEY_NETWORK="network"
 QUICK_KEY_NONAT="nonat"
@@ -126,6 +128,7 @@ QUICK_OPTION_DEVICE=0
 QUICK_OPTION_DHCP=0
 QUICK_OPTION_EPHEMERAL=0
 QUICK_OPTION_EMPTY=0
+QUICK_OPTION_ENV=0
 QUICK_OPTION_EXPOSE=0
 QUICK_OPTION_FILE=
 QUICK_OPTION_FILES=
@@ -151,6 +154,7 @@ QUICK_OPTION_LINUXFS=0
 QUICK_OPTION_LOGIN="${DEFAULT_LOGIN}"
 QUICK_OPTION_LOGIN_USER="${DEFAULT_LOGIN_USER}"
 QUICK_OPTION_MACADDR=0
+QUICK_OPTION_META=0
 QUICK_OPTION_MOUNT_DEVFS="${DEFAULT_MOUNT_DEVFS}"
 QUICK_OPTION_NAT=0
 QUICK_OPTION_NETWORK=0
@@ -222,7 +226,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -240,7 +244,7 @@ quick_main()
 	brandelf_options="brandelf"
 
 	local label_options
-	label_options="label"
+	label_options="label env meta"
 
 	local file_options
 	file_options="copy tzdata resolv_conf"
@@ -877,6 +881,82 @@ quick_set_label()
 	lib_keys_set "${QUICK_KEY_LABELS}" "${key}" "value" "${value}"
 
 	QUICK_OPTION_LABEL=1
+}
+
+quick_run_meta()
+{
+	if [ ${QUICK_OPTION_META} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_keys_list "${QUICK_KEY_META}" | while IFS= read -r meta; do
+		value=`lib_keys_get "${QUICK_KEY_META}" "${meta}" "value"`
+
+		lib_debug "Adding meta ${meta} (value:${value}) ..."
+
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" "meta.${meta}=${value}"
+	done || exit $?
+}
+
+quick_set_meta()
+{
+	local meta
+
+	meta="$1"
+
+	quick_reqoption "meta" "${meta}"
+
+	local key value
+
+	key=`lib_jailparam_name "${meta}" :`
+
+	if ! lib_check_labelname "${key}"; then
+		lib_err ${EX_DATAERR} "Invalid meta name '${key}'"
+	fi
+
+	value=`lib_jailparam_value "${meta}" :`
+
+	lib_keys_set "${QUICK_KEY_META}" "${key}" "value" "${value}"
+
+	QUICK_OPTION_META=1
+}
+
+quick_run_env()
+{
+	if [ ${QUICK_OPTION_ENV} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_keys_list "${QUICK_KEY_ENV}" | while IFS= read -r env; do
+		value=`lib_keys_get "${QUICK_KEY_ENV}" "${env}" "value"`
+
+		lib_debug "Adding env ${env} (value:${value}) ..."
+
+		lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" "env.${env}=${value}"
+	done || exit $?
+}
+
+quick_set_env()
+{
+	local env
+
+	env="$1"
+
+	quick_reqoption "env" "${env}"
+
+	local key value
+
+	key=`lib_jailparam_name "${env}" :`
+
+	if ! lib_check_labelname "${key}"; then
+		lib_err ${EX_DATAERR} "Invalid env name '${key}'"
+	fi
+
+	value=`lib_jailparam_value "${env}" :`
+
+	lib_keys_set "${QUICK_KEY_ENV}" "${key}" "value" "${value}"
+
+	QUICK_OPTION_ENV=1
 }
 
 quick_run_vnet()
