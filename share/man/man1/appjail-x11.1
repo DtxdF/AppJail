@@ -96,6 +96,15 @@ Application to be run after starting
 In most cases, this is the window manager or desktop environment. You can run an individual
 application that is not a window manager, but for certain applications that rely heavily on
 at least a window manager, you should run your application with the window manager.
+.Pp
+The value of this parameter may contain some keywords that have special meaning:
+.Bl -dash -compact
+.It
+.Sy %d
+.Aq Assigned display
+.El
+.Pp
+If you want to escape a keyword, use %%, e.g. %%d.
 .It Cm exec_user Ns = Ns Qo Ar user Qc
 Run the application inside the jail as the specified user. The user must exist inside the
 jail and have a home directory for
