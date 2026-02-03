@@ -59,36 +59,43 @@ main(int argc, char *argv[])
 {
 	int jid;
 	login_cap_t *lcap = NULL;
-	int ch, clean, uflag, wflag;
+	int ch, clean, dflag, uflag, Uflag;
 	int env_argc = argc;
 	char **env_argv = argv;
 	char *cleanenv;
 	const struct passwd *pwd = NULL;
 	const char *username, *shell, *term;
 	const char *workdir;
-	const char *jexec_args = "le:u:w:";
+	const char *jexec_args = "d:e:lnu:U:";
 
-	ch = clean = uflag = wflag = 0;
+	ch = clean = dflag = uflag = Uflag = 0;
 	username = NULL;
 	workdir = "/";
 
 	while ((ch = getopt(argc, argv, jexec_args)) != -1) {
 		switch (ch) {
-		case 'l':
-			clean = 1;
+		case 'd':
+			workdir = optarg;
+			dflag = 1;
 			break;
 		case 'e':
 			/* Used later. */
 			if (strchr(optarg, '=') == NULL)
 				errx(1, "%s: Invalid environment variable.", optarg);
 			break;
+		case 'l':
+			clean = 1;
+			break;
+		case 'n':
+			/* Specified name, now unused */
+			break;
 		case 'u':
 			username = optarg;
 			uflag = 1;
 			break;
-		case 'w':
-			workdir = optarg;
-			wflag = 1;
+		case 'U':
+			username = optarg;
+			Uflag = 1;
 			break;
 		default:
 			usage();
@@ -98,7 +105,9 @@ main(int argc, char *argv[])
 	argv += optind;
 	if (argc < 1)
 		usage();
-	if (clean && !uflag)
+	if (uflag && Uflag)
+		usage();
+	if (uflag || (clean && !Uflag))
 		/* User info from the home environment */
 		get_user_info(username, &pwd, &lcap);
 
@@ -113,7 +122,7 @@ main(int argc, char *argv[])
 
 	/* Set up user environment */
 	if (clean || username != NULL) {
-		if (uflag)
+		if (Uflag)
 			/* User info from the jail environment */
 			get_user_info(username, &pwd, &lcap);
 		if (clean) {
@@ -135,7 +144,7 @@ main(int argc, char *argv[])
 		setenv("HOME", pwd->pw_dir, 1);
 		setenv("SHELL",
 		    *pwd->pw_shell ? pwd->pw_shell : _PATH_BSHELL, 1);
-		if (clean && username && !wflag && chdir(pwd->pw_dir) < 0)
+		if (clean && username && !dflag && chdir(pwd->pw_dir) < 0)
 			err(1, "chdir: %s", pwd->pw_dir);
 		endpwent();
 	}
@@ -205,6 +214,7 @@ usage(void)
 {
 
 	fprintf(stderr, "%s\n",
-	    "usage: jexec [-l] [[-e name=value] ...] [-u username] [-w working-directory] jail [command ...]");
+	    "usage: jexec [-l] [-d working-directory] [[-e name=value] ...]\n"
+	    "       [-u username | -U username] jail [command ...]");
 	exit(1);
 }

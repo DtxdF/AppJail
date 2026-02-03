@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 21, 2024
+.Dd February 3, 2026
 .Dt APPJAIL-MAKEJAIL 5
 .Os
 .Sh NAME
@@ -100,7 +100,7 @@ instruction, all commands written up to this instruction and in the current stag
 .Pp
 .It Cm CMD Fl Fl chroot Ar command Oo Ar args No "..." Oc
 .It Cm CMD Fl Fl jaildir Ar command Oo Ar args No "..." Oc
-.It Cm CMD Oo Fl Fl jexec Oc Oo Fl Fl noclean Oc Oo Fl Fl juser Ar username Ns | Ns Fl Fl huser Ar username Oc Ar command Oo Ar args No "..." Oc
+.It Cm CMD Oo Fl Fl jexec Oc Oo Fl Fl noclean Oc Oo Oo Fl Fl env Ar name Ns Oo Ns = Ns Ar value Oc Oc No "..." Oc Oo Fl Fl juser Ar username Ns | Ns Fl Fl huser Ar username Oc Oo Fl Fl workdir Ar working-directory Oc Ar command Oo Ar args No "..." Oc
 .It Cm CMD Fl Fl local Ar command Oo Ar args No "..." Oc
 .It Cm CMD Fl Fl local-jaildir Ar command Oo Ar args No "..." Oc
 .It Cm CMD Fl Fl local-rootdir Ar command Oo Ar args No "..." Oc
@@ -152,9 +152,13 @@ but if you run it in a Makejail you will get
 .Pp
 .Fl Fl jexec Fl Fl noclean No is equivalent to Xr appjail-cmd 1 Cm jexec Fl l Ns "."
 .br
+.Fl Fl jexec Fl Fl env No is equivalent to Xr appjail-cmd 1 Cm jexec Fl e Ns "."
+.br
 .Fl Fl jexec Fl Fl juser No is equivalent to Xr appjail-cmd 1 Cm jexec Fl U Ns "."
 .br
 .Fl Fl jexec Fl Fl huser No is equivalent to Xr appjail-cmd 1 Cm jexec Fl u Ns "."
+.br
+.Fl Fl jexec Fl Fl workdir No is equivalent to Xr appjail-cmd 1 Cm jexec Fl w Ns "."
 .Pp
 .Fl Fl local No runs a command from the host but using the local directory which may be different. See
 .Cm INCLUDE

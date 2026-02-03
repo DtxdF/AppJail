@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -142,8 +142,10 @@ cmd_jexec()
 	local opt_clean=1
 	local jail_username=
 	local host_username=
+	local workdir="/"
 	local jail_name
 	local jexec_args=
+	local env=
 
 	jail_name="$1"; shift
 	if lib_check_empty "${jail_name}"; then
@@ -151,9 +153,9 @@ cmd_jexec()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":lU:u:" _o; do
+	while getopts ":le:U:u:w:" _o; do
 		case "${_o}" in
-			U|u)
+			e|U|u|w)
 				if lib_check_empty "${OPTARG}"; then
 					cmd_usage
 					exit ${EX_USAGE}
@@ -165,11 +167,28 @@ cmd_jexec()
 			l)
 				opt_clean=0
 				;;
+			e)
+				local env_var="${OPTARG}"
+				if ! lib_check_env "${env_var}"; then
+					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
+				fi
+
+				env_var=`lib_escape_string "${env_var}"`
+
+				if [ -z "${env}" ]; then
+					env="-e \"${env_var}\""
+				else
+					env="${env} -e \"${env_var}\""
+				fi
+				;;
 			U)
 				jail_username="${OPTARG}"
 				;;
 			u)
 				host_username="${OPTARG}"
+				;;
+			w)
+				workdir="${OPTARG}"
 				;;
 			*)
 				cmd_usage
@@ -202,12 +221,46 @@ cmd_jexec()
 	fi
 
 	if ! lib_check_empty "${jail_username}"; then
-		jexec ${jexec_args} -U "${jail_username}" -- "${jail_name}" "$@"
+		local escape_jail_username
+		escape_jail_username=`lib_escape_string "${jail_username}"`
+
+		jexec_args="${jexec_args} -U \"${escape_jail_username}\""
 	elif ! lib_check_empty "${host_username}"; then
-		jexec ${jexec_args} -u "${host_username}" -- "${jail_name}" "$@"
-	else
-		jexec ${jexec_args} -- "${jail_name}" "$@"
+		local escape_host_username
+		escape_host_username=`lib_escape_string "${host_username}"`
+
+		jexec_args="${jexec_args} -u \"${escape_host_username}\""
 	fi
+
+	local escape_jail_name
+	escape_jail_name=`lib_escape_string "${jail_name}"`
+
+	local escape_workdir
+	escape_workdir=`lib_escape_string "${workdir}"`
+
+	# Add workdir parameter.
+	jexec_args="${jexec_args} -d \"${escape_workdir}\""
+
+	# Add env parameters.
+	jexec_args="${jexec_args} ${env} -- \"${escape_jail_name}\""
+
+	# Command and arguments.
+	local arg
+
+	for arg in "$@"; do
+		local escape_arg
+		escape_arg=`lib_escape_string "${arg}"`
+
+		jexec_args="${jexec_args} ${escape_arg}"
+	done
+
+	local jexec
+	jexec="${UTILDIR}/jexec/jexec"
+
+	local escape_jexec
+	escape_jexec=`lib_escape_string "${jexec}"`
+
+	sh -c "\"${escape_jexec}\" ${jexec_args}"
 }
 
 cmd_local()

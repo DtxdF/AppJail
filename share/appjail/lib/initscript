@@ -198,13 +198,13 @@ CMD()
 	fi
 
 	if ${opt_u}; then
-		args="${args} -u \"${escape_user}\""
+		args="${args} -U \"${escape_user}\""
 	fi
 
 	local escape_workdir
 	escape_workdir=`lib_escape_string "${workdir}"`
 
-	args="${args} -w \"${escape_workdir}\""
+	args="${args} -d \"${escape_workdir}\""
 
 	local escape_jailname
 	escape_jailname=`lib_escape_string "${APPJAIL_JAILNAME}"`

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -42,8 +42,8 @@ main()
 	if lib_check_empty "${args}"; then
 		lib_err - "usage: CMD --chroot <command> [<args> ...]"
 		lib_err - "       CMD --jaildir <command> [<args> ...]"
-		lib_err - "       CMD [--jexec] [--noclean] [--juser <username>|--huser <username>] <command>"
-		lib_err - "               [<args> ...]"
+		lib_err - "       CMD [--jexec] [--noclean] [[--env name[=value]] ...] [--juser <username>|--huser <username>]"
+		lib_err - "               [--workdir <working-directory>] <command> [<args> ...]"
 		lib_err - "       CMD --local <command> [<args> ...]"
 		lib_err - "       CMD --local-jaildir <command> [<args> ...]"
 		lib_err - "       CMD --local-rootdir <command> [<args> ...]"
@@ -63,8 +63,10 @@ main()
 
 	# jexec options
 	local noclean=0
+	local env=
 	local juser=
 	local huser=
+	local workdir="/"
 
 	# Arguments
 	local has_args=0
@@ -84,7 +86,7 @@ main()
 
 		local optarg=
 		case "${arg}" in
-			--juser|--huser)
+			--env|--juser|--huser|--workdir)
 				current_index=$((current_index+1))
 				if [ ${current_index} -eq ${total_items} ]; then
 					main # usage
@@ -119,11 +121,23 @@ main()
 			--noclean)
 				noclean=1
 				;;
+			--env)
+				local escape_env=`lib_escape_string "${optarg}" "" "${escape_chars}"`
+
+				if [ -z "${env}" ]; then
+					env="-e \"${escape_env}\""
+				else
+					env="${env} -e \"${escape_env}\""
+				fi
+				;;
 			--huser)
 				huser="${optarg}"
 				;;
 			--juser)
 				juser="${optarg}"
+				;;
+			--workdir)
+				workdir="${optarg}"
 				;;
 			--)
 				has_args=1
@@ -164,6 +178,11 @@ main()
 		if [ ${noclean} -eq 1 ]; then
 			jexec_args="-l"
 		fi
+
+		local escape_workdir=`lib_escape_string "${workdir}" "" "${escape_chars}"`
+
+		jexec_args="${jexec_args} -w \"${escape_workdir}\""
+		jexec_args="${jexec_args} ${env}"
 
 		if [ -n "${juser}" ]; then
 			local escape_juser=`lib_escape_string "${juser}" "" "${escape_chars}"`

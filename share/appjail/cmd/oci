@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2024-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -277,7 +277,7 @@ oci_exec()
 		local escape_user
 		escape_user=`lib_escape_string "${user}"`
 
-		jexec_args="${jexec_args} -u \"${escape_user}\""
+		jexec_args="${jexec_args} -U \"${escape_user}\""
 	fi
 
 	if lib_check_empty "${workdir}"; then
@@ -298,7 +298,7 @@ oci_exec()
 	local escape_workdir
 	escape_workdir=`lib_escape_string "${workdir}"`
 
-	jexec_args="${jexec_args} -w \"${escape_workdir}\""
+	jexec_args="${jexec_args} -d \"${escape_workdir}\""
 
 	local default_env
 	default_env=`oci_ociv1_get_env "${container_name}"` || exit $?
