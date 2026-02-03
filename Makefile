@@ -58,7 +58,8 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-nat.1 \
 	 man5/appjail-makejail.5 \
 	 man1/appjail-label.1 \
-	 man1/appjail-oci.1
+	 man1/appjail-oci.1 \
+	 man1/appjail-x11.1
 
 APPJAIL_VERSION?=4.8.0
 

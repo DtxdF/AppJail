@@ -1201,8 +1201,7 @@ lib_check_proc()
     local pid=$1
 
     if [ -z "${pid}" ]; then
-        err "usage: lib_check_proc pid"
-        exit ${EX_USAGE}
+        lib_err ${EX_USAGE} "usage: lib_check_proc pid"
     fi
 
     if [ `ps -o pid -p ${pid} | wc -l` -eq 2 ]; then

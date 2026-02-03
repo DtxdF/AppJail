@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -1760,6 +1760,8 @@ jail_get()
 	local flag_type=0
 	local flag_version=0
 	local flag_version_extra=0
+	local flag_x11_display=0
+	local flag_xephyr_pid=0
 
 	lib_table_init "jail_get"
 
@@ -2220,6 +2222,32 @@ jail_get()
 				fi
 
 				flag_version_extra=1
+				;;
+			x11_display)
+				if [ ${flag_x11_display} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/x11/display" ]; then
+					value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/x11/display"`
+				fi
+
+				flag_x11_display=1
+				;;
+			xephyr_pid)
+				if [ ${flag_xephyr_pid} -eq 1 ]; then
+					continue
+				fi
+
+				if [ -f "${JAILDIR}/${jail_name}/conf/boot/x11/Xephyr.pid" ]; then
+					value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/x11/Xephyr.pid"`
+
+					if ! lib_check_proc "${value}"; then
+						value=
+					fi
+				fi
+
+				flag_xephyr_pid=1
 				;;
 			*)
 				lib_warn -- "${keyword}: keyword not found."

@@ -1,0 +1,517 @@
+#!/bin/sh
+#
+# Copyright (c) 2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/jail"
+lib_load "${LIBDIR}/x11"
+
+x11_desc="Execute x11 applications in jails"
+
+X11_JAILNAME=
+X11_OPTION_DISPLAY="${DISPLAY:-:0}"
+X11_OPTION_EXEC_START=
+X11_OPTION_EXEC_USER=
+X11_OPTION_XAUTHORITY="${X11_XAUTHORITY}"
+X11_OPTION_XEPHYR_ARGS=
+X11_OPTION_XEPHYR_USER=
+X11_OPTION_XRANDR_REFRESH="${X11_XRANDR_REFRESH}"
+
+x11_main()
+{
+	unset XAUTHORITY
+
+	local tool tools
+
+	tools="Xephyr appjail xauth"
+
+	for tool in ${tools}; do
+		if ! which -s "${tool}"; then
+			lib_err ${EX_UNAVAILABLE} "${tool} is not installed. Cannot continue ..."
+		fi
+	done
+
+	X11_JAILNAME="$1"; shift
+	if lib_check_empty "${X11_JAILNAME}"; then
+		x11_usage
+		exit ${EX_USAGE}
+	fi
+
+	local errmsg errlevel
+	errmsg=`appjail status -- "${X11_JAILNAME}" 2>&1`
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} -- "${errmsg}"
+	fi
+
+	lib_set_logprefix " [`random_color`${X11_JAILNAME}${COLOR_DEFAULT}]"
+
+	if ! jexec -l -- "${X11_JAILNAME}" which xauth; then
+		lib_err ${EX_UNAVAILABLE} "xauth is not installed. Cannot continue ..."
+	fi
+
+	lib_debug "x11 parameters: $@"
+
+	local option value
+	for option in "$@"; do
+		value=`lib_jailparam_value "${option}" =`
+		option=`lib_jailparam_name "${option}" =`
+
+		case "${option}" in
+			display|exec_start|exec_user|xauthority|xephyr_args|xephyr_user|xrandr_refresh) x11_set_${option} "${value}" ;;
+			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
+		esac
+	done
+
+	if [ "${X11_OPTION_XRANDR_REFRESH}" != 0 ]; then
+		x11_chkxrandr_refresh "${X11_OPTION_XRANDR_REFRESH}"
+	fi
+
+	local jail_path="${JAILDIR}/${X11_JAILNAME}"
+	local bootdir="${jail_path}/conf/boot"
+	local x11dir="${bootdir}/x11"
+
+	if [ ! -d "${x11dir}" ]; then
+		mkdir -p -- "${x11dir}" || exit $?
+	fi
+
+	local xephyr_pid
+	local xephyr_pidfile="${x11dir}/Xephyr.pid"
+
+	if [ -f "${xephyr_pidfile}" ]; then
+		xephyr_pid=`head -1 -- "${xephyr_pidfile}"` || exit $?
+	fi
+
+	# Although we can technically run another application here, it is probably not
+	# correct to do so. Although we can avoid running Xephyr again, we have already
+	# configured xauth, and although we can obtain the cookie from the jail, it is
+	# not a wise decision, since the jail could be compromised or the user could
+	# have modified the cookie in some way. And finally, if we run a WM or DE twice,
+	# there may be conflicts. The best alternative is to treat the Xephyr window
+	# created the first time as a server and run the applications inside the jail
+	# or through jexec(8).
+	if ! lib_check_empty "${xephyr_pid}" && lib_check_proc "${xephyr_pid}"; then
+		lib_err ${EX_NOPERM} -- "${xephyr_pid}: Xephyr is already running."
+	fi
+
+	local display_file="${x11dir}/display"
+
+	local xephyr_display
+
+	if [ ! -f "${display_file}" ]; then
+		xephyr_display=`lib_x11_get_available_display` || exit $?
+
+		echo "${xephyr_display}" > "${display_file}" || exit $?
+	else
+		xephyr_display=`head -1 -- "${display_file}"` || exit $?
+	fi
+
+	if [ ! -f "${X11_OPTION_XAUTHORITY}" ]; then
+		lib_debug "Creating new Xauthority: ${X11_OPTION_XAUTHORITY}"
+		
+		install -m 600 /dev/null "${X11_OPTION_XAUTHORITY}" || exit $?
+	fi
+
+	local xauthority
+	xauthority="`lib_generate_tempfile`" || exit $?
+
+	local escape_xauthority
+	escape_xauthority=`lib_escape_string "${xauthority}"`
+
+	lib_atexit_add "rm -f \"${escape_xauthority}\""
+
+	lib_debug "Merging '${X11_OPTION_DISPLAY}' entry from '${X11_OPTION_XAUTHORITY}' into '${xauthority}'"
+
+	# This way, we avoid touching the user's Xauthority, working only with what we
+	# really need.
+	xauth -f "${X11_OPTION_XAUTHORITY}" extract - "localhost${X11_OPTION_DISPLAY}" | xauth -f "${xauthority}" merge - || exit $?
+
+	local xauth_list
+	xauth_list=`xauth -f "${X11_OPTION_XAUTHORITY}" list ":${xephyr_display}"` || exit $?
+
+	local cookie
+
+	cookie=`echo ${xauth_list} | cut -d' ' -f3`
+
+	if [ -z "${cookie}" ]; then
+		lib_debug "Generating a new cookie ..."
+
+		cookie=`openssl rand -hex 16` || exit $?
+	fi
+
+	lib_debug "Cookie to allow access to '${xephyr_display}' is '${cookie}'"
+
+	xauth -f "${xauthority}" add "localhost:${xephyr_display}" MIT-MAGIC-COOKIE-1 "${cookie}" || exit $?
+
+	local jexec_args=
+
+	if [ -n "${X11_OPTION_EXEC_USER}" ]; then
+		local escape_user
+		escape_user=`lib_escape_string "${X11_OPTION_EXEC_USER}"`
+
+		jexec_args="-U \"${escape_user}\""
+	fi
+
+	local escape_jail
+	escape_jail=`lib_escape_string "${X11_JAILNAME}"`
+
+	jexec_args="${jexec_args} -- \"${escape_jail}\""
+
+	local cmd
+	cmd="jexec -l ${jexec_args} xauth add \"localhost:${xephyr_display}\" MIT-MAGIC-COOKIE-1 \"${cookie}\""
+
+	lib_debug "Allowing access to display '${xephyr_display}': ${cmd}"
+
+	sh -c "${cmd}" || exit $?
+
+	local xephyr_args=
+
+	if [ -n "${X11_OPTION_XEPHYR_ARGS}" ]; then
+		local params total_items current_index
+
+		params=`lib_split_jailparams "${X11_OPTION_XEPHYR_ARGS}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local _arg=
+
+		while [ ${current_index} -lt ${total_items} ]; do
+			current_index=$((current_index+1))
+
+			local arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			arg=`lib_escape_string "${arg}"`
+
+			if [ -z "${_arg}" ]; then
+				_arg="\"${arg}\""
+			else
+				_arg="${_arg} \"${arg}\""
+			fi
+		done
+
+		xephyr_args="${_arg}"
+	fi
+
+	local kill_child_cmd
+	kill_child_cmd=`lib_escape_string "${SCRIPTSDIR}/kill_child.sh"`
+
+	local config_file
+	config_file=`lib_escape_string "${CONFIG}"`
+
+	local escape_xephyr_user=
+	local runas=
+
+	if [ -n "${X11_OPTION_XEPHYR_USER}" ]; then
+		lib_debug "Xephyr will run as '${X11_OPTION_XEPHYR_USER}'"
+
+		escape_xephyr_user=`lib_escape_string "${X11_OPTION_XEPHYR_USER}"`
+
+		runas="su-exec \"${escape_xephyr_user}\""
+
+		lib_debug "runas command is '${runas}'"
+
+		lib_debug "Changing ownership to the Xauthority file ..."
+
+		chown -- "${X11_OPTION_XEPHYR_USER}" "${xauthority}" || exit $?
+	fi
+
+	cmd="env DISPLAY=${X11_OPTION_DISPLAY} ${runas} Xephyr ${xephyr_args} -auth \"${escape_xauthority}\" :${xephyr_display}"
+
+	lib_debug "Starting Xephyr: ${cmd}"
+
+	sh -c "${cmd}" &
+
+	xephyr_pid=$!
+
+	lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${xephyr_pid} > /dev/null 2>&1"
+
+	echo "${xephyr_pid}" > "${xephyr_pidfile}" || exit $?
+
+	lib_debug "Xephyr started (pid:${xephyr_pid})"
+
+	local it ct et
+
+	it=`date +"%s"`
+	et=`jot -r 1 3 5`
+
+	# Check if the socket has been created.
+	while [ ! -S "/tmp/.X11-unix/X${xephyr_display}" ]; do
+		sleep 0.1
+
+		# Maybe this is due to a signal.
+		errlevel=$?
+
+		if [ ${errlevel} -ne 0 ]; then
+			# Free resources.
+			wait ${xephyr_pid}
+			exit ${errlevel}
+		fi
+
+		ct=`date +"%s"`
+		ct=$((ct-it))
+
+		# To avoid spending more CPU time.
+		if [ ${ct} -gt ${et} ]; then
+			# Free.
+			wait ${xephyr_pid}
+			lib_err ${EX_UNAVAILABLE} "There is a problem with Xephyr ..."
+		fi
+	done
+
+	local in=0 tn=3
+
+	# There may be a delay when Xephyr closes, so we should check again shortly
+	# before continuing or exiting permanently.
+	while [ ${in} -lt ${tn} ]; do
+		sleep 0.3
+
+		if ! lib_check_proc "${xephyr_pid}"; then
+			wait ${xephyr_pid}
+			lib_err ${EX_UNAVAILABLE} "There is a problem with Xephyr ..."
+		fi
+
+		in=$((in+1))
+	done
+
+	local xrandr_refresh_pid=
+
+	if [ "${X11_OPTION_XRANDR_REFRESH}" != 0 ]; then
+		lib_debug "Starting xrandr ..."
+
+		# Yes, this hack makes the -resizeable parameter work perfectly.
+		while :; do
+			sh -c "jexec -l ${jexec_args} env DISPLAY=:${xephyr_display} xrandr > /dev/null" || break
+			sleep -- "${X11_OPTION_XRANDR_REFRESH}" || break
+		done &
+
+		xrandr_refresh_pid=$!
+
+		lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${xrandr_refresh_pid} > /dev/null 2>&1"
+
+		lib_debug "xrandr started (pid:${xrandr_refresh_pid})"
+	fi
+
+	if [ -n "${X11_OPTION_EXEC_START}" ]; then
+		local exec_start
+		exec_start="${X11_OPTION_EXEC_START}"
+		exec_start=`lib_replace "${exec_start}" d "\"${xephyr_display}\""`
+
+		local params total_items current_index
+
+		params=`lib_split_jailparams "${exec_start}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local _arg=
+
+		while [ ${current_index} -lt ${total_items} ]; do
+			current_index=$((current_index+1))
+
+			local arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			arg=`lib_escape_string "${arg}"`
+
+			if [ -z "${_arg}" ]; then
+				_arg="\"${arg}\""
+			else
+				_arg="${_arg} \"${arg}\""
+			fi
+		done
+
+		exec_start="${_arg}"
+
+		local exec_start_pid=
+
+		cmd="jexec -l ${jexec_args} env DISPLAY=:${xephyr_display} ${exec_start}"
+
+		lib_debug "Starting client: ${cmd}"
+
+		sh -c "${cmd}" &
+
+		exec_start_pid=$!
+
+		lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${exec_start_pid} > /dev/null 2>&1"
+
+		lib_debug "Client started (pid:${exec_start_pid})"
+
+		wait ${exec_start_pid}
+
+		lib_debug "Client exits (pid:${exec_start_pid}, rc:$?)"
+
+		lib_debug "Sending termination signal to Xephyr (pid:${xephyr_pid})"
+
+		kill ${xephyr_pid} > /dev/null 2>&1
+	fi
+
+	lib_debug "Waiting for Xephyr (pid:${xephyr_pid}) ..."
+
+	wait ${xephyr_pid}
+
+	if [ -n "${xrandr_refresh_pid}" ]; then
+		lib_debug "Sending termination signal to xrandr (pid:${xrandr_refresh_pid})"
+
+		kill ${xrandr_refresh_pid} > /dev/null 2>&1
+
+		lib_debug "Waiting for xrandr (pid:${xrandr_refresh_pid}) ..."
+
+		wait ${xrandr_refresh_pid}
+	fi
+
+	lib_debug "Done."
+}
+
+x11_set_xrandr_refresh()
+{
+	local xrandr_refresh
+
+	xrandr_refresh="$1"; x11_reqoption "xrandr_refresh" "${xrandr_refresh}"
+
+	x11_chkxrandr_refresh "${xrandr_refresh}"
+
+	X11_OPTION_XRANDR_REFRESH="${xrandr_refresh}"
+}
+
+x11_set_xephyr_user()
+{
+	local xephyr_user
+
+	xephyr_user="$1"; x11_reqoption "xephyr_user" "${xephyr_user}"
+
+	if ! printf "%s" "${xephyr_user}" | grep -qEe '^[^:]+$'; then
+		lib_err ${xephyr_user} -- "${xephyr_user}: invalid user."
+	fi
+
+	if ! which -s "su-exec"; then
+		lib_err ${EX_UNAVAILABLE} "su-exec is not installed. Cannot continue ..."
+	fi
+
+	X11_OPTION_XEPHYR_USER="${xephyr_user}"
+}
+
+x11_set_xephyr_args()
+{
+	local xephyr_args
+
+	xephyr_args="$1"; x11_reqoption "xephyr_args" "${xephyr_args}"
+
+	X11_OPTION_XEPHYR_ARGS="${xephyr_args}"
+}
+
+x11_set_xauthority()
+{
+	local xauthority
+
+	xauthority="$1"; x11_reqoption "xauthority" "${xauthority}"
+
+	X11_OPTION_XAUTHORITY="${xauthority}"
+}
+
+x11_set_exec_user()
+{
+	local user
+
+	user="$1"; x11_reqoption "exec_user" "${user}"
+
+	X11_OPTION_EXEC_USER="${user}"
+}
+
+x11_set_exec_start()
+{
+	local program
+
+	program="$1"; x11_reqoption "exec_start" "${program}"
+
+	X11_OPTION_EXEC_START="${program}"
+}
+
+x11_set_display()
+{
+	local display
+	
+	display="$1"; x11_reqoption "display" "${display}"
+
+	x11_chkdisplay "${display}"
+
+	X11_OPTION_DISPLAY="${display}"
+}
+
+x11_reqoption()
+{
+	local option="$1" value="$2"
+	if [ -z "${option}" ]; then
+		lib_err ${EX_USAGE} "usage: x11_reqoption option value"
+	fi
+
+	if lib_check_empty "${value}"; then
+		lib_err ${EX_DATAERR} -- "${option}: option requires an argument."
+	fi
+}
+
+x11_reqoptions()
+{
+	local option="$1" options="$2"
+	if [ -z "${option}" -o -z "${options}" ]; then
+		lib_err ${EX_USAGE} "usage: x11_reqoptions option options"
+	fi
+
+	lib_err ${EX_CONFIG} "${option} requires the following options: ${options}."
+}
+
+x11_chkxrandr_refresh()
+{
+	if ! lib_check_number "$1" && ! printf "%s" "$1" | grep -qEe '^[0-9]+\.[0-9]+$'; then
+		lib_err ${EX_DATAERR} -- "$1: invalid refresh value."
+	fi
+}
+
+x11_chkdisplay()
+{
+	local display="$1"
+
+	if ! printf "%s" "${display}" | grep -qEe '^:[0-9]+$'; then
+		lib_err ${EX_DATAERR} "${display}: invalid display."
+	fi
+}
+
+x11_help()
+{
+	man 1 appjail-x11
+}
+
+x11_usage()
+{
+	echo "usage: x11 <name> [<options> ...]"
+}

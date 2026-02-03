@@ -1,0 +1,138 @@
+.\"Copyright (c) 2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"All rights reserved.
+.\"
+.\"Redistribution and use in source and binary forms, with or without
+.\"modification, are permitted provided that the following conditions are met:
+.\"
+.\"* Redistributions of source code must retain the above copyright notice, this
+.\"  list of conditions and the following disclaimer.
+.\"
+.\"* Redistributions in binary form must reproduce the above copyright notice,
+.\"  this list of conditions and the following disclaimer in the documentation
+.\"  and/or other materials provided with the distribution.
+.\"
+.\"* Neither the name of the copyright holder nor the names of its
+.\"  contributors may be used to endorse or promote products derived from
+.\"  this software without specific prior written permission.
+.\"
+.\"THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\"AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\"IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+.\"DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+.\"FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\"DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+.\"SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+.\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd February 3, 2026
+.Dt APPJAIL-X11 1
+.Os
+.Sh NAME
+.Nm appjail-x11
+.Nd Execute x11 applications in jails
+.Sh SYNOPSIS
+.Nm appjail x11
+.Ar name
+.Op Ar options Ns " " Ns "..."
+.Sh DESCRIPTION
+The
+.Sy appjail x11
+utility is designed to run an x11 application inside the jail with
+.Sy MIT-MAGIC-COOKIE-1
+authentication already configured. With this approach, even if the
+.Pa /tmp/.X11-unix
+directory is shared with other sockets, an x11 application inside the jail cannot
+access other X servers.
+.Pp
+This utility uses
+.Xr Xephyr 1
+as the X server, so you will have the advantage that the window will behave like
+any other application, but running inside the isolated environment as if it were
+running on the host. This utility also
+.Dq refreshes
+the server when the main window is resized, so the
+.Fl resizeable
+parameter of
+.Xr Xephyr 1
+works quite well, providing an experience similar to that of
+.Xr xpra 1 Ns "."
+.Pp
+The other advantage of using this utility is that it automatically reserves a free
+display number, so you don't need to keep track of this, which is not very practical
+from a human perspective. See
+.Dq X11 PARAMETERS
+in
+.Xr appjail.conf 5
+for details on configuration, but the default settings work well in many cases.
+.Pp
+This utility is designed not to touch the Xauthority file you specify, so you don't have
+to worry about messing up your precious authorizations with jails that may even be ephemeral.
+.Pp
+The cookie is only created if no entry is found in the Xauthority you specify. This cookie is
+ephemeral, so it is replaced by a new one after the next execution. If you want to use other
+useful utilities such as
+.Xr xclip 1 Ns ","
+you must create an entry in Xauthority for the display used inside the jail. Of course, this
+is a chicken-egg problem, since you don't know which display to use before it is assigned, so
+run this utility at least once and the display number will be assigned. See
+.Xr appjail-jail 1
+to obtain the display number assigned to the jail.
+.Sh OPTIONS
+.Bl -tag -width xx
+.It Cm display Ns = Ns Qo Ar display Qc
+The main server for painting the
+.Xr Xephyr 1 Ns 's window. It is also used to obtain the cookie from the Xauthority
+you specify, which is supposed to allow access to
+.Xr Xephyr 1 Ns "."
+By default, the
+.Ev DISPLAY
+environment variable is used, and if it is not defined,
+.Sy :0
+is used as an alternative.
+.It Cm exec_start Ns = Ns Qo Ar command Oo Ar args Ns " " Ns "..." Oc Qc
+Application to be run after starting
+.Xr Xephyr 1 Ns "."
+In most cases, this is the window manager or desktop environment. You can run an individual
+application that is not a window manager, but for certain applications that rely heavily on
+at least a window manager, you should run your application with the window manager.
+.It Cm exec_user Ns = Ns Qo Ar user Qc
+Run the application inside the jail as the specified user. The user must exist inside the
+jail and have a home directory for
+.Xr xauth 1
+to work correctly.
+.It Cm xauthority Ns = Ns Qo Ar file Qc
+Specify an alternative Xauthority file other than the one specified by the
+.Sy X11_XAUTHORITY
+parameter in
+.Xr appjail.conf 5 Ns "."
+.It Cm xephyr_args Ns = Ns Qo Ar args Ns " " Ns "..." Qc
+Pass any valid parameter for
+.Xr Xephyr 1
+and
+.Xr Xserver 1 Ns "."
+The only parameters that are implicitly added are
+.Fl auth
+and the display used within the jail. Specifying a parameter such as
+.Fl ac
+is undefined.
+.It Cm xephyr_user Ns = Ns Qo Ar user Qc
+Run
+.Xr Xephyr 1
+as another user. For this to work, you must have
+.Em security/su-exec
+installed.
+.It Cm xrandr_refresh Ns = Ns Qo Ar number Qc
+Specify the number of seconds in decimal or an integer to wait before re-running
+.Xr xrandr 1
+within the jail. Of course, the jail must have
+.Em x11/xrandr
+installed for this to work.
+.El
+.Sh SEE ALSO
+.Xr Xephyr 1
+.Xr Xserver 1
+.Xr xauth 1
+.Xr Xsecurity 7
+.Sh AUTHORS
+.An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
