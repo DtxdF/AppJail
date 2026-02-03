@@ -73,7 +73,13 @@ x11_main()
 
 	lib_set_logprefix " [`random_color`${X11_JAILNAME}${COLOR_DEFAULT}]"
 
-	if ! jexec -l -- "${X11_JAILNAME}" which xauth; then
+	local jexec
+	jexec="${UTILDIR}/jexec/jexec"
+
+	local escape_jexec
+	escape_jexec=`lib_escape_string "${jexec}"`
+
+	if ! "${jexec}" -l -- "${X11_JAILNAME}" which xauth; then
 		lib_err ${EX_UNAVAILABLE} "xauth is not installed. Cannot continue ..."
 	fi
 
@@ -185,7 +191,7 @@ x11_main()
 	jexec_args="${jexec_args} -- \"${escape_jail}\""
 
 	local cmd
-	cmd="jexec -l ${jexec_args} xauth add \"localhost:${xephyr_display}\" MIT-MAGIC-COOKIE-1 \"${cookie}\""
+	cmd="\"${escape_jexec}\" -l ${jexec_args} xauth add \"localhost:${xephyr_display}\" MIT-MAGIC-COOKIE-1 \"${cookie}\""
 
 	lib_debug "Allowing access to display '${xephyr_display}': ${cmd}"
 
@@ -310,7 +316,7 @@ x11_main()
 
 		# Yes, this hack makes the -resizeable parameter work perfectly.
 		while :; do
-			sh -c "jexec -l ${jexec_args} env DISPLAY=:${xephyr_display} xrandr > /dev/null" || break
+			sh -c "\"${escape_jexec}\" -l -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" || break
 			sleep -- "${X11_OPTION_XRANDR_REFRESH}" || break
 		done &
 
@@ -355,7 +361,7 @@ x11_main()
 
 		local exec_start_pid=
 
-		cmd="jexec -l ${jexec_args} env DISPLAY=:${xephyr_display} ${exec_start}"
+		cmd="\"${escape_jexec}\" -l -e DISPLAY=:${xephyr_display} ${jexec_args} ${exec_start}"
 
 		lib_debug "Starting client: ${cmd}"
 
