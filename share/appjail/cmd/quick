@@ -186,6 +186,7 @@ QUICK_OPTION_VNET=0
 QUICK_OPTION_VNET_INTERFACES=
 QUICK_OPTION_VOLUME=0
 QUICK_OPTION_X11=0
+QUICK_OPTION_X11_OPTIONS=
 QUICK_OPTION_ZFS_IMPORT_JAIL=0
 QUICK_OPTION_ZFS_IMPORT_ROOT=0
 
@@ -2857,9 +2858,12 @@ quick_run_x11()
 	if [ ! -d "/tmp/.X11-unix" ]; then
 		lib_warn "/tmp/.X11-unix: directory does not seem to exist or is not a directory."
 	fi
+
+	local options
+	options="${QUICK_OPTION_X11_OPTIONS:-ro}"
 	
 	mkdir -pm 1777 "${JAILDIR}/${QUICK_JAILNAME}/jail/tmp/.X11-unix" || exit $?
-	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp/.X11-unix -m /tmp/.X11-unix || exit $?
+	appjail fstab jail "${QUICK_JAILNAME}" set -d /tmp/.X11-unix -m /tmp/.X11-unix -o "${options}" || exit $?
 }
 
 quick_set_x11()
@@ -2868,7 +2872,18 @@ quick_set_x11()
 		quick_exclusive "x11" "tmpdir"
 	fi
 
+	local options
+	options="$1"
+
+	if ! lib_check_empty "${options}"; then
+		case "${options}" in
+			rw|ro) ;;
+			*) lib_err ${EX_DATAERR} -- "${options}: valid options for x11 are 'ro' and 'rw'" ;;
+		esac
+	fi
+
 	QUICK_OPTION_X11=1
+	QUICK_OPTION_X11_OPTIONS="${options}"
 }
 
 quick_run_tmpdir()
