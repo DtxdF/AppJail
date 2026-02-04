@@ -251,7 +251,7 @@ cmd_jexec()
 		local escape_arg
 		escape_arg=`lib_escape_string "${arg}"`
 
-		jexec_args="${jexec_args} ${escape_arg}"
+		jexec_args="${jexec_args} \"${escape_arg}\""
 	done
 
 	local jexec
