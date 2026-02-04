@@ -79,7 +79,7 @@ x11_main()
 	local escape_jexec
 	escape_jexec=`lib_escape_string "${jexec}"`
 
-	if ! "${jexec}" -l -- "${X11_JAILNAME}" which xauth; then
+	if ! "${jexec}" -l -- "${X11_JAILNAME}" which -s xauth; then
 		lib_err ${EX_UNAVAILABLE} "xauth is not installed. Cannot continue ..."
 	fi
 
