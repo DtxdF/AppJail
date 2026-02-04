@@ -155,6 +155,10 @@ x11_main()
 
 	lib_debug "Merging '${X11_OPTION_DISPLAY}' entry from '${X11_OPTION_XAUTHORITY}' into '${xauthority}'"
 
+	if [ -z "`xauth -f \"${X11_OPTION_XAUTHORITY}\" list \"localhost${X11_OPTION_DISPLAY}\"`" ]; then
+		lib_err ${EX_NOINPUT} -- "No entry was found for '${X11_OPTION_DISPLAY}' in '${X11_OPTION_XAUTHORITY}'"
+	fi
+
 	# This way, we avoid touching the user's Xauthority, working only with what we
 	# really need.
 	xauth -f "${X11_OPTION_XAUTHORITY}" extract - "localhost${X11_OPTION_DISPLAY}" | xauth -f "${xauthority}" merge - || exit $?
