@@ -80,6 +80,16 @@ run this utility at least once and the display number will be assigned. See
 to obtain the display number assigned to the jail, or better yet, use the
 .Sy assign_only
 option, designed to solve this problem.
+.Pp
+Optionally, if you have installed
+.Em x11/xdotool
+and
+.Em x11/xseticon Ns ,
+this utility changes
+.Xr Xephyr 1 Ns 's
+window icon to easily identify which x11 applications are isolated from the rest. This does not affect other instances of
+.Xr Xephyr 1
+not created by this utility.
 .Sh OPTIONS
 .Bl -tag -width xx
 .It Cm assign_only

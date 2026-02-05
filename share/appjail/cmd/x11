@@ -321,6 +321,8 @@ x11_main()
 		in=$((in+1))
 	done
 
+	x11_change_xephyr_icon "${xephyr_display}"
+
 	local xrandr_refresh_pid=
 
 	if [ "${X11_OPTION_XRANDR_REFRESH}" != 0 ]; then
@@ -532,6 +534,26 @@ x11_chkdisplay()
 x11_help()
 {
 	man 1 appjail-x11
+}
+
+x11_change_xephyr_icon()
+{
+	local display="$1"
+
+	if [ -z "${display}" ]; then
+		lib_err ${EX_USAGE} "usage: x11_change_xephyr_icon display"
+	fi
+
+	if ! which -s xdotool || ! which -s xseticon; then
+		return 0
+	fi
+
+	local window_id
+	window_id=`xdotool search --name "Xephyr on :${display}" 2> /dev/null` || return 0
+
+	test -n "${window_id}" || return 0
+
+	xseticon -id "${window_id}" "${SHAREDIR}/Isotype.png" 2> /dev/null || return 0
 }
 
 x11_usage()

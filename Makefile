@@ -80,6 +80,9 @@ install: utils-strip
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man7"
 	${MKDIR} -m 755 -p "${DESTDIR}${MANDIR}/man8"
 
+	# Used by appjail-x11(1)
+	${INSTALL} -m 444 assets/img/Isotype.png "${DESTDIR}${PREFIX}/share/appjail/Isotype.png"
+
 	# man pages.
 .for manpage in ${MANPAGES}
 	${INSTALL} -m 444 share/man/${manpage} "${DESTDIR}${MANDIR}/${manpage}"
