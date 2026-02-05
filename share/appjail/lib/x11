@@ -28,6 +28,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 lib_load "${LIBDIR}/select"
+lib_load "${LIBDIR}/strlen"
 
 lib_x11_get_available_display()
 {
@@ -52,14 +53,22 @@ lib_x11_get_assigned_displays()
 {
 	local jail
 
+	if [ ! -d "${JAILDIR}" ] || [ `lib_countfiles "${JAILDIR}"` -eq 0 ]; then
+		return
+	fi
+
 	for jail in "${JAILDIR}/"*; do
-		local display_file="${JAILDIR}/${jaildir}/conf/boot/x11/display"
+		jail="${jail##*/}"
+
+		local display_file="${JAILDIR}/${jail}/conf/boot/x11/display"
 
 		if [ ! -f "${display_file}" ]; then
 			continue
 		fi
 
-		head -1 -- "${display_file}" 2> /dev/null && echo
+		local display=`head -1 -- "${display_file}" 2> /dev/null`
+
+		printf "%s\n" "${display}"
 	done
 
 	return 0
