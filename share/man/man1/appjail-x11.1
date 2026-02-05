@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 4, 2026
+.Dd February 5, 2026
 .Dt APPJAIL-X11 1
 .Os
 .Sh NAME
@@ -77,9 +77,14 @@ you must create an entry in Xauthority for the display used inside the jail. Of 
 is a chicken-egg problem, since you don't know which display to use before it is assigned, so
 run this utility at least once and the display number will be assigned. See
 .Xr appjail-jail 1
-to obtain the display number assigned to the jail.
+to obtain the display number assigned to the jail, or better yet, use the
+.Sy assign_only
+option, designed to solve this problem.
 .Sh OPTIONS
 .Bl -tag -width xx
+.It Cm assign_only
+This option is designed to just reserve the display for the jail and nothing else, and when
+this utility finishes running, the display is displayed via stdout.
 .It Cm display Ns = Ns Qo Ar display Qc
 The main server for painting the
 .Xr Xephyr 1 Ns 's window. It is also used to obtain the cookie from the Xauthority

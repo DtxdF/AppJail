@@ -35,6 +35,7 @@ lib_load "${LIBDIR}/x11"
 x11_desc="Execute x11 applications in jails"
 
 X11_JAILNAME=
+X11_OPTION_ASSIGN_ONLY=false
 X11_OPTION_DISPLAY="${DISPLAY:-:0}"
 X11_OPTION_EXEC_START=
 X11_OPTION_EXEC_USER=
@@ -91,7 +92,7 @@ x11_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			display|exec_start|exec_user|xauthority|xephyr_args|xephyr_user|xrandr_refresh) x11_set_${option} "${value}" ;;
+			assign_only|display|exec_start|exec_user|xauthority|xephyr_args|xephyr_user|xrandr_refresh) x11_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -123,8 +124,10 @@ x11_main()
 	# there may be conflicts. The best alternative is to treat the Xephyr window
 	# created the first time as a server and run the applications inside the jail
 	# or through jexec(8).
-	if ! lib_check_empty "${xephyr_pid}" && lib_check_proc "${xephyr_pid}"; then
-		lib_err ${EX_NOPERM} -- "${xephyr_pid}: Xephyr is already running."
+	if ! ${X11_OPTION_ASSIGN_ONLY}; then
+		if ! lib_check_empty "${xephyr_pid}" && lib_check_proc "${xephyr_pid}"; then
+			lib_err ${EX_NOPERM} -- "${xephyr_pid}: Xephyr is already running."
+		fi
 	fi
 
 	local display_file="${x11dir}/display"
@@ -137,6 +140,11 @@ x11_main()
 		echo "${xephyr_display}" > "${display_file}" || exit $?
 	else
 		xephyr_display=`head -1 -- "${display_file}"` || exit $?
+	fi
+
+	if ${X11_OPTION_ASSIGN_ONLY}; then
+		printf "%d\n" "${xephyr_display}" || exit $?
+		exit ${EX_OK}
 	fi
 
 	if [ ! -f "${X11_OPTION_XAUTHORITY}" ]; then
@@ -401,6 +409,11 @@ x11_main()
 	fi
 
 	lib_debug "Done."
+}
+
+x11_set_assign_only()
+{
+	X11_OPTION_ASSIGN_ONLY=true
 }
 
 x11_set_xrandr_refresh()
