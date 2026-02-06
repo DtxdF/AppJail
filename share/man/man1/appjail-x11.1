@@ -136,7 +136,9 @@ Pass any valid parameter for
 and
 .Xr Xserver 1 Ns "."
 The only parameters that are implicitly added are
-.Fl auth
+.Fl auth Ns ","
+.Fl name
+.Pq used to distinguish between multiple instances of Xephyr and set customizations such as the icon
 and the display used within the jail. Specifying a parameter such as
 .Fl ac
 is undefined.

@@ -263,7 +263,7 @@ x11_main()
 		chown -- "${X11_OPTION_XEPHYR_USER}" "${xauthority}" || exit $?
 	fi
 
-	cmd="env DISPLAY=${X11_OPTION_DISPLAY} ${runas} Xephyr ${xephyr_args} -auth \"${escape_xauthority}\" :${xephyr_display}"
+	cmd="env DISPLAY=${X11_OPTION_DISPLAY} ${runas} Xephyr ${xephyr_args} -auth \"${escape_xauthority}\" -name AppJail-Xephyr-${xephyr_display} :${xephyr_display}"
 
 	lib_debug "Starting Xephyr: ${cmd}"
 
@@ -549,7 +549,7 @@ x11_change_xephyr_icon()
 	fi
 
 	local window_id
-	window_id=`xdotool search --name "^Xephyr on :${display}" 2> /dev/null | head -1` || return 0
+	window_id=`xdotool search --classname "AppJail-Xephyr-${display}" 2> /dev/null | head -1` || return 0
 
 	test -n "${window_id}" || return 0
 
