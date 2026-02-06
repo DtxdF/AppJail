@@ -549,7 +549,7 @@ x11_change_xephyr_icon()
 	fi
 
 	local window_id
-	window_id=`xdotool search --name "Xephyr on :${display}" 2> /dev/null` || return 0
+	window_id=`xdotool search --name "^Xephyr on :${display}" 2> /dev/null | head -1` || return 0
 
 	test -n "${window_id}" || return 0
 
