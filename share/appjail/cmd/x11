@@ -553,6 +553,8 @@ x11_change_xephyr_icon()
 
 	test -n "${window_id}" || return 0
 
+	lib_debug "Changing window's icon ..."
+
 	xseticon -id "${window_id}" "${SHAREDIR}/Isotype.png" 2> /dev/null || return 0
 }
 
