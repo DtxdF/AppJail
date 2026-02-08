@@ -113,7 +113,7 @@ test -n "${INTERFACE}" || exit $?
 CURRENT_IP=$(ifconfig -- "${INTERFACE}" inet | \
       grep -m 1 -o 'inet.*' | cut -d ' ' -f 2)
 
-test -n "${CURRENT_IP}" || exit $?
+test -n "${CURRENT_IP}" || exit 0
 
 USERNAME=`appjail label get -l "dyndns.username" -- "${JAIL}" value 2> /dev/null`
 
