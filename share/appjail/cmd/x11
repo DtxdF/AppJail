@@ -43,6 +43,7 @@ X11_OPTION_XAUTHORITY="${X11_XAUTHORITY}"
 X11_OPTION_XEPHYR_ARGS=
 X11_OPTION_XEPHYR_USER=
 X11_OPTION_XRANDR_REFRESH="${X11_XRANDR_REFRESH}"
+X11_OPTION_EXEC_ENV_ARGS=
 
 x11_main()
 {
@@ -92,7 +93,7 @@ x11_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			assign_only|display|exec_start|exec_user|xauthority|xephyr_args|xephyr_user|xrandr_refresh) x11_set_${option} "${value}" ;;
+			assign_only|display|exec_env|exec_start|exec_user|xauthority|xephyr_args|xephyr_user|xrandr_refresh) x11_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -375,7 +376,7 @@ x11_main()
 
 		local exec_start_pid=
 
-		cmd="\"${escape_jexec}\" -l -e DISPLAY=:${xephyr_display} ${jexec_args} ${exec_start}"
+		cmd="\"${escape_jexec}\" -l ${X11_OPTION_EXEC_ENV_ARGS} -e DISPLAY=:${xephyr_display} ${jexec_args} ${exec_start}"
 
 		lib_debug "Starting client: ${cmd}"
 
@@ -480,6 +481,26 @@ x11_set_exec_start()
 	program="$1"; x11_reqoption "exec_start" "${program}"
 
 	X11_OPTION_EXEC_START="${program}"
+}
+
+x11_set_exec_env()
+{
+	local env
+
+	env="$1"; x11_reqoption "exec_env" "${env}"
+
+	if ! lib_check_env "${env}"; then
+		lib_err ${EX_DATAERR} -- "${env}: invalid environment variable"
+	fi
+
+	local escape_env
+	escape_env=`lib_escape_string "${env}"`
+
+	if [ -z "${X11_OPTION_EXEC_ENV_ARGS}" ]; then
+		X11_OPTION_EXEC_ENV_ARGS="-e \"${escape_env}\""
+	else
+		X11_OPTION_EXEC_ENV_ARGS="${X11_OPTION_EXEC_ENV_ARGS} -e \"${escape_env}\""
+	fi
 }
 
 x11_set_display()

@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 5, 2026
+.Dd February 9, 2026
 .Dt APPJAIL-X11 1
 .Os
 .Sh NAME
@@ -105,6 +105,10 @@ By default, the
 environment variable is used, and if it is not defined,
 .Sy :0
 is used as an alternative.
+.It Cm exec_env Ns = Ns Qo Ar name Ns = Ns Ar value Qc
+Pass an environment variable to the command executed by
+.Sy exec_start Ns "."
+Can be specified multiple times.
 .It Cm exec_start Ns = Ns Qo Ar command Oo Ar args Ns " " Ns "..." Oc Qc
 Application to be run after starting
 .Xr Xephyr 1 Ns "."
