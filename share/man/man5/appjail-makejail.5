@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 3, 2026
+.Dd February 13, 2026
 .Dt APPJAIL-MAKEJAIL 5
 .Os
 .Sh NAME
@@ -675,9 +675,11 @@ is specified, leave the environment unchanged instead of simulating a full login
 The rest of the parameters have the same meaning as
 .Cm CMD Fl Fl jexec Ns "."
 .Pp
-.It Cm SERVICE Ar args No "..."
+.It Cm SERVICE Oo Fl Fl jail Oc Ar args No "..."
 Manipulate services. See
 .Xr appjail-service 1 "."
+.Pp
+.Fl Fl jail No is equivalent to Xr appjail-service 1 Cm jail Fl j Ns "."
 .Pp
 .It Cm SET Oo Fl Fl mark Oc Oo Fl Fl column Ar column Oc Oo Fl Fl row Ar row Oc Ar parameter Ns Oo Ns = Ns Ar value Oc
 Use
@@ -703,10 +705,11 @@ is used instead of
 Change the current stage. The default stage is
 .Sy build Ns "."
 .Pp
-.It Cm SYSRC Oo Fl Fl jail Ns | Ns Fl Fl local Oc Ar name Ns Oo Oo + Ns | Ns - Oc Ns = Ns Ar value Oc No "..."
+.It Cm SYSRC Oo Fl Fl jexec Oo Fl Fl jail Oc Ns | Ns Fl Fl local Oc Ar name Ns Oo Oo + Ns | Ns - Oc Ns = Ns Ar value Oc No "..."
 Safely edit system rc files within a jail.
 .Pp
-.Fl Fl jail No is equivalent to Xr appjail-sysrc 1 Cm jail Ns "."
+.Fl Fl jexec Po default Pc No is equivalent to Xr appjail-sysrc 1 Cm jail Ns "."
+.Fl Fl jail No is equivalent to Xr appjail-sysrc 1 Cm jail Fl j Ns "."
 .Pp
 .Fl Fl local No is equivalent to Xr appjail-sysrc 1 Cm local Ns "."
 It is only recommended to use this parameter with thick jails instead of thin jails,

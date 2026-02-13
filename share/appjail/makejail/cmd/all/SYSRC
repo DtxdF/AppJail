@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -40,11 +40,12 @@ main()
 {
 	local args="$1"
 	if lib_check_empty "${args}"; then
-		lib_err ${EX_USAGE} "usage: SYSRC [--jail|--local] <name>[[+|-]=<value>] ..."
+		lib_err ${EX_USAGE} "usage: SYSRC [--jexec [--jail]|--local] <name>[[+|-]=<value>] ..."
 	fi
 
 	# Options
-	local use_jail=1
+	local use_jail=0
+	local use_jexec=1
 	local use_local=0
 
 	# Arguments
@@ -66,6 +67,9 @@ main()
 			--jail)
 				use_jail=1
 				;;
+			--jexec)
+				use_jexec=1
+				;;
 			--local)
 				use_local=1
 				;;
@@ -86,8 +90,14 @@ main()
 
 	if [ ${use_local} -eq 1 ]; then
 		printf "%s" "\"\${APPJAIL_SCRIPT}\" sysrc local \"\${APPJAIL_JAILNAME}\" --"
-	elif [ ${use_jail} -eq 1 ]; then
-		printf "%s" "\"\${APPJAIL_SCRIPT}\" sysrc jail \"\${APPJAIL_JAILNAME}\" --"
+	elif [ ${use_jexec} -eq 1 ]; then
+		local sysrc_args=
+
+		if [ ${use_jail} -eq 1 ]; then
+			sysrc_args="-j"
+		fi
+
+		printf "%s" "\"\${APPJAIL_SCRIPT}\" sysrc jail ${sysrc_args} \"\${APPJAIL_JAILNAME}\" --"
 	fi
 
 	while [ ${current_index} -lt ${total_items} ]; do 

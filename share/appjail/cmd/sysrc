@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -103,7 +103,25 @@ sysrc_all()
 
 sysrc_jail()
 {
-	local jail_name="$1"; shift
+	local _o
+	local opt_j_flag=false
+
+	while getopts ":j" _o; do
+		case "${_o}" in
+			j)
+				opt_j_flag=true
+				;;
+			*)
+				sysrc_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local jail_name
+
+	jail_name="$1"; shift
 	if lib_check_empty "${jail_name}"; then
 		sysrc_usage
 		exit ${EX_USAGE}
@@ -113,7 +131,13 @@ sysrc_jail()
 		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
 	fi
 
-	"${APPJAIL_PROGRAM}" cmd jexec "${jail_name}" sysrc "$@"
+	if ${opt_j_flag}; then
+		"${APPJAIL_PROGRAM}" cmd jexec "${jail_name}" \
+			sysrc "$@"
+	else
+		"${APPJAIL_PROGRAM}" cmd local "${jail_name}" \
+			sysrc -j "${jail_name}" "$@"
+	fi
 }
 
 sysrc_local()
@@ -148,7 +172,7 @@ sysrc_usage()
 {
 	cat << EOF
 usage: sysrc all [-e] <target> [<args> ...]
-       sysrc jail <jail> [<args> ...]
+       sysrc jail [-j] <jail> [<args> ...]
        sysrc local <jail> [<args> ...]
 EOF
 }

@@ -714,11 +714,32 @@ REPLACE()
 
 SERVICE()
 {
+	local _o
+	local opt_j=false
+
 	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: SERVICE <args> ..."
+		lib_err ${EX_USAGE} "usage: SERVICE [-j] <args> ..."
 	fi
 
-	"${APPJAIL_SCRIPT}" service jail "${APPJAIL_JAILNAME}" "$@"
+	while getopts ":j" _o; do
+		case "${_o}" in
+			j)
+				opt_j=true
+				;;
+			*)
+				SERVICE # usage
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local service_args=
+
+	if ${opt_j}; then
+		service_args="-j"
+	fi
+
+	"${APPJAIL_SCRIPT}" service jail ${service_args} "${APPJAIL_JAILNAME}" "$@"
 
 	return $?
 }
@@ -726,14 +747,18 @@ SERVICE()
 SYSRC()
 {
 	local _o
+	local opt_j=false
 	local opt_l=false
 
 	if [ $# -eq 0 ]; then
-		lib_err ${EX_USAGE} "usage: SYSRC [-l] <args> ..."
+		lib_err ${EX_USAGE} "usage: SYSRC [-jl] <args> ..."
 	fi
 
-	while getopts ":l" _o; do
+	while getopts ":jl" _o; do
 		case "${_o}" in
+			j)
+				opt_j=true
+				;;
 			l)
 				opt_l=true
 				;;
@@ -744,15 +769,20 @@ SYSRC()
 	done
 	shift $((OPTIND-1))
 
+	local service_args=
 	local target
 	
 	if ${opt_l}; then
 		target="local"
 	else
 		target="jail"
+
+		if ${opt_j}; then
+			service_args="-j"
+		fi
 	fi
 
-	"${APPJAIL_SCRIPT}" sysrc "${target}" "${APPJAIL_JAILNAME}" "$@"
+	"${APPJAIL_SCRIPT}" sysrc "${target}" ${sysrc_args} "${APPJAIL_JAILNAME}" "$@"
 
 	return $?
 }

@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd March 25, 2024
+.Dd February 13, 2026
 .Dt APPJAIL-INITSCRIPT 5
 .Os
 .Sh NAME
@@ -262,10 +262,16 @@ will be converted to
 but will not be replaced by any value. A different file can be used as
 .Ar output
 for the replaced keywords.
-.It Cm SERVICE Ar args No "..."
+.It Cm SERVICE Oo Fl j Oc Ar args No "..."
 See
 .Xr appjail-service 1 Ns "."
-.It Cm SYSRC Oo Fl l Oc Ar args No "..."
+.Pp
+Use
+.Fl j
+to use
+.Xr service 8
+from inside the jail instead of the host.
+.It Cm SYSRC Oo Fl jl Oc Ar args No "..."
 See
 .Xr appjail-sysrc 1 Ns "."
 .Pp
@@ -275,6 +281,14 @@ is specified,
 .Xr appjail-sysrc 1 Cm local
 is used instead of
 .Xr appjail-sysrc 1 Cm jail Ns "."
+.Pp
+Use
+.Fl j
+to use
+.Xr sysrc 8
+from inside the jail instead of the host. If specified together with
+.Fl l Ns ","
+this parameter is ignored.
 .It Cm WORKDIR Ar directory
 Sets the working directory of commands such as
 .Cm REPLACE
