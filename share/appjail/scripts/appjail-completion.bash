@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2025-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -90,6 +90,7 @@ upgrade \
 usage \
 version \
 volume \
+x11 \
 zfs"
 	_APPJAIL_KEYWORDS_LIMITS_="\
 action \
@@ -3041,7 +3042,7 @@ _appjail_cmd_jexec()
 		COMPREPLY=($(compgen -W "${completion}" -- "${cur}"))
 	else
 		local completion
-		completion="-l -U -u"
+		completion="-l -e -U -u"
 
 		COMPREPLY=($(compgen -W "${completion}" -- "${cur}"))
 	fi
