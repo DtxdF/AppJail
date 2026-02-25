@@ -1353,7 +1353,7 @@ network_plug()
 
 		# Description
 		if [ -n "${ether_description}" ]; then
-			lib_debug "e[ab]_${ether_name} description is \`${ether_description}\`"
+			lib_debug "ea_${ether_name} description is \`${ether_description}\`"
 			ifconfig "ea_${ether_name}" description "${ether_description}" || exit $?
 		fi
 	fi
