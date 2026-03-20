@@ -459,7 +459,7 @@ oci_exec()
 	local escape_jexec
 	escape_jexec=`lib_escape_string "${jexec}"`
 
-	local daemon_args logname pid
+	local daemon_args= logname= pid=
 
 	if ${opt_detach}; then
 		pid=`oci_get-pid "${jail}"`
@@ -514,10 +514,14 @@ oci_exec()
 
 	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}"
 
+	errlevel=$?
+
 	if ${opt_detach}; then
 		pid=`oci_get-pid "${jail}"`
 
 		lib_info "Detached: pid:${pid}, log:${logname}"
+	else
+		exit ${errlevel}
 	fi
 }
 
