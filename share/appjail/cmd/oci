@@ -1282,9 +1282,9 @@ oci_umount()
 	mounted=`lib_mountpoint_mounted ${tflag} -s "${jaildir}"`
 	
 	if [ -n "${mounted}" ]; then
-		lib_debug "unmounting: umount \"${jaildir}\""
+		lib_debug "unmounting: umount -f \"${jaildir}\""
 
-		if ! umount "${jaildir}"; then
+		if ! umount -f "${jaildir}"; then
 			lib_err ${EX_SOFTWARE} "Error unmounting \`${jaildir}\`"
 		fi
 	else
