@@ -1455,10 +1455,6 @@ quick_run_expose()
 		exit ${errlevel}
 	fi
 
-	if [ ${QUICK_OPTION_FROM} -eq 1 ] && [ ${QUICK_OPTION_CONTAINER_EXPOSE} -eq 0 ]; then
-		return 0
-	fi
-	
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart='"appjail expose on \"${name}\""'
 	lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop='"appjail expose off \"${name}\""'
 }
