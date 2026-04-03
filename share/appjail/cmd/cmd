@@ -220,11 +220,39 @@ cmd_jexec()
 		jexec_args="-l"
 	fi
 
+	local jexec
+	jexec="${UTILDIR}/jexec/jexec"
+
+	local juexec
+	juexec="${UTILDIR}/juexec/juexec"
+
+	local opt_use_juexec=0
+	local uid= gid= home= shell=
+	local escape_jail_username
+
 	if ! lib_check_empty "${jail_username}"; then
-		local escape_jail_username
+		local jail_type
+		jail_type=`lib_ajconf get -Vnt "${JAILDIR}/${jail_name}/conf/config.conf" jail_type` || exit $?
+
+		if [ -n "${jail_type}" ] && \
+				[ "${jail_type}" = "${JAIL_TYPE_DEBOOTSTRAP}" ] && \
+				"${jexec}" -l -- "${jail_name}" which getent > /dev/null 2>&1; then
+			uid=`"${jexec}" -l -- "${jail_name}" getent passwd "${jail_username}" 2> /dev/null | cut -d: -f3`
+			gid=`"${jexec}" -l -- "${jail_name}" getent passwd "${jail_username}" 2> /dev/null | cut -d: -f4`
+
+			if [ -n "${uid}" -a -n "${gid}" ]; then
+				opt_use_juexec=1
+
+				home=`"${jexec}" -l -- "${jail_name}" getent passwd "${jail_username}" 2> /dev/null | cut -d: -f6`
+				shell=`"${jexec}" -l -- "${jail_name}" getent passwd "${jail_username}" 2> /dev/null | cut -d: -f7`
+			fi
+		fi
+
 		escape_jail_username=`lib_escape_string "${jail_username}"`
 
-		jexec_args="${jexec_args} -U \"${escape_jail_username}\""
+		if [ ${opt_use_juexec} -eq 0 ]; then
+			jexec_args="${jexec_args} -U \"${escape_jail_username}\""
+		fi
 	elif ! lib_check_empty "${host_username}"; then
 		local escape_host_username
 		escape_host_username=`lib_escape_string "${host_username}"`
@@ -241,8 +269,40 @@ cmd_jexec()
 	# Add workdir parameter.
 	jexec_args="${jexec_args} -d \"${escape_workdir}\""
 
+	# Need to set this before user environment.
+	if [ ${opt_use_juexec} -eq 1 ]; then
+		jexec_args="${jexec_args} -e \"USER=${escape_jail_username}\""
+
+		if [ -n "${home}" ]; then
+			local escape_home
+			escape_home=`lib_escape_string "${home}"`
+
+			jexec_args="${jexec_args} -e \"HOME=${escape_home}\""
+		fi
+
+		if [ -n "${shell}" ]; then
+			local escape_shell
+			escape_shell=`lib_escape_string "${shell}"`
+
+			jexec_args="${jexec_args} -e \"SHELL=${escape_shell}\""
+		fi
+	fi
+
 	# Add env parameters.
-	jexec_args="${jexec_args} ${env} -- \"${escape_jail_name}\""
+	jexec_args="${jexec_args} ${env}"
+
+	# Specify the jail
+	if [ ${opt_use_juexec} -eq 0 ]; then
+		jexec_args="${jexec_args} -- \"${escape_jail_name}\""
+	else
+		local escape_uid
+		escape_uid=`lib_escape_string "${uid}"`
+
+		local escape_gid
+		escape_gid=`lib_escape_string "${gid}"`
+
+		jexec_args="${jexec_args} -- \"${escape_uid}\":\"${escape_gid}\" \"${escape_jail_name}\""
+	fi
 
 	# Command and arguments.
 	local arg
@@ -254,13 +314,17 @@ cmd_jexec()
 		jexec_args="${jexec_args} \"${escape_arg}\""
 	done
 
-	local jexec
-	jexec="${UTILDIR}/jexec/jexec"
+	if [ ${opt_use_juexec} -eq 0 ]; then
+		local escape_jexec
+		escape_jexec=`lib_escape_string "${jexec}"`
 
-	local escape_jexec
-	escape_jexec=`lib_escape_string "${jexec}"`
+		sh -c "\"${escape_jexec}\" ${jexec_args}"
+	else
+		local escape_juexec
+		escape_juexec=`lib_escape_string "${juexec}"`
 
-	sh -c "\"${escape_jexec}\" ${jexec_args}"
+		sh -c "\"${escape_juexec}\" ${jexec_args}"
+	fi
 }
 
 cmd_local()

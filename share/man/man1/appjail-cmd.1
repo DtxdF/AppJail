@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 3, 2026
+.Dd April 3, 2026
 .Dt APPJAIL-CMD 1
 .Os
 .Sh NAME
@@ -103,6 +103,18 @@ and
 .Cm Fl u
 parameters, see
 .Xr jexec 8 "."
+.Pp
+If the jail type is a
+.Sy linux+debootstrap
+jail, the
+.Xr getent 1
+command is installed inside the jail and user information has been successfully retrieved using that command, and when the
+.Fl U
+flag is set, it uses a modified version of
+.Xr jexec 8
+to set the UID and GID (but clearing the supplementary groups) after entering into the jail, so that it works with LinuxJails of that type, since
+.Xr jexec 8
+cannot do so due to the difference between the database formats used by the password database functions.
 .Pp
 .Cm local
 is used to execute the given command from the host. If

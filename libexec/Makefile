@@ -6,7 +6,8 @@ TARGETS=appjail-config \
 		getservbyname \
 		ipcheck \
 		network \
-		jexec
+		jexec \
+		juexec
 
 all:
 .for target in ${TARGETS}

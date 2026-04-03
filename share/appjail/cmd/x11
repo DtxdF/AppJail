@@ -78,11 +78,8 @@ x11_main()
 	local jexec
 	jexec="${UTILDIR}/jexec/jexec"
 
-	local escape_jexec
-	escape_jexec=`lib_escape_string "${jexec}"`
-
-	if ! "${jexec}" -l -- "${X11_JAILNAME}" which -s xauth; then
-		lib_err ${EX_UNAVAILABLE} "xauth is not installed. Cannot continue ..."
+	if ! "${jexec}" -l -- "${X11_JAILNAME}" which xauth > /dev/null 2>&1; then
+		lib_err ${EX_UNAVAILABLE} "xauth is not installed in the jail. Cannot continue ..."
 	fi
 
 	lib_debug "x11 parameters: $@"
@@ -201,10 +198,8 @@ x11_main()
 	local escape_jail
 	escape_jail=`lib_escape_string "${X11_JAILNAME}"`
 
-	jexec_args="${jexec_args} -- \"${escape_jail}\""
-
 	local cmd
-	cmd="\"${escape_jexec}\" -l ${jexec_args} xauth add \"localhost:${xephyr_display}\" MIT-MAGIC-COOKIE-1 \"${cookie}\""
+	cmd="appjail cmd jexec \"${escape_jail}\" ${jexec_args} xauth add \"localhost:${xephyr_display}\" MIT-MAGIC-COOKIE-1 \"${cookie}\""
 
 	lib_debug "Allowing access to display '${xephyr_display}': ${cmd}"
 
@@ -331,7 +326,7 @@ x11_main()
 
 		# Yes, this hack makes the -resizeable parameter work perfectly.
 		while :; do
-			sh -c "\"${escape_jexec}\" -l -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" || break
+			sh -c "appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" || break
 			sleep -- "${X11_OPTION_XRANDR_REFRESH}" || break
 		done &
 
@@ -376,7 +371,7 @@ x11_main()
 
 		local exec_start_pid=
 
-		cmd="\"${escape_jexec}\" -l ${X11_OPTION_EXEC_ENV_ARGS} -e DISPLAY=:${xephyr_display} ${jexec_args} ${exec_start}"
+		cmd="appjail cmd jexec \"${escape_jail}\" ${X11_OPTION_EXEC_ENV_ARGS} -e DISPLAY=:${xephyr_display} ${jexec_args} ${exec_start}"
 
 		lib_debug "Starting client: ${cmd}"
 

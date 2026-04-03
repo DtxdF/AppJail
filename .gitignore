@@ -7,6 +7,7 @@
 /libexec/find-smallest-missing-number/find-smallest-missing-number
 /libexec/get_assigned_rulesets/get_assigned_rulesets
 /libexec/jexec/jexec
+/libexec/juexec/juexec
 *.o
 /*.vim
 /.cpignore
