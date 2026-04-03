@@ -357,7 +357,7 @@ x11_main()
 			local escape_xresize
 			escape_xresize=`lib_escape_string "${SCRIPTSDIR}/xresize-exec.sh"`
 
-			sh -c "\"${escape_xresize}\" \"${window_id}\" appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" &
+			sh -c "env DISPLAY=${X11_OPTION_DISPLAY} \"${escape_xresize}\" \"${window_id}\" appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" &
 		fi
 
 		xrandr_refresh_pid=$!
