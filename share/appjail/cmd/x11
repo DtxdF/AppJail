@@ -322,13 +322,43 @@ x11_main()
 	local xrandr_refresh_pid=
 
 	if [ "${X11_OPTION_XRANDR_REFRESH}" != 0 ]; then
+		# Yes, this hack makes the -resizeable parameter work perfectly.
+		
 		lib_debug "Starting xrandr ..."
 
-		# Yes, this hack makes the -resizeable parameter work perfectly.
-		while :; do
-			sh -c "appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" || break
-			sleep -- "${X11_OPTION_XRANDR_REFRESH}" || break
-		done &
+		local opt_use_polling=false
+		local event_dependencies="xev xdotool"
+		local dependency
+
+		for dependency in ${event_dependencies}; do
+			if ! which -s "${dependency}"; then
+				lib_warn "${dependency} isn't installed on your system, so I can't efficiently detect events in Xephyr's window ..."
+				opt_use_polling=true
+				break
+			fi
+		done
+
+		local window_id=
+
+		if ! ${opt_use_polling}; then
+			window_id=`xdotool search --classname "AppJail-Xephyr-${xephyr_display}" 2> /dev/null | head -1`
+
+			if [ -z "${window_id}" ]; then
+				opt_use_polling=true
+			fi
+		fi
+
+		if ${opt_use_polling}; then
+			while :; do
+				sh -c "appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" || break
+				sleep -- "${X11_OPTION_XRANDR_REFRESH}" || break
+			done &
+		else
+			local escape_xresize
+			escape_xresize=`lib_escape_string "${SCRIPTSDIR}/xresize-exec.sh"`
+
+			sh -c "\"${escape_xresize}\" \"${window_id}\" appjail cmd jexec \"${escape_jail}\" -e DISPLAY=:${xephyr_display} ${jexec_args} xrandr > /dev/null" &
+		fi
 
 		xrandr_refresh_pid=$!
 
