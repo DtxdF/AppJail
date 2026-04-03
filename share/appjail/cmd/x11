@@ -320,13 +320,13 @@ x11_main()
 	x11_change_xephyr_icon "${xephyr_display}"
 
 	local xrandr_refresh_pid=
+	local opt_use_polling=false
 
 	if [ "${X11_OPTION_XRANDR_REFRESH}" != 0 ]; then
 		# Yes, this hack makes the -resizeable parameter work perfectly.
 		
 		lib_debug "Starting xrandr ..."
 
-		local opt_use_polling=false
 		local event_dependencies="xev xdotool"
 		local dependency
 
@@ -365,7 +365,9 @@ x11_main()
 
 		xrandr_refresh_pid=$!
 
-		lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${xrandr_refresh_pid} > /dev/null 2>&1"
+		if ${opt_use_polling}; then
+			lib_atexit_add "\"${kill_child_cmd}\" -c \"${config_file}\" -P $$ -p ${xrandr_refresh_pid} > /dev/null 2>&1"
+		fi
 
 		lib_debug "xrandr started (pid:${xrandr_refresh_pid})"
 	fi
@@ -429,7 +431,7 @@ x11_main()
 
 	wait ${xephyr_pid}
 
-	if [ -n "${xrandr_refresh_pid}" ]; then
+	if ${opt_use_polling} && [ -n "${xrandr_refresh_pid}" ]; then
 		lib_debug "Sending termination signal to xrandr (pid:${xrandr_refresh_pid})"
 
 		kill ${xrandr_refresh_pid} > /dev/null 2>&1
