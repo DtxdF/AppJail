@@ -61,7 +61,7 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-oci.1 \
 	 man1/appjail-x11.1
 
-APPJAIL_VERSION?=4.10.1
+APPJAIL_VERSION?=4.11.0
 
 all: install
 
