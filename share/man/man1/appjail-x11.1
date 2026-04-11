@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 3, 2026
+.Dd April 11, 2026
 .Dt APPJAIL-X11 1
 .Os
 .Sh NAME
@@ -170,6 +170,9 @@ will not perform polling to call
 Instead, it will simply call
 .Xr xrandr 1
 when the window size changes, which is much more efficient.
+However, this parameter should be set to a value other than
+.Sy 0
+to enable this feature.
 .El
 .Sh EXIT STATUS
 .Ex -std "appjail x11"
