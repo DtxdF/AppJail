@@ -382,7 +382,7 @@ preferable to change things as little as possible.
 .Bd -literal -offset indent
 # sysrc cloned_interfaces+="tap0"
 # sysrc ifconfig_tap0_name="ajdns"
-# sysrc ifconfig_ajdns="inet 172.0.0.1/32"
+# sysrc ifconfig_ajdns="inet 172.16.0.1/32"
 # service netif cloneup
 # service netif start ajdns
 .Ed
@@ -414,7 +414,7 @@ file at
 .Pa %%PREFIX%%/etc/appjail/
 should be very simple.
 .Bd -literal -offset indent
-nameserver 172.0.0.1
+nameserver 172.16.0.1
 .Ed
 .Pp
 Now our jails can use a DNS hostname to communicate with another jail. That is fine,
