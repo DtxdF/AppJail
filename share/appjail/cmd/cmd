@@ -273,14 +273,14 @@ cmd_jexec()
 	if [ ${opt_use_juexec} -eq 1 ]; then
 		jexec_args="${jexec_args} -e \"USER=${escape_jail_username}\""
 
-		if [ -n "${home}" ]; then
+		if ! lib_check_empty "${home}"; then
 			local escape_home
 			escape_home=`lib_escape_string "${home}"`
 
 			jexec_args="${jexec_args} -e \"HOME=${escape_home}\""
 		fi
 
-		if [ -n "${shell}" ]; then
+		if ! lib_check_empty "${shell}"; then
 			local escape_shell
 			escape_shell=`lib_escape_string "${shell}"`
 
@@ -308,8 +308,10 @@ cmd_jexec()
 	local arg
 
 	for arg in "$@"; do
-		local escape_arg
-		escape_arg=`lib_escape_string "${arg}"`
+		local escape_arg=
+		if ! lib_check_empty "${arg}"; then
+			escape_arg=`lib_escape_string "${arg}"`
+		fi
 
 		jexec_args="${jexec_args} \"${escape_arg}\""
 	done
