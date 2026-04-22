@@ -123,6 +123,7 @@ const char *template_parameters[] = {
     "allow.sysvipc",
     "allow.unprivileged_proc_debug",
     "allow.vmm",
+    "allow.vmm_ppt",
     "children.cur",
     "children.max",
     "command",
