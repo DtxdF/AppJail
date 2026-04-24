@@ -111,7 +111,7 @@ x11_main()
 	local xephyr_pidfile="${x11dir}/Xephyr.pid"
 
 	if [ -f "${xephyr_pidfile}" ]; then
-		xephyr_pid=`head -1 -- "${xephyr_pidfile}"` || exit $?
+		xephyr_pid=`pgrep -F "${xephyr_pidfile}" -x Xephyr 2> /dev/null`
 	fi
 
 	# Although we can technically run another application here, it is probably not

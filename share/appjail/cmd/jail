@@ -2240,9 +2240,9 @@ jail_get()
 				fi
 
 				if [ -f "${JAILDIR}/${jail_name}/conf/boot/x11/Xephyr.pid" ]; then
-					value=`head -1 "${JAILDIR}/${jail_name}/conf/boot/x11/Xephyr.pid"`
+					value=`pgrep -F "${JAILDIR}/${jail_name}/conf/boot/x11/Xephyr.pid" -x Xephyr 2> /dev/null`
 
-					if ! lib_check_proc "${value}"; then
+					if ! lib_check_empty "${value}" && ! lib_check_proc "${value}"; then
 						value=
 					fi
 				fi
