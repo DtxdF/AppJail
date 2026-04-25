@@ -183,7 +183,7 @@ oci_ociv1_get_user()
 	fi
 
 	local user
-	user=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["User"]'` || exit $?
+	user=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["User"]'` || exit $?
 
 	if [ "${user}" = "null" ]; then
 		return 0
