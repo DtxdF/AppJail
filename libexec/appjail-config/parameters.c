@@ -171,6 +171,8 @@ const char *template_parameters[] = {
     "linux.osname",
     "linux.osrelease",
     "linux.oss_version",
+    "mac.do",
+    "mac.do.rules",
     "meta",
     "mount",
     "mount.devfs",
