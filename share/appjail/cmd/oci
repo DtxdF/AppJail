@@ -865,13 +865,25 @@ oci_mount()
 oci_run()
 {
 	local _o
+	local opt_persist=false
 	local opt_detach=false
 	local env=
 	local options=
 	local user=
 	local workdir=
+	local oci_run_args=":Pde:o:u:w:"
 
-	while getopts ":de:o:u:w:" _o; do
+	while getopts "${oci_run_args}" _o; do
+		case "${_o}" in
+			P)
+				opt_persist=true
+				;;
+		esac
+	done
+
+	OPTIND=1
+
+	while getopts "${oci_run_args}" _o; do
 		case "${_o}" in
 			e|o|u|w)
 				if lib_check_empty "${OPTARG}"; then
@@ -882,6 +894,9 @@ oci_run()
 		esac
 
 		case "${_o}" in
+			P)
+				# pass.
+				;;
 			d)
 				opt_detach=true
 				;;
@@ -891,12 +906,22 @@ oci_run()
 					lib_err ${EX_DATAERR} "Invalid environment variable '${env_var}'"
 				fi
 
-				env_var=`lib_escape_string "${env_var}"`
+				if ${opt_persist}; then
+					env_var=`lib_escape_string "${env_var}" "" '\"' "-"`
 
-				if [ -z "${env}" ]; then
-					env="-e \"${env_var}\""
+					if [ -z "${env}" ]; then
+						env="\"${env_var}\""
+					else
+						env="${env} \"${env_var}\""
+					fi
 				else
-					env="${env} -e \"${env_var}\""
+					env_var=`lib_escape_string "${env_var}"`
+
+					if [ -z "${env}" ]; then
+						env="-e \"${env_var}\""
+					else
+						env="${env} -e \"${env_var}\""
+					fi
 				fi
 				;;
 			o)
@@ -968,6 +993,10 @@ oci_run()
 		exit ${errlevel}
 	fi
 
+	if ${opt_persist}; then
+		oci_set-boot on "${jail}"
+	fi
+
 	local exec_args=
 
 	if ${opt_detach}; then
@@ -975,20 +1004,52 @@ oci_run()
 	fi
 
 	if [ -n "${user}" ]; then
-		local escape_user
-		escape_user=`lib_escape_string "${user}"`
+		if ${opt_persist}; then
+			oci_set-user "${jail}" "${user}"
+		else
+			local escape_user
+			escape_user=`lib_escape_string "${user}"`
 
-		exec_args="${exec_args} -u \"${escape_user}\""
+			exec_args="${exec_args} -u \"${escape_user}\""
+		fi
 	fi
 
 	if [ -n "${workdir}" ]; then
-		local escape_workdir
-		escape_workdir=`lib_escape_string "${workdir}"`
+		if ${opt_persist}; then
+			oci_set-workdir "${jail}" "${workdir}"
+		else
+			local escape_workdir
+			escape_workdir=`lib_escape_string "${workdir}"`
 
-		exec_args="${exec_args} -w \"${escape_workdir}\""
+			exec_args="${exec_args} -w \"${escape_workdir}\""
+		fi
 	fi
 
-	exec_args="${exec_args} ${env}"
+	if ${opt_persist}; then
+		local params total_items current_index
+
+		params=`lib_split_jailparams "${env}"` || exit $?
+		total_items=`printf "%s\n" "${params}" | wc -l`
+		current_index=0
+
+		local arg
+		while [ ${current_index} -lt ${total_items} ]; do
+			current_index=$((current_index+1))
+
+			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			if lib_check_empty "${arg}"; then
+				continue
+			fi
+
+			local env_name env_value
+			env_value=`lib_jailparam_value "${arg}" =`
+			env_name=`lib_jailparam_name "${arg}" =`
+
+			oci_set-env "${jail}" "${env_name}" "${env_value}"
+		done
+	else
+		exec_args="${exec_args} ${env}"
+	fi
 	exec_args="${exec_args} -- \"${escape_jail}\""
 
 	if [ $# -gt 0 ]; then
