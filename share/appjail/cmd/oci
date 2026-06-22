@@ -1026,27 +1026,29 @@ oci_run()
 	fi
 
 	if ${opt_persist}; then
-		local params total_items current_index
+		if [ -n "${env}" ]; then
+			local params total_items current_index
 
-		params=`lib_split_jailparams "${env}"` || exit $?
-		total_items=`printf "%s\n" "${params}" | wc -l`
-		current_index=0
+			params=`lib_split_jailparams "${env}"` || exit $?
+			total_items=`printf "%s\n" "${params}" | wc -l`
+			current_index=0
 
-		local arg
-		while [ ${current_index} -lt ${total_items} ]; do
-			current_index=$((current_index+1))
+			local arg
+			while [ ${current_index} -lt ${total_items} ]; do
+				current_index=$((current_index+1))
 
-			arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
-			if lib_check_empty "${arg}"; then
-				continue
-			fi
+				arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+				if lib_check_empty "${arg}"; then
+					continue
+				fi
 
-			local env_name env_value
-			env_value=`lib_jailparam_value "${arg}" =`
-			env_name=`lib_jailparam_name "${arg}" =`
+				local env_name env_value
+				env_value=`lib_jailparam_value "${arg}" =`
+				env_name=`lib_jailparam_name "${arg}" =`
 
-			oci_set-env "${jail}" "${env_name}" "${env_value}"
-		done
+				oci_set-env "${jail}" "${env_name}" "${env_value}"
+			done
+		fi
 	else
 		exec_args="${exec_args} ${env}"
 	fi
