@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd June 19, 2024
+.Dd June 30, 2026
 .Dt APPJAIL-OCI 1
 .Os
 .Sh NAME
@@ -174,14 +174,13 @@ parameter.
 .Pp
 Note that a Linux image will probably not work if you or the image itself specifies a user because the
 .Xr getpwent 3
-function does not work in such an environment. Also some Linux images may specify a user as
-.Sy UID Ns : Ns Sy GID
-which is not valid by
-.Xr jexec 8
-because it expects a user as
-.Sy USERNAME Ns ,
-which has the advantage of being more human readable and should also exist in the
-environment.
+function does not work in such an environment. The exception is a user specified using the
+.Ar UID Ns Oo Ns : Ns Ar GID Oc
+syntax. If a user is specified using this syntax, no mapping is performed, and the process runs with the specified
+.Ar UID
+and
+.Ar GID
+.Po using the Ar UID No if the Ar GID No is not specified Pc Ns "."
 .Pp
 If the
 .Fl d

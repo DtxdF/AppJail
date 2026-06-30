@@ -171,6 +171,7 @@ oci_exec()
 	local env=
 	local user=
 	local workdir=
+	local use_juexec=false
 
 	while getopts ":de:u:w:" _o; do
 		case "${_o}" in
@@ -273,11 +274,16 @@ oci_exec()
 		fi
 	fi
 
+	local escape_user=
+
 	if ! lib_check_empty "${user}"; then
-		local escape_user
 		escape_user=`lib_escape_string "${user}"`
 
-		jexec_args="${jexec_args} -U \"${escape_user}\""
+		if lib_check_uidgid "${user}"; then
+			use_juexec=true
+		else
+			jexec_args="${jexec_args} -U \"${escape_user}\""
+		fi
 	fi
 
 	if lib_check_empty "${workdir}"; then
@@ -368,7 +374,11 @@ oci_exec()
 	local escape_jail
 	escape_jail=`lib_escape_string "${jail}"`
 
-	jexec_args="${jexec_args} -- \"${escape_jail}\""
+	if ${use_juexec}; then
+		jexec_args="${jexec_args} -- \"${escape_user}\" \"${escape_jail}\""
+	else
+		jexec_args="${jexec_args} -- \"${escape_jail}\""
+	fi
 
 	if lib_check_empty "${entrypoint}"; then
 		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
@@ -454,7 +464,12 @@ oci_exec()
 	fi
 
 	local jexec
-	jexec="${UTILDIR}/jexec/jexec"
+
+	if ${use_juexec}; then
+		jexec="${UTILDIR}/juexec/juexec"
+	else
+		jexec="${UTILDIR}/jexec/jexec"
+	fi
 
 	local escape_jexec
 	escape_jexec=`lib_escape_string "${jexec}"`
