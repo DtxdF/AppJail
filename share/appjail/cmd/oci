@@ -1416,7 +1416,7 @@ usage: oci del-env <jail> <name>
        oci kill [-s <signal>] <jail>
        oci ls-env <jail>
        oci mount <jail>
-       oci run [-d] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
+       oci run [-Pd] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
                [-w <workdir>] <image> <jail> [<command> [<args> ...]]
        oci set-boot [on|off] <jail>
        oci set-container-name <container-name> <jail>
