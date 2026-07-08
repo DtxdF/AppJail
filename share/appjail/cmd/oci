@@ -223,10 +223,12 @@ oci_exec()
 
 	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
 
+	local opt_entrypoint=false
 	local entrypoint=
 
 	if [ $# -gt 0 ]; then
 		entrypoint="$1"
+		opt_entrypoint=true
 
 		shift
 	fi
@@ -380,7 +382,7 @@ oci_exec()
 		jexec_args="${jexec_args} -- \"${escape_jail}\""
 	fi
 
-	if lib_check_empty "${entrypoint}"; then
+	if ! ${opt_entrypoint}; then
 		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
 
 		if [ -n "${entrypoint}" ]; then
@@ -448,16 +450,22 @@ oci_exec()
 			jexec_args="${jexec_args} ${entrypoint} ${cmd}"
 		fi
 	else
-		local escape_entrypoint
-		escape_entrypoint=`lib_escape_string "${entrypoint}"`
+		local escape_entrypoint=
+
+		if [ -n "${entrypoint}" ]; then
+			escape_entrypoint=`lib_escape_string "${entrypoint}"`
+		fi
 
 		jexec_args="${jexec_args} \"${escape_entrypoint}\""
 
 		local arg
 		
 		for arg in "$@"; do
-			local escape_arg
-			escape_arg=`lib_escape_string "${arg}"`
+			local escape_arg=
+
+			if [ -n "${arg}" ]; then
+				escape_arg=`lib_escape_string "${arg}"`
+			fi
 
 			jexec_args="${jexec_args} \"${escape_arg}\""
 		done
@@ -1072,8 +1080,11 @@ oci_run()
 	if [ $# -gt 0 ]; then
 		local arg
 		for arg in "$@"; do
-			local escape_arg
-			escape_arg=`lib_escape_string "${arg}"`
+			local escape_arg=
+
+			if [ -n "${arg}" ]; then
+				escape_arg=`lib_escape_string "${arg}"`
+			fi
 
 			exec_args="${exec_args} \"${escape_arg}\""
 		done
