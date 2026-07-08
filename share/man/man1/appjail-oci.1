@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd June 30, 2026
+.Dd July 08, 2026
 .Dt APPJAIL-OCI 1
 .Os
 .Sh NAME
@@ -87,6 +87,7 @@
 .Nm appjail oci
 .Cm run
 .Op Fl Pd
+.Op Fl E Ar entrypoint
 .Oo
 .Op Fl e Ar name Ns Oo = Ns Ar value Oc
 .Ns "..."
@@ -99,7 +100,7 @@
 .Op Fl w Ar workdir
 .Ar image
 .Ar jail
-.Op Ar command Op Ar args Ns " " Ns "..."
+.Op Ar args Ns " " Ns "..."
 .Nm appjail oci
 .Cm set-boot
 .Op Cm off Ns | Ns Cm on
@@ -228,7 +229,7 @@ Lists all environment variables previously specified by
 .Cm set-env Ns "."
 .It Cm mount Ar jail
 Mount the container directory in the jail directory.
-.It Cm run Oo Fl Pd Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl o Ar option Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar command Oo Ar args No "..." Oc Oc
+.It Cm run Oo Fl Pd Oc Oo Fl E Ar entrypoint Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl o Ar option Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar args No "..." Oc
 This subcommand first calls
 .Cm from
 with the options specified by
@@ -247,6 +248,12 @@ option is specified, using options such as
 .Cm set-user Ns , Cm set-workdir Ns , and Cm set-env subcommands.
 .Cm set-boot
 is executed after the jail is created.
+.Pp
+The default entrypoint can be overridden using the
+.Fl E
+option, which must be a valid JSON string or an array of strings. The same
+applies to executable arguments. Any positional arguments will override
+the default values defined by the image.
 .It Cm set-boot Oo Cm off Ns | Ns Cm on Oc Ar jail
 Specify
 .Cm on

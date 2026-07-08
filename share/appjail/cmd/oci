@@ -37,6 +37,9 @@ lib_load "${LIBDIR}/strlen"
 
 oci_desc="Commands for interpreting OCI images."
 
+APPJAIL_PREPEND_ENTRYPOINT="${APPJAIL_PREPEND_ENTRYPOINT}"
+APPJAIL_PREPEND_ENTRYPOINT_FORCE="${APPJAIL_PREPEND_ENTRYPOINT_FORCE:-false}"
+
 oci_main()
 {
 	oci_check_dependencies
@@ -226,7 +229,7 @@ oci_exec()
 	local opt_entrypoint=false
 	local entrypoint=
 
-	if [ $# -gt 0 ]; then
+	if [ $# -gt 0 ] && ! ${APPJAIL_PREPEND_ENTRYPOINT_FORCE}; then
 		entrypoint="$1"
 		opt_entrypoint=true
 
@@ -383,7 +386,26 @@ oci_exec()
 	fi
 
 	if ! ${opt_entrypoint}; then
-		entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
+		if [ -z "${APPJAIL_PREPEND_ENTRYPOINT}" ]; then
+			entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
+		else
+			local type
+			type=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -rM 'type' 2>&1`
+
+			errlevel=$?
+
+			if [ ${errlevel} -ne 0 ]; then
+				lib_err ${errlevel} "Error parsing entrypoint: ${type}"
+			fi
+
+			if [ "${type}" = "string" ]; then
+				entrypoint=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -M 'split("\n") | .[]'` || exit $?
+			elif [ "${type}" = "array" ]; then
+				entrypoint=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -M '.[]'` || exit $?
+			else
+				lib_err ${EX_DATAERR} "Error parsing entrypoint: unknown data type (${type})"
+			fi
+		fi
 
 		if [ -n "${entrypoint}" ]; then
 			params=`lib_split_jailparams "${entrypoint}"` || exit $?
@@ -413,35 +435,50 @@ oci_exec()
 			entrypoint="${_entrypoint}"
 		fi
 
-		local cmd
-		cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
+		local cmd=
 
-		if [ -n "${cmd}" ]; then
-			params=`lib_split_jailparams "${cmd}"` || exit $?
-			total_items=`printf "%s\n" "${params}" | wc -l`
-			current_index=0
-
-			local _cmd=
-
+		if [ $# -gt 0 ]; then
 			local arg
-			while [ ${current_index} -lt ${total_items} ]; do
-				current_index=$((current_index+1))
+			
+			for arg in "$@"; do
+				local escape_arg=
 
-				arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
-				if lib_check_empty "${arg}"; then
-					continue
+				if [ -n "${arg}" ]; then
+					escape_arg=`lib_escape_string "${arg}"`
 				fi
 
-				arg=`lib_escape_string "${arg}"`
-
-				if [ -z "${_cmd}" ]; then
-					_cmd="\"${arg}\""
-				else
-					_cmd="${_cmd} \"${arg}\""
-				fi
+				cmd="${cmd} \"${escape_arg}\""
 			done
+		else
+			cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
 
-			cmd="${_cmd}"
+			if [ -n "${cmd}" ]; then
+				params=`lib_split_jailparams "${cmd}"` || exit $?
+				total_items=`printf "%s\n" "${params}" | wc -l`
+				current_index=0
+
+				local _cmd=
+
+				local arg
+				while [ ${current_index} -lt ${total_items} ]; do
+					current_index=$((current_index+1))
+
+					arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+					if lib_check_empty "${arg}"; then
+						continue
+					fi
+
+					arg=`lib_escape_string "${arg}"`
+
+					if [ -z "${_cmd}" ]; then
+						_cmd="\"${arg}\""
+					else
+						_cmd="${_cmd} \"${arg}\""
+					fi
+				done
+
+				cmd="${_cmd}"
+			fi
 		fi
 
 		if lib_check_empty "${entrypoint}" && lib_check_empty "${cmd}"; then
@@ -890,11 +927,12 @@ oci_run()
 	local _o
 	local opt_persist=false
 	local opt_detach=false
+	local entrypoint=
 	local env=
 	local options=
 	local user=
 	local workdir=
-	local oci_run_args=":Pde:o:u:w:"
+	local oci_run_args=":PdE:e:o:u:w:"
 
 	while getopts "${oci_run_args}" _o; do
 		case "${_o}" in
@@ -908,7 +946,7 @@ oci_run()
 
 	while getopts "${oci_run_args}" _o; do
 		case "${_o}" in
-			e|o|u|w)
+			E|e|o|u|w)
 				if lib_check_empty "${OPTARG}"; then
 					oci_usage
 					exit ${EX_USAGE}
@@ -922,6 +960,9 @@ oci_run()
 				;;
 			d)
 				opt_detach=true
+				;;
+			E)
+				entrypoint="${OPTARG}"
 				;;
 			e)
 				local env_var="${OPTARG}"
@@ -1090,7 +1131,14 @@ oci_run()
 		done
 	fi
 
-	sh -c "\"${escape_appjail}\" oci exec ${exec_args}"
+	local escape_entrypoint=
+
+	if [ -n "${entrypoint}" ]; then
+		escape_entrypoint=`lib_escape_string "${entrypoint}"`
+	fi
+
+	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
+		\"${escape_appjail}\" oci exec ${exec_args}"
 }
 
 oci_set-boot()
@@ -1427,7 +1475,7 @@ usage: oci del-env <jail> <name>
        oci kill [-s <signal>] <jail>
        oci ls-env <jail>
        oci mount <jail>
-       oci run [-Pd] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
+       oci run [-Pd] [-E <entrypoint>] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
                [-w <workdir>] <image> <jail> [<command> [<args> ...]]
        oci set-boot [on|off] <jail>
        oci set-container-name <container-name> <jail>
