@@ -25,13 +25,19 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd July 08, 2026
+.Dd July 12, 2026
 .Dt APPJAIL-OCI 1
 .Os
 .Sh NAME
 .Nm appjail-oci
 .Nd Commands for interpreting OCI images
 .Sh SYNOPSIS
+.Nm appjail oci
+.Cm del-args
+.Ar jail
+.Nm appjail oci
+.Cm del-entrypoint
+.Ar jail
 .Nm appjail oci
 .Cm del-env
 .Ar jail
@@ -102,6 +108,10 @@
 .Ar jail
 .Op Ar args Ns " " Ns "..."
 .Nm appjail oci
+.Cm set-args
+.Ar jail
+.Op Ar args Ns " " Ns "..."
+.Nm appjail oci
 .Cm set-boot
 .Op Cm off Ns | Ns Cm on
 .Ar jail
@@ -109,6 +119,10 @@
 .Cm set-container-name
 .Ar container-name
 .Ar jail
+.Nm appjail oci
+.Cm set-entrypoint
+.Ar jail
+.Ar entrypoint
 .Nm appjail oci
 .Cm set-env
 .Ar jail
@@ -135,6 +149,12 @@ jail using an image, executing the process defined by the image, and so on.
 .Pp
 The options are as follows:
 .Bl -tag -width xxx
+.It Cm del-args Ar jail
+Removes user-defined arguments that was previously specified by
+.Cm set-args Ns "."
+.It Cm del-entrypoint Ar jail
+Removes a user-defined entrypoint that was previously specified by
+.Cm set-entrypoint Ns "."
 .It Cm del-env Ar jail Ar name
 Removes a user-defined environment variable that was previously specified by
 .Cm set-env Ns "."
@@ -244,16 +264,24 @@ option is always used.
 If the
 .Fl P
 option is specified, using options such as
-.Fl u Ns , Fl w Ns , and Fl e No is equivalent to calling
-.Cm set-user Ns , Cm set-workdir Ns , and Cm set-env subcommands.
+.Fl E Ns , Fl u Ns , Fl w Ns , and Fl e No is equivalent to calling
+.Cm set-entrypoint Ns , Cm set-user Ns , Cm set-workdir Ns , and Cm set-env
+subcommands.
 .Cm set-boot
-is executed after the jail is created.
+is executed after the jail is created. And if positional arguments are defined,
+.Cm set-args
+is called.
 .Pp
 The default entrypoint can be overridden using the
 .Fl E
 option, which must be a valid JSON string or an array of strings. The same
 applies to executable arguments. Any positional arguments will override
 the default values defined by the image.
+.It Cm set-args Ar jail Oo Ar args No "..." Oc
+Specifies the arguments passed to the entrypoint.
+.Pp
+If no positional arguments are specified, this is equivalent to calling the
+entrypoint without any arguments.
 .It Cm set-boot Oo Cm off Ns | Ns Cm on Oc Ar jail
 Specify
 .Cm on
@@ -264,6 +292,10 @@ or
 otherwise.
 .It Cm set-container-name Ar container-name Ar jail
 Sets the container that will be linked to this jail.
+.It Cm set-entrypoint Ar jail Ar entrypoint
+Sets the entrypoint. See the
+.Cm run
+subcommand for more details about the entrypoint.
 .It Cm set-env Ar jail Ar name Oo Ar value Oc
 Sets an environment variable or overwrites a previously existing one.
 .It Cm set-user Ar jail Ar user

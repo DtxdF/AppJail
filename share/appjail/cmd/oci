@@ -51,11 +51,37 @@ oci_main()
 	fi
 
 	case "${entity}" in
-		del-env|del-user|del-workdir|exec|from|get-container-name|get-env|get-pid|get-user|get-workdir|kill|ls-env|mount|run|set-boot|set-container-name|set-env|set-user|set-workdir|umount) ;;
+		del-args|del-entrypoint|del-env|del-user|del-workdir|exec|from|get-args|get-container-name|get-entrypoint|get-env|get-pid|get-user|get-workdir|kill|ls-env|mount|run|set-args|set-boot|set-container-name|set-entrypoint|set-env|set-user|set-workdir|umount) ;;
 		*) oci_usage; exit ${EX_USAGE} ;;
 	esac
 
 	oci_${entity} "$@"
+}
+
+oci_del-args()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_del-common "${jail}" "args" "No arguments have been defined."
+}
+
+oci_del-entrypoint()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_del-common "${jail}" "entrypoint" "No entrypoint has been defined."
 }
 
 oci_del-env()
@@ -67,10 +93,6 @@ oci_del-env()
 
 	local jail
 	jail="$1"
-
-	_oci_chk_jail "${jail}"
-
-	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
 
 	local env_name
 	env_name="$2"
@@ -84,23 +106,7 @@ oci_del-env()
 		lib_err ${EX_DATAERR} "Invalid environment variable name '${env_name}'"
 	fi
 
-	local is_container
-	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
-
-	if [ ${is_container} -eq 0 ]; then
-		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
-	fi
-
-	local jail_path="${JAILDIR}/${jail}"
-	local ocidir="${jail_path}/conf/boot/oci"
-	local envdir="${ocidir}/env"
-	local envfile="${envdir}/${env_name}"
-
-	if [ ! -f "${envfile}" ]; then
-		lib_err ${EX_NOINPUT} "Environment variable '${env_name}' doesn't seem to exist."
-	fi
-	
-	rm -f -- "${envfile}"
+	_oci_del-common "${jail}" "env/${env_name}" "Environment variable '${env_name}' doesn't seem to exist."
 }
 
 oci_del-user()
@@ -113,26 +119,15 @@ oci_del-user()
 	local jail
 	jail="$1"
 
-	_oci_chk_jail "${jail}"
-
-	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
-
-	local is_container
-	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
-
-	if [ ${is_container} -eq 0 ]; then
-		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
 	fi
 
-	local jail_path="${JAILDIR}/${jail}"
-	local ocidir="${jail_path}/conf/boot/oci"
-	local user_file="${ocidir}/user"
+	local jail
+	jail="$1"
 
-	if [ ! -f "${user_file}" ]; then
-		lib_err ${EX_NOINPUT} "The jail '${jail}' has no user."
-	fi
-	
-	rm -f -- "${user_file}"
+	_oci_del-common "${jail}" "user" "No user has been defined."
 }
 
 oci_del-workdir()
@@ -145,6 +140,24 @@ oci_del-workdir()
 	local jail
 	jail="$1"
 
+	_oci_del-common "${jail}" "workdir" "No working directory found."
+}
+
+_oci_del-common()
+{
+	if [ $# -lt 3 ]; then
+		lib_err ${EX_USAGE} "usage: _oci_del-common jail object errmsg"
+	fi
+
+	local jail
+	jail="$1"
+
+	local object
+	object="$2"
+
+	local errmsg
+	errmsg="$3"
+
 	_oci_chk_jail "${jail}"
 
 	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
@@ -158,13 +171,13 @@ oci_del-workdir()
 
 	local jail_path="${JAILDIR}/${jail}"
 	local ocidir="${jail_path}/conf/boot/oci"
-	local workdir_file="${ocidir}/workdir"
+	local object_file="${ocidir}/${object}"
 
-	if [ ! -f "${workdir_file}" ]; then
-		lib_err ${EX_NOINPUT} "The jail '${jail}' has no working directory."
+	if [ ! -f "${object_file}" ]; then
+		lib_err ${EX_NOINPUT} -- "${errmsg}"
 	fi
 	
-	rm -f -- "${workdir_file}"
+	rm -f -- "${object_file}"
 }
 
 oci_exec()
@@ -387,24 +400,13 @@ oci_exec()
 
 	if ! ${opt_entrypoint}; then
 		if [ -z "${APPJAIL_PREPEND_ENTRYPOINT}" ]; then
-			entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
+			entrypoint=`oci_get-entrypoint "${jail}"` || exit $?
+
+			if [ -z "${entrypoint}" ]; then
+				entrypoint=`oci_ociv1_get_entrypoint "${container_name}"` || exit $?
+			fi
 		else
-			local type
-			type=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -rM 'type' 2>&1`
-
-			errlevel=$?
-
-			if [ ${errlevel} -ne 0 ]; then
-				lib_err ${errlevel} "Error parsing entrypoint: ${type}"
-			fi
-
-			if [ "${type}" = "string" ]; then
-				entrypoint=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -M 'split("\n") | .[]'` || exit $?
-			elif [ "${type}" = "array" ]; then
-				entrypoint=`printf "%s\n" "${APPJAIL_PREPEND_ENTRYPOINT}" | jq -M '.[]'` || exit $?
-			else
-				lib_err ${EX_DATAERR} "Error parsing entrypoint: unknown data type (${type})"
-			fi
+			entrypoint=`_parse_entrypoint "${APPJAIL_PREPEND_ENTRYPOINT}"` || exit $?
 		fi
 
 		if [ -n "${entrypoint}" ]; then
@@ -419,11 +421,9 @@ oci_exec()
 				current_index=$((current_index+1))
 
 				arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
-				if lib_check_empty "${arg}"; then
-					continue
+				if ! lib_check_empty "${arg}"; then
+					arg=`lib_escape_string "${arg}"`
 				fi
-
-				arg=`lib_escape_string "${arg}"`
 
 				if [ -z "${_entrypoint}" ]; then
 					_entrypoint="\"${arg}\""
@@ -450,34 +450,41 @@ oci_exec()
 				cmd="${cmd} \"${escape_arg}\""
 			done
 		else
-			cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
+			cmd=`oci_get-args "${jail}"` || exit $?
 
-			if [ -n "${cmd}" ]; then
-				params=`lib_split_jailparams "${cmd}"` || exit $?
-				total_items=`printf "%s\n" "${params}" | wc -l`
-				current_index=0
+			local args_file
+			args_file="${ocidir}/args"
 
-				local _cmd=
+			if [ -z "${cmd}" ] && [ ! -f "${args_file}" ]; then
+				cmd=`oci_ociv1_get_cmd "${container_name}"` || exit $?
 
-				local arg
-				while [ ${current_index} -lt ${total_items} ]; do
-					current_index=$((current_index+1))
+				if [ -n "${cmd}" ]; then
+					params=`lib_split_jailparams "${cmd}"` || exit $?
+					total_items=`printf "%s\n" "${params}" | wc -l`
+					current_index=0
 
-					arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
-					if lib_check_empty "${arg}"; then
-						continue
-					fi
+					local _cmd=
 
-					arg=`lib_escape_string "${arg}"`
+					local arg
+					while [ ${current_index} -lt ${total_items} ]; do
+						current_index=$((current_index+1))
 
-					if [ -z "${_cmd}" ]; then
-						_cmd="\"${arg}\""
-					else
-						_cmd="${_cmd} \"${arg}\""
-					fi
-				done
+						arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+						if lib_check_empty "${arg}"; then
+							continue
+						fi
 
-				cmd="${_cmd}"
+						arg=`lib_escape_string "${arg}"`
+
+						if [ -z "${_cmd}" ]; then
+							_cmd="\"${arg}\""
+						else
+							_cmd="${_cmd} \"${arg}\""
+						fi
+					done
+
+					cmd="${_cmd}"
+				fi
 			fi
 		fi
 
@@ -579,7 +586,13 @@ oci_exec()
 	if ${opt_detach}; then
 		pid=`oci_get-pid "${jail}"`
 
-		lib_info "Detached: pid:${pid}, log:${logname}"
+		if [ -z "${pid}" ]; then
+			# Processes that spawn and die quickly will not show a PID.
+			
+			lib_info "Detached: log:${logname}"
+		else
+			lib_info "Detached: pid:${pid}, log:${logname}"
+		fi
 	else
 		exit ${errlevel}
 	fi
@@ -603,6 +616,36 @@ oci_from()
 	shift
 
 	"${APPJAIL_PROGRAM}" quick "${jail}" from="${image}" "$@"
+}
+
+oci_get-args()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local args_file
+	args_file="${ocidir}/args"
+
+	if [ -f "${args_file}" ]; then
+		local args
+		args=`head -1 -- "${args_file}"` || exit $?
+
+		printf "%s\n" "${args}"
+	fi
+
+	return 0
 }
 
 oci_get-container-name()
@@ -631,6 +674,41 @@ oci_get-container-name()
 
 		printf "%s\n" "${container_name}"
 	fi
+}
+
+oci_get-entrypoint()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+	local entrypoint_file="${ocidir}/entrypoint"
+
+	if [ ! -f "${entrypoint_file}" ]; then
+		return 0
+	fi
+	
+	local entrypoint
+	entrypoint=`head -1 -- "${entrypoint_file}"`
+
+	printf "%s\n" "${entrypoint}"
 }
 
 oci_get-env()
@@ -1118,7 +1196,7 @@ oci_run()
 	fi
 	exec_args="${exec_args} -- \"${escape_jail}\""
 
-	if [ $# -gt 0 ]; then
+	if [ $# -gt 0 ] && ! ${opt_persist}; then
 		local arg
 		for arg in "$@"; do
 			local escape_arg=
@@ -1129,16 +1207,78 @@ oci_run()
 
 			exec_args="${exec_args} \"${escape_arg}\""
 		done
+	elif [ $# -gt 0 ] && ${opt_persist}; then
+		oci_set-args "${jail}" "$@"
+
+		local _exec_args
+		_exec_args=`oci_get-args "${jail}"` || exit $?
+
+		if [ -n "${_exec_args}" ]; then
+			exec_args="${exec_args} ${_exec_args}"
+		fi
 	fi
 
 	local escape_entrypoint=
 
 	if [ -n "${entrypoint}" ]; then
 		escape_entrypoint=`lib_escape_string "${entrypoint}"`
+
+		if ${opt_persist}; then
+			oci_set-entrypoint "${jail}" "${entrypoint}"
+		fi
 	fi
 
 	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
 		\"${escape_appjail}\" oci exec ${exec_args}"
+}
+
+oci_set-args()
+{
+	if [ $# -lt 1 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	shift
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local args_file
+	args_file="${ocidir}/args"
+
+	local args= arg
+	for arg in "$@"; do
+		local escape_arg=
+
+		if [ -n "${arg}" ]; then
+			escape_arg=`lib_escape_string "${arg}"`
+		fi
+
+		if [ -z "${args}" ]; then
+			args="\"${escape_arg}\""
+		else
+			args="${args} \"${escape_arg}\""
+		fi
+	done
+
+	if ! printf "%s" "${args}" > "${args_file}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the arguments."
+	fi
 }
 
 oci_set-boot()
@@ -1251,6 +1391,48 @@ oci_set-container-name()
 
 	if [ -n "${prev_container_name}" ]; then
 		lib_warn "'${prev_container_name}' was the previous container name, now '${container_name}' is the current one."
+	fi
+}
+
+oci_set-entrypoint()
+{
+	if [ $# -lt 2 ]; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	local jail
+	jail="$1"
+
+	_oci_chk_jail "${jail}"
+
+	lib_set_logprefix " [`random_color`${jail}${COLOR_DEFAULT}]"
+
+	local entrypoint
+	entrypoint="$2"
+
+	if lib_check_empty "${entrypoint}"; then
+		oci_usage
+		exit ${EX_USAGE}
+	fi
+
+	entrypoint=`_parse_entrypoint "${entrypoint}"` || exit $?
+
+	local is_container
+	is_container=`"${APPJAIL_PROGRAM}" jail get -I -- "${jail}" is_container`
+
+	if [ ${is_container} -eq 0 ]; then
+		lib_err ${EX_DATAERR} "Jail '${jail}' is not a container."
+	fi
+
+	local jail_path="${JAILDIR}/${jail}"
+	local ocidir="${jail_path}/conf/boot/oci"
+
+	local entrypoint_file
+	entrypoint_file="${ocidir}/entrypoint"
+
+	if ! printf "%s" "${entrypoint}" > "${entrypoint_file}"; then
+		lib_err ${EX_IOERR} "An error occurred while setting the entrypoint '${entrypoint}'."
 	fi
 }
 
@@ -1453,6 +1635,34 @@ _oci_chk_jail()
 	fi
 }
 
+_parse_entrypoint()
+{
+	local entrypoint="$1"
+
+	if [ -z "${entrypoint}" ]; then
+		lib_err ${EX_USAGE} "usage: _parse_entrypoint entrypoint"
+	fi
+
+	local type
+	type=`printf "%s\n" "${entrypoint}" | jq -rM 'type' 2>&1`
+
+	errlevel=$?
+
+	if [ ${errlevel} -ne 0 ]; then
+		lib_err ${errlevel} "Error parsing entrypoint: ${type}"
+	fi
+
+	if [ "${type}" = "string" ]; then
+		entrypoint=`printf "%s\n" "${entrypoint}" | jq -M 'split("\n") | .[]'` || exit $?
+	elif [ "${type}" = "array" ]; then
+		entrypoint=`printf "%s\n" "${entrypoint}" | jq -M '.[]'` || exit $?
+	else
+		lib_err ${EX_DATAERR} "Error parsing entrypoint: unknown data type (${type})"
+	fi
+
+	printf "%s\n" "${entrypoint}"
+}
+
 oci_help()
 {
 	man 1 appjail-oci
@@ -1461,13 +1671,17 @@ oci_help()
 oci_usage()
 {
 	cat << EOF
-usage: oci del-env <jail> <name>
+usage: oci del-args <jail>
+       oci del-entrypoint <jail>
+       oci del-env <jail> <name>
        oci del-user <jail>
        oci del-workdir <jail>
        oci exec [-d] [[-e <name>[=<value>]] ...] [-u <user>] [-w <workdir>] <jail>
                [<command> [<args> ...]]
        oci from <image> <jail> [<options> ...]
+       oci get-args <jail>
        oci get-container-name <jail>
+       oci get-entrypoint <jail>
        oci get-env <jail> <name>
        oci get-pid <jail>
        oci get-user <jail>
@@ -1477,8 +1691,10 @@ usage: oci del-env <jail> <name>
        oci mount <jail>
        oci run [-Pd] [-E <entrypoint>] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
                [-w <workdir>] <image> <jail> [<command> [<args> ...]]
+       oci set-args <jail> [<args> ...]
        oci set-boot [on|off] <jail>
        oci set-container-name <container-name> <jail>
+       oci set-entrypoint <jail> <entrypoint>
        oci set-env <jail> <name> [<value>]
        oci set-user <jail> <user>
        oci set-workdir <jail> <workdir>
