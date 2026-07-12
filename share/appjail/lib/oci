@@ -65,7 +65,7 @@ oci_rm()
 		lib_err ${EX_USAGE} "usage: oci_rm container_name"
 	fi
 
-	buildah rm "${container_name}"
+	buildah rm "${container_name}" >&2
 }
 
 oci_from()
@@ -82,7 +82,7 @@ oci_from()
 	local escape_container_name
 	escape_container_name=`lib_escape_string "${container_name}"`
 
-	sh -c "buildah from --name \"${escape_container_name}\" ${buildah_from_args:-${BUILDAH_FROM_ARGS}} \"${escape_image}\""
+	sh -c "buildah from --name \"${escape_container_name}\" ${buildah_from_args:-${BUILDAH_FROM_ARGS}} \"${escape_image}\" >&2"
 }
 
 oci_check_container_name()
