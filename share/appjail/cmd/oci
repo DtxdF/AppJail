@@ -911,6 +911,8 @@ oci_kill()
 		fi
 	fi
 
+	lib_debug "Sending ${signal} -> ${pid}"
+
 	kill -"${signal}" "${pid}"
 }
 
