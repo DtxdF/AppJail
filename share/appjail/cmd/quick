@@ -533,10 +533,16 @@ quick_run_from()
 	local container_name
 
 	if [ -z "${QUICK_OPTION_CONTAINER}" ]; then
-		container_name=`random_hexstring 11 0 15 | tr -d '\n'`
-		container_name="appjail-${container_name}"
+		container_name="appjail-${QUICK_JAILNAME}"
 	else
 		container_name="${QUICK_OPTION_CONTAINER}"
+	fi
+
+	if [ "${container_name}" = "<random>" ]; then
+		container_name=`random_hexstring 11 0 15 | tr -d '\n'`
+		container_name="appjail-${container_name}"
+	elif [ "${container_name}" = "<name>" ]; then
+		container_name="appjail-${QUICK_JAILNAME}"
 	fi
 
 	if ! oci_check_container_name "${container_name}"; then

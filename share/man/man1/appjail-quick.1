@@ -830,11 +830,17 @@ This option also implicitly sets the
 .Cm empty
 option.
 .Pp
-By default, the container name is randomly generated unless you specify one using the
+By default, the container name is derived from the jail name using a syntax such as
+.Sy appjail- Ns Ar name Ns "."
+You can choose any name you want using the
 .Cm name
 suboption of the
 .Cm container
-option.
+option. Special names include
+.Sy <name>
+and
+.Sy <random> Ns "."
+The first special name is the default, and the second is used to choose a random name.
 .Pp
 The volumes and labels specified by the OCI image are also created as AppJail volumes and labels. Since the volume name must be unique in AppJail, a bit of magic is performed:
 .Sy _
