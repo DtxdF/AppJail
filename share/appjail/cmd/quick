@@ -533,7 +533,7 @@ quick_run_from()
 	local container_name
 
 	if [ -z "${QUICK_OPTION_CONTAINER}" ]; then
-		container_name="appjail-${QUICK_JAILNAME}"
+		container_name="<name>"
 	else
 		container_name="${QUICK_OPTION_CONTAINER}"
 	fi
