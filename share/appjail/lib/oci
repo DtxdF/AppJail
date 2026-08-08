@@ -236,14 +236,9 @@ oci_ociv1_get_entrypoint()
 		lib_err ${EX_USAGE} "usage: oci_ociv1_get_entrypoint container"
 	fi
 
-	local entrypoint
-	entrypoint=`buildah inspect -t container "${container}" | jq '.["OCIv1"].["config"].["Entrypoint"]'` || exit $?
+	buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Entrypoint"] | map(@sh) | join(" ")' 2> /dev/null
 
-	if [ "${entrypoint}" = "null" ]; then
-		return 0
-	fi
-
-	printf "%s\n" "${entrypoint}" | jq -M ".[]"
+	return 0
 }
 
 oci_ociv1_get_cmd()
@@ -254,14 +249,9 @@ oci_ociv1_get_cmd()
 		lib_err ${EX_USAGE} "usage: oci_ociv1_get_cmd container"
 	fi
 
-	local cmd
-	cmd=`buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Cmd"]'` || exit $?
+	buildah inspect -t container "${container}" | jq -r '.["OCIv1"].["config"].["Cmd"] | map(@sh) | join(" ")' 2> /dev/null
 
-	if [ "${cmd}" = "null" ]; then
-		return 0
-	fi
-
-	printf "%s\n" "${cmd}" | jq -M '.[]'
+	return 0
 }
 
 oci_ociv1_get_env()
