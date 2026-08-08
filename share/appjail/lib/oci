@@ -376,7 +376,7 @@ oci_get_osversion()
 	esac
 
 	if [ -z "${osversion}" ]; then
-		lib_warn "The specific operating system version for container '${container}' (jail:${jail}), so '${os}' is used instead."
+		lib_warn "The specific operating system version for container '${container}' (jail:${jail}) cannot be detected, so '${os}' is used instead."
 		osversion="${os}" # fallback
 	fi
 
