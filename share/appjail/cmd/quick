@@ -551,7 +551,7 @@ quick_run_from()
 
 	lib_debug "Creating a container (name:${container_name}) from ${QUICK_OPTION_FROM_IMAGE} (args:${QUICK_OPTION_CONTAINER_BUILDAH_ARGS}) ..."
 
-	if ! oci_rm "${container_name}"; then
+	if oci_check_container "${container_name}" && ! oci_rm "${container_name}"; then
 		lib_warn "Error destroying container '${container_name}'"
 	fi
 

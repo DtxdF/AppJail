@@ -104,32 +104,11 @@ oci_check_container()
 		lib_err ${EX_USAGE} "usage: oci_check_container container_name"
 	fi
 
-	local info
-	info=`oci_get_container_info "${container_name}"`
-
-	if [ -n "${info}" ]; then
+	if buildah containers --format "{{.ContainerName}}" --filter name="${container_name}" | grep -qFx "${container_name}"; then
 		return 0
 	else
 		return 1
 	fi
-}
-
-oci_get_container_info()
-{
-	local container_name="$1"
-
-	if [ -z "${container_name}" ]; then
-		lib_err ${EX_USAGE} "usage: oci_get_container_info container_name"
-	fi
-
-	local info
-	info=`buildah containers --json` || exit $?
-
-	if [ "${info}" = "null" ]; then
-		return 0
-	fi
-
-	printf "%s\n" "${info}" | jq -r --arg container "${container_name}" '.[] | select(.containername == $container)'
 }
 
 oci_ociv1_get_arch()
