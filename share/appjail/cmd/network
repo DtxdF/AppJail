@@ -1523,7 +1523,7 @@ network_reserve()
 		lib_debug "appjail-dns is enabled. Reloading ..."
 
 		lockf -ks "${TMPDIR}/appjail-dns.lock" \
-			service appjail-dns reload || :
+			service appjail-dns reload >&2 || :
 	fi
 }
 
