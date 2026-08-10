@@ -164,6 +164,7 @@ QUICK_OPTION_OSVERSION="${FREEBSD_VERSION}"
 QUICK_OPTION_OVERWRITE="${DEFAULT_OVERWRITE}"
 QUICK_OPTION_PKG="${DEFAULT_PACKAGES}"
 QUICK_OPTION_PRIORITY="${DEFAULT_PRIORITY}"
+QUICK_OPTION_DEPEND=
 QUICK_OPTION_RELEASE="${DEFAULT_RELEASE}"
 QUICK_OPTION_RESTART="${DEFAULT_RESTART}"
 QUICK_OPTION_RUN="${DEFAULT_RUN}"
@@ -227,7 +228,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|depend|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -287,7 +288,7 @@ quick_main()
 	device_options="devfs device volume fstab tmpdir linuxfs x11"
 
 	local startup_options
-	startup_options="boot priority"
+	startup_options="boot priority depend"
 
 	local health_options
 	health_options="healthcheck"
@@ -3590,6 +3591,44 @@ quick_set_priority()
 	quick_chknumber "priority" "${priority}"
 
 	QUICK_OPTION_PRIORITY="${priority}"
+}
+
+quick_run_depend()
+{
+	if [ -z "${QUICK_OPTION_DEPEND}" ]; then
+		return 0
+	fi
+
+	lib_debug "Setting jails (${QUICK_OPTION_DEPEND}) that this jail (${QUICK_JAILNAME}) depends on."
+
+	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" depend="${QUICK_OPTION_DEPEND}"
+}
+
+quick_set_depend()
+{
+	local jail
+
+	jail="$1"
+
+	quick_reqoption "jail" "${jail}"
+
+	if [ "${jail}" = "${QUICK_JAILNAME}" ]; then
+		lib_err ${EX_DATAERR} "depend: Can't add myself as a dependency."
+	fi
+
+	if ! lib_check_jailname "${jail}"; then
+		lib_err ${EX_DATAERR} "depend: Invalid jail name \"${jail}\""
+	fi
+
+	if [ ! -d "${JAILDIR}/${jail}" ]; then
+		lib_err ${EX_NOINPUT} "depend: Cannot find the jail \`${jail}\`"
+	fi
+
+	if [ -z "${QUICK_OPTION_DEPEND}" ]; then
+		QUICK_OPTION_DEPEND="${jail}"
+	else
+		QUICK_OPTION_DEPEND="${QUICK_OPTION_DEPEND} ${jail}"
+	fi
 }
 
 quick_run_healthcheck()

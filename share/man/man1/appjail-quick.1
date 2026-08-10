@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 3, 2026
+.Dd August 09, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -513,6 +513,28 @@ Create a static default route to this jail.
 .It Cm defaultrouter6 Ns = Ns Qo Ar router Qc
 The IPv6 equivalent of
 .Sy defaultrouter Ns "."
+.It Cm depend Ns = Ns Qo Ar jail Qc
+.Pp
+Add a
+.Ar jail
+as a dependency. For this to work,
+.Ar jail
+must already exist.
+.Pp
+See also
+.Xr appjail-start 1
+and
+.Xr appjail-rstop 1 "."
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm depend Ns = Ns Qo seaweedfs-master Qc
+.El
 .It Cm device Ns = Ns Qo Ar rulespec Qc
 .Pp
 Add a DEVFS rule.
