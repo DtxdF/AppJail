@@ -1514,6 +1514,17 @@ network_reserve()
 	if ! echo "${address}" | tee "${reserved_addr}"; then
 		lib_err ${EX_IOERR} "Error writing ${reserved_addr}"
 	fi
+
+	local appjail_dns_enable
+	appjail_dns_enable=`sysrc -qin appjail_dns_enable 2> /dev/null`
+
+	if ! lib_check_empty "${appjail_dns_enable}" &&
+			lib_check_yesno "appjail_dns_enable" "${appjail_dns_enable}"; then
+		lib_debug "appjail-dns is enabled. Reloading ..."
+
+		lockf -ks "${TMPDIR}/appjail-dns.lock" \
+			service appjail-dns reload || :
+	fi
 }
 
 network_unplug()

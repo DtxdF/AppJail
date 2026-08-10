@@ -20,8 +20,6 @@
 name=appjail_dns
 rcvar=${name}_enable
 
-start_precmd="appjail_dns_precmd"
-
 load_rc_config ${name}
 
 : ${appjail_dns_enable:=NO}
@@ -38,6 +36,9 @@ procname="%%PREFIX%%/share/appjail/scripts/ajdns.sh"
 command="/usr/sbin/daemon"
 command_args="-c -p ${pidfile} -o ${appjail_dns_logfile} ${procname} -i ${appjail_dns_interval} -h ${appjail_dns_hosts} -H ${appjail_dns_hook} -- ${appjail_dns_extra}"
 command_interpreter="/bin/sh"
+start_precmd="appjail_dns_precmd"
+extra_commands="reload"
+reload_cmd="appjail_dns_reload"
 
 appjail_dns_precmd()
 {
@@ -45,6 +46,12 @@ appjail_dns_precmd()
 		install -m 640 /dev/null "${appjail_dns_logfile}"
 	fi
 	echo "AppJail log file (DNS): ${appjail_dns_logfile}"
+}
+
+appjail_dns_reload()
+{
+	# '-i 0' means once.
+	${procname} -i 0 -h ${appjail_dns_hosts} -H ${appjail_dns_hook} -- ${appjail_dns_extra}
 }
 
 run_rc_command "$1"
