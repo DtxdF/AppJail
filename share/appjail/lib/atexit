@@ -44,7 +44,12 @@ lib_atexit_init()
 
 	trap '' ${ATEXIT_IGNORED_SIGNALS}
 	trap "ATEXIT_ERRLEVEL=\$?; lib_atexit_cleanup; exit \${ATEXIT_ERRLEVEL}" EXIT
-	trap "lib_atexit_cleanup; exit 70" ${ATEXIT_HANDLER_SIGNALS}
+	trap "lib_atexit_cleanup; lib_atexit_exit_status; exit \$?" ${ATEXIT_HANDLER_SIGNALS}
+}
+
+lib_atexit_exit_status()
+{
+	return 70
 }
 
 lib_atexit_cleanup()

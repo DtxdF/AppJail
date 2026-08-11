@@ -39,6 +39,7 @@ oci_desc="Commands for interpreting OCI images."
 
 APPJAIL_PREPEND_ENTRYPOINT="${APPJAIL_PREPEND_ENTRYPOINT}"
 APPJAIL_PREPEND_ENTRYPOINT_FORCE="${APPJAIL_PREPEND_ENTRYPOINT_FORCE:-false}"
+ATEXIT_STATUS=
 
 oci_main()
 {
@@ -525,9 +526,14 @@ oci_exec()
 
 	lib_debug "Executing: ${daemon_args} ${jexec} ${jexec_args}"
 
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
 	set +T
 
-	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}"
+	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
@@ -546,6 +552,20 @@ oci_exec()
 	else
 		exit ${errlevel}
 	fi
+}
+
+lib_atexit_exit_status()
+{
+	if [ -z "${ATEXIT_STATUS}" ]; then
+		return 70
+	fi
+
+	local exit_status
+	exit_status=`head -1 -- "${ATEXIT_STATUS}"` || return $?
+
+	rm -f -- "${ATEXIT_STATUS}"
+
+	return ${exit_status}
 }
 
 oci_from()
@@ -1180,10 +1200,15 @@ oci_run()
 		fi
 	fi
 
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
 	set +T
 
 	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
-		\"${escape_appjail}\" oci exec ${exec_args}"
+		\"${escape_appjail}\" oci exec ${exec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 

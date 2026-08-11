@@ -35,6 +35,8 @@ lib_load "${LIBDIR}/random"
 
 cmd_desc="Execute commands in a jail."
 
+ATEXIT_STATUS=
+
 cmd_main()
 {
 	local entity="$1"; shift
@@ -316,6 +318,11 @@ cmd_jexec()
 		jexec_args="${jexec_args} \"${escape_arg}\""
 	done
 
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
 	local errlevel
 
 	set +T
@@ -324,14 +331,14 @@ cmd_jexec()
 		local escape_jexec
 		escape_jexec=`lib_escape_string "${jexec}"`
 
-		sh -c "\"${escape_jexec}\" ${jexec_args}"
+		sh -c "\"${escape_jexec}\" ${jexec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 		errlevel=$?
 	else
 		local escape_juexec
 		escape_juexec=`lib_escape_string "${juexec}"`
 
-		sh -c "\"${escape_juexec}\" ${jexec_args}"
+		sh -c "\"${escape_juexec}\" ${jexec_args}; ERRLEVEL=\$?; echo ${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 		errlevel=$?
 	fi
@@ -339,6 +346,20 @@ cmd_jexec()
 	set -T
 
 	return ${errlevel}
+}
+
+lib_atexit_exit_status()
+{
+	if [ -z "${ATEXIT_STATUS}" ]; then
+		return 70
+	fi
+
+	local exit_status
+	exit_status=`head -1 -- "${ATEXIT_STATUS}"` || return $?
+
+	rm -f -- "${ATEXIT_STATUS}"
+
+	return ${exit_status}
 }
 
 cmd_local()
