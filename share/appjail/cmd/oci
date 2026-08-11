@@ -529,9 +529,9 @@ oci_exec()
 
 	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}"
 
-	set -T
-
 	errlevel=$?
+
+	set -T
 
 	if ${opt_detach}; then
 		pid=`oci_get-pid "${jail}"`
@@ -1185,7 +1185,11 @@ oci_run()
 	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
 		\"${escape_appjail}\" oci exec ${exec_args}"
 
+	errlevel=$?
+
 	set -T
+
+	exit ${errlevel}
 }
 
 oci_set-args()
