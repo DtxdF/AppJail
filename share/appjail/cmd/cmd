@@ -117,7 +117,40 @@ cmd_jaildir()
 		set -- "${SHELL:-/bin/sh}"
 	fi
 
-	(cd "${JAILDIR}"; command -- "$@")
+	local command= arg=
+
+	for arg in "$@"; do
+		local escape_arg=
+		if ! lib_check_empty "${arg}"; then
+			escape_arg=`lib_escape_string "${arg}"`
+		fi
+
+		if [ -z "${command}" ]; then
+			command="\"${escape_arg}\""
+		else
+			command="${command} \"${escape_arg}\""
+		fi
+	done
+
+	local escape_jaildir
+	escape_jaildir=`lib_escape_string "${JAILDIR}"`
+
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
+	local errlevel
+
+	set +T
+
+	sh -c "cd -- \"${escape_jaildir}\"; ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
+
+	errlevel=$?
+
+	set -T
+
+	return ${errlevel}
 }
 
 cmd_chroot()
@@ -130,12 +163,49 @@ cmd_chroot()
 		exit ${EX_USAGE}
 	fi
 
+	if ! lib_check_jailname "${jail_name}"; then
+		lib_err ${EX_DATAERR} "Invalid jail name \"${jail_name}\""
+	fi
+
 	jail_path="${JAILDIR}/${jail_name}/jail"
 	if [ ! -d "${jail_path}" ]; then
 		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
 	fi
 
-	chroot -- "${jail_path}" "$@"
+	local command= arg=
+
+	for arg in "$@"; do
+		local escape_arg=
+		if ! lib_check_empty "${arg}"; then
+			escape_arg=`lib_escape_string "${arg}"`
+		fi
+
+		if [ -z "${command}" ]; then
+			command="\"${escape_arg}\""
+		else
+			command="${command} \"${escape_arg}\""
+		fi
+	done
+
+	local escape_jail_path
+	escape_jail_path=`lib_escape_string "${jail_path}"`
+
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
+	local errlevel
+
+	set +T
+
+	sh -c "chroot -- \"${escape_jail_path}\" ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
+
+	errlevel=$?
+
+	set -T
+
+	return ${errlevel}
 }
 
 cmd_jexec()
@@ -413,7 +483,40 @@ cmd_local()
 		set -- "${SHELL:-/bin/sh}"
 	fi
 
-	(cd "${basedir}"; command -- "$@")
+	local command= arg=
+
+	for arg in "$@"; do
+		local escape_arg=
+		if ! lib_check_empty "${arg}"; then
+			escape_arg=`lib_escape_string "${arg}"`
+		fi
+
+		if [ -z "${command}" ]; then
+			command="\"${escape_arg}\""
+		else
+			command="${command} \"${escape_arg}\""
+		fi
+	done
+
+	local escape_basedir
+	escape_basedir=`lib_escape_string "${basedir}"`
+
+	ATEXIT_STATUS=`lib_generate_tempfile` || exit $?
+	
+	local escape_atexit_status
+	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
+
+	local errlevel
+
+	set +T
+
+	sh -c "cd -- \"${escape_basedir}\"; ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
+
+	errlevel=$?
+
+	set -T
+
+	return ${errlevel}
 }
 
 cmd_help()
