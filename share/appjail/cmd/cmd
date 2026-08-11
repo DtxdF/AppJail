@@ -338,7 +338,7 @@ cmd_jexec()
 		local escape_juexec
 		escape_juexec=`lib_escape_string "${juexec}"`
 
-		sh -c "\"${escape_juexec}\" ${jexec_args}; ERRLEVEL=\$?; echo ${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
+		sh -c "\"${escape_juexec}\" ${jexec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 		errlevel=$?
 	fi
