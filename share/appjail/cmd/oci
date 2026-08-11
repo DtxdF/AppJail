@@ -260,7 +260,8 @@ oci_exec()
 		printf "%s\n" "${output}" >&2
 		return 0
 	elif [ ${errlevel} -ne 0 ]; then
-		lib_err ${errlevel} "${output}"
+		printf "%s\n" "${output}" >&2
+		exit ${errlevel}
 	fi
 
 	local is_container
