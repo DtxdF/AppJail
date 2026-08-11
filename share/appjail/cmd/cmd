@@ -316,17 +316,29 @@ cmd_jexec()
 		jexec_args="${jexec_args} \"${escape_arg}\""
 	done
 
+	local errlevel
+
+	set +T
+
 	if [ ${opt_use_juexec} -eq 0 ]; then
 		local escape_jexec
 		escape_jexec=`lib_escape_string "${jexec}"`
 
 		sh -c "\"${escape_jexec}\" ${jexec_args}"
+
+		errlevel=$?
 	else
 		local escape_juexec
 		escape_juexec=`lib_escape_string "${juexec}"`
 
 		sh -c "\"${escape_juexec}\" ${jexec_args}"
+
+		errlevel=$?
 	fi
+
+	set -T
+
+	return ${errlevel}
 }
 
 cmd_local()
