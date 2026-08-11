@@ -525,7 +525,11 @@ oci_exec()
 
 	lib_debug "Executing: ${daemon_args} ${jexec} ${jexec_args}"
 
+	set +T
+
 	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}"
+
+	set -T
 
 	errlevel=$?
 
@@ -1176,8 +1180,12 @@ oci_run()
 		fi
 	fi
 
+	set +T
+
 	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
 		\"${escape_appjail}\" oci exec ${exec_args}"
+
+	set -T
 }
 
 oci_set-args()
