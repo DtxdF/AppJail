@@ -1384,7 +1384,7 @@ quick_run_expose()
 		quick_reqoptions "expose" "virtualnet"
 	fi
 
-	lib_keys_list "${QUICK_KEY_EXPOSE}" | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_EXPOSE}" | sort -n | while IFS= read -r nro
 	do
 		network=`lib_keys_get "${QUICK_KEY_EXPOSE}" "${nro}" "network"`
 
@@ -2170,7 +2170,7 @@ quick_run_alias()
 	fi
 
 	if [ ${QUICK_OPTION_IP4} -eq 1 ]; then
-		lib_keys_list "${QUICK_KEY_IP4}" | while IFS= read -r nro
+		lib_keys_list "${QUICK_KEY_IP4}" | sort -n | while IFS= read -r nro
 		do
 			addr=`lib_keys_get "${QUICK_KEY_IP4}" "${nro}" "addr"`
 
@@ -2205,7 +2205,7 @@ quick_run_alias()
 	fi
 
 	if [ ${QUICK_OPTION_IP6} -eq 1 ]; then
-		lib_keys_list "${QUICK_KEY_IP6}" | while IFS= read -r nro
+		lib_keys_list "${QUICK_KEY_IP6}" | sort -n | while IFS= read -r nro
 		do
 			addr=`lib_keys_get "${QUICK_KEY_IP6}" "${nro}" "addr"`
 
@@ -2283,7 +2283,7 @@ quick_run_dhcp()
 		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: dhcp can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
 	esac
 
-	lib_keys_list "${QUICK_KEY_DHCP}" | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_DHCP}" | sort -n | while IFS= read -r nro
 	do
 		interface=`lib_keys_get "${QUICK_KEY_DHCP}" "${nro}" "interface"`
 
@@ -2338,7 +2338,7 @@ quick_run_slaac()
 	sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" rtsold_enable="YES" >&2 || exit $?
 	sysrc -f "${QUICK_JAILPATH}/jail/etc/rc.conf" rtsold_flags="--" >&2 || exit $?
 
-	lib_keys_list "${QUICK_KEY_SLAAC}" | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_SLAAC}" | sort -n | while IFS= read -r nro
 	do
 		interface=`lib_keys_get "${QUICK_KEY_SLAAC}" "${nro}" "interface"`
 
@@ -3367,7 +3367,7 @@ quick_run_ifconfig()
 		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: ifconfig|ifconfig6 can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
 	esac
 
-	lib_keys_list "${QUICK_KEY_IFCONFIG}" | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_IFCONFIG}" | sort -n | while IFS= read -r nro
 	do
 		interface=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "interface"`
 		options=`lib_keys_get "${QUICK_KEY_IFCONFIG}" "${nro}" "options"`
@@ -3461,7 +3461,7 @@ quick_run_macaddr()
 		*) lib_err ${EX_CONFIG} -- "${QUICK_OPTION_JAILTYPE}: macaddr can only be used when the jail type is a ${JAIL_TYPE_THICK} or a ${JAIL_TYPE_THIN} jail."
 	esac
 
-	lib_keys_list "${QUICK_KEY_ETHER}" | while IFS= read -r nro
+	lib_keys_list "${QUICK_KEY_ETHER}" | sort -n | while IFS= read -r nro
 	do
 		interface=`lib_keys_get "${QUICK_KEY_ETHER}" "${nro}" "interface"`
 		addr=`lib_keys_get "${QUICK_KEY_ETHER}" "${nro}" "addr"`
