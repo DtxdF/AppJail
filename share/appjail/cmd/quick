@@ -4387,14 +4387,20 @@ quick_run_pkg()
 		return 0
 	fi
 
+	local pkg_cmd="jail"
+
 	if [ "${QUICK_OPTION_START}" = 0 ] || ! appjail status -q -- "${QUICK_JAILNAME}"; then
-		lib_err ${EX_CONFIG} "Packages '${QUICK_OPTION_PKG}' cannot be installed because the jail is not started."
+		if [ "${QUICK_OPTION_JAILTYPE}" = "${JAIL_TYPE_THIN}" ]; then
+			lib_err ${EX_CONFIG} "Packages '${QUICK_OPTION_PKG}' cannot be installed because the jail is not started."
+		else
+			pkg_cmd="chroot"
+		fi
 	fi
 
 	lib_split_jailparams "${QUICK_OPTION_PKG}" | while IFS= read -r package; do
 		lib_debug "Installing package '${package}' ..."
 
-		appjail pkg jail "${QUICK_JAILNAME}" install -y -- "${package}"
+		appjail pkg "${pkg_cmd}" "${QUICK_JAILNAME}" install -y -- "${package}"
 
 		errlevel=$?
 

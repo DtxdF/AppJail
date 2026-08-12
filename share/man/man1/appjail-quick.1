@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd August 09, 2026
+.Dd August 11, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -1751,6 +1751,11 @@ do nothing when ZFS is not enabled.
 .It Cm pkg Ns = Ns Qo Ar package Qc
 .Pp
 Install a package.
+.Pp
+If the jail is a thinjail, it must be started or this option will refuse to continue. For other types of jails,
+.Xr appjail-pkg 1
+.Cm chroot
+will be used instead.
 .Pp
 .Em Type Ns : Ns " " Ns Sy String
 .br
