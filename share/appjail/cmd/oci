@@ -992,7 +992,7 @@ oci_run()
 	local options=
 	local user=
 	local workdir=
-	local oci_run_args=":Pdi:E:e:o:u:w:"
+	local oci_run_args=":PdiE:e:o:u:w:"
 
 	while getopts "${oci_run_args}" _o; do
 		case "${_o}" in
