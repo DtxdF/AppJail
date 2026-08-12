@@ -185,12 +185,13 @@ oci_exec()
 {
 	local _o
 	local opt_detach=false
+	local opt_interactive=false
 	local env=
 	local user=
 	local workdir=
 	local use_juexec=false
 
-	while getopts ":de:u:w:" _o; do
+	while getopts ":die:u:w:" _o; do
 		case "${_o}" in
 			e|u|w)
 				if lib_check_empty "${OPTARG}"; then
@@ -203,6 +204,9 @@ oci_exec()
 		case "${_o}" in
 			d)
 				opt_detach=true
+				;;
+			i)
+				opt_interactive=true
 				;;
 			e)
 				local env_var="${OPTARG}"
@@ -532,13 +536,17 @@ oci_exec()
 	local escape_atexit_status
 	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
 
-	set +T
+	if ${opt_interactive}; then
+		set +T
+	fi
 
 	sh -c "${daemon_args} \"${escape_jexec}\" ${jexec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
-	set -T
+	if ${opt_interactive}; then
+		set -T
+	fi
 
 	if ${opt_detach}; then
 		pid=`oci_get-pid "${jail}"`
@@ -978,12 +986,13 @@ oci_run()
 	local _o
 	local opt_persist=false
 	local opt_detach=false
+	local opt_interactive=false
 	local entrypoint=
 	local env=
 	local options=
 	local user=
 	local workdir=
-	local oci_run_args=":PdE:e:o:u:w:"
+	local oci_run_args=":Pdi:E:e:o:u:w:"
 
 	while getopts "${oci_run_args}" _o; do
 		case "${_o}" in
@@ -1011,6 +1020,9 @@ oci_run()
 				;;
 			d)
 				opt_detach=true
+				;;
+			i)
+				opt_interactive=true
 				;;
 			E)
 				entrypoint="${OPTARG}"
@@ -1118,6 +1130,10 @@ oci_run()
 		exec_args="-d"
 	fi
 
+	if ${opt_interactive}; then
+		exec_args="${exec_args} -i"
+	fi
+
 	if [ -n "${user}" ]; then
 		if ${opt_persist}; then
 			oci_set-user "${jail}" "${user}"
@@ -1206,14 +1222,18 @@ oci_run()
 	local escape_atexit_status
 	escape_atexit_status=`lib_escape_string "${ATEXIT_STATUS}"`
 
-	set +T
+	if ${opt_interactive}; then
+		set +T
+	fi
 
 	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
 		\"${escape_appjail}\" oci exec ${exec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
-	set -T
+	if ${opt_interactive}; then
+		set -T
+	fi
 
 	exit ${errlevel}
 }
@@ -1662,7 +1682,7 @@ usage: oci del-args <jail>
        oci del-env <jail> <name>
        oci del-user <jail>
        oci del-workdir <jail>
-       oci exec [-d] [[-e <name>[=<value>]] ...] [-u <user>] [-w <workdir>] <jail>
+       oci exec [-di] [[-e <name>[=<value>]] ...] [-u <user>] [-w <workdir>] <jail>
                [<command> [<args> ...]]
        oci from <image> <jail> [<options> ...]
        oci get-args <jail>
@@ -1675,7 +1695,7 @@ usage: oci del-args <jail>
        oci kill [-s <signal>] <jail>
        oci ls-env <jail>
        oci mount <jail>
-       oci run [-Pd] [-E <entrypoint>] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
+       oci run [-Pdi] [-E <entrypoint>] [[-e <name>[=<value>]] ...] [[-o <option>] ...] [-u <user>]
                [-w <workdir>] <image> <jail> [<command> [<args> ...]]
        oci set-args <jail> [<args> ...]
        oci set-boot [on|off] <jail>

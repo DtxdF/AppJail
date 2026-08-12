@@ -108,6 +108,22 @@ cmd_all()
 
 cmd_jaildir()
 {
+	local _o
+	local opt_interactive=0
+
+	while getopts ":i" _o; do
+		case "${_o}" in
+			i)
+				opt_interactive=1
+				;;
+			*)
+				cmd_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
 	if [ ! -d "${JAILDIR}" ]; then
 		lib_err ${EX_NOINPUT} "Cannot find the \`${JAILDIR}\` directory."
 	fi
@@ -142,19 +158,25 @@ cmd_jaildir()
 
 	local errlevel
 
-	set +T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set +T
+	fi
 
 	sh -c "cd -- \"${escape_jaildir}\"; ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
-	set -T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set -T
+	fi
 
 	return ${errlevel}
 }
 
 cmd_chroot()
 {
+	local _o
+	local opt_interactive=0
 	local jail_name
 
 	jail_name="$1"; shift
@@ -171,6 +193,19 @@ cmd_chroot()
 	if [ ! -d "${jail_path}" ]; then
 		lib_err ${EX_NOINPUT} "Cannot find the jail \`${jail_name}\`"
 	fi
+
+	while getopts ":i" _o; do
+		case "${_o}" in
+			i)
+				opt_interactive=1
+				;;
+			*)
+				cmd_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
 
 	local command= arg=
 
@@ -197,13 +232,17 @@ cmd_chroot()
 
 	local errlevel
 
-	set +T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set +T
+	fi
 
 	sh -c "chroot -- \"${escape_jail_path}\" ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
-	set -T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set -T
+	fi
 
 	return ${errlevel}
 }
@@ -211,6 +250,7 @@ cmd_chroot()
 cmd_jexec()
 {
 	local _o
+	local opt_interactive=0
 	local opt_clean=1
 	local jail_username=
 	local host_username=
@@ -225,7 +265,7 @@ cmd_jexec()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":le:U:u:w:" _o; do
+	while getopts ":ile:U:u:w:" _o; do
 		case "${_o}" in
 			e|U|u|w)
 				if lib_check_empty "${OPTARG}"; then
@@ -236,6 +276,9 @@ cmd_jexec()
 		esac
 
 		case "${_o}" in
+			i)
+				opt_interactive=1
+				;;
 			l)
 				opt_clean=0
 				;;
@@ -395,7 +438,9 @@ cmd_jexec()
 
 	local errlevel
 
-	set +T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set +T
+	fi
 
 	if [ ${opt_use_juexec} -eq 0 ]; then
 		local escape_jexec
@@ -413,28 +458,17 @@ cmd_jexec()
 		errlevel=$?
 	fi
 
-	set -T
-
-	return ${errlevel}
-}
-
-lib_atexit_exit_status()
-{
-	if [ -z "${ATEXIT_STATUS}" ]; then
-		return 70
+	if [ ${opt_interactive} -eq 1 ]; then
+		set -T
 	fi
 
-	local exit_status
-	exit_status=`head -1 -- "${ATEXIT_STATUS}"` || return $?
-
-	rm -f -- "${ATEXIT_STATUS}"
-
-	return ${exit_status}
+	return ${errlevel}
 }
 
 cmd_local()
 {
 	local _o
+	local opt_interactive=0
 	local opt_jails=0
 	local opt_jail=1
 	local opt_rootdir=0
@@ -447,8 +481,11 @@ cmd_local()
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":jr" _o; do
+	while getopts ":ijr" _o; do
 		case "${_o}" in
+			i)
+				opt_interactive=1
+				;;
 			j)
 				opt_jail=1
 				opt_rootdir=0
@@ -508,15 +545,33 @@ cmd_local()
 
 	local errlevel
 
-	set +T
+	if [ ${opt_interactive} -eq 1 ]; then
+		set +T
+	fi
 
 	sh -c "cd -- \"${escape_basedir}\"; ${command}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
 
-	set -T
+	if [ ${opt_interactive} ]; then
+		set -T
+	fi
 
 	return ${errlevel}
+}
+
+lib_atexit_exit_status()
+{
+	if [ -z "${ATEXIT_STATUS}" ]; then
+		return 70
+	fi
+
+	local exit_status
+	exit_status=`head -1 -- "${ATEXIT_STATUS}"` || return $?
+
+	rm -f -- "${ATEXIT_STATUS}"
+
+	return ${exit_status}
 }
 
 cmd_help()
@@ -528,10 +583,10 @@ cmd_usage()
 {
 	cat << EOF
 usage: cmd all [-e] [-i <file>] <target> [<args> ...]
-       cmd chroot <jail> [<command> [<args> ...]]
-       cmd jaildir [<command> [<args> ...]]
-       cmd jexec <jail> [-l] [[-U <username>|-u <username>]]
+       cmd chroot <jail> [-i] [<command> [<args> ...]]
+       cmd jaildir [-i] [<command> [<args> ...]]
+       cmd jexec <jail> [-il] [[-U <username>|-u <username>]]
                [<command> [<args> ...]]
-       cmd local <jail> [[-j|-r]] [<command> [<args> ...]]
+       cmd local <jail> [-i] [[-j|-r]] [<command> [<args> ...]]
 EOF
 }

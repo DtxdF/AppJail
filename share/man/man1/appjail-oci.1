@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd July 12, 2026
+.Dd August 12, 2026
 .Dt APPJAIL-OCI 1
 .Os
 .Sh NAME
@@ -50,7 +50,7 @@
 .Ar jail
 .Nm appjail oci
 .Cm exec
-.Op Fl d
+.Op Fl di
 .Oo
 .Op Fl e Ar name Ns Oo = Ns Ar value Oc
 .Ns "..."
@@ -92,7 +92,7 @@
 .Ar jail
 .Nm appjail oci
 .Cm run
-.Op Fl Pd
+.Op Fl Pdi
 .Op Fl E Ar entrypoint
 .Oo
 .Op Fl e Ar name Ns Oo = Ns Ar value Oc
@@ -164,7 +164,7 @@ Removes a user-defined username that was previously specified by
 .It Cm del-workdir Ar jail
 Removes a user-defined working directory that was previously specified by
 .Cm set-workdir Ns "."
-.It Cm exec Oo Fl d Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar command Oo Ar args No "..." Oc Oc
+.It Cm exec Oo Fl di Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar command Oo Ar args No "..." Oc Oc
 Executes the command specified by the OCI image. The command to be executed is a combination of the entrypoint and its arguments. Environment variables are also set if the OCI image contains them. If the OCI image specifies a user, the process is executed as such, and if the working directory is specified by the OCI image, the process is executed in that directory
 .Po which should exist Pc Ns "."
 .Pp
@@ -206,6 +206,16 @@ and
 If the
 .Fl d
 parameter is specified, the process runs in the background.
+.Pp
+The
+.Fl i
+flag is used to indicate that the command to be executed is interactive. This
+is intended for programs that may request input or that may behave unexpectedly
+when receiving a
+.Sy SIGINT
+signal. When this flag is set and AppJail receives a handled signal, it will not
+attempt to terminate the child process as long as it continues to run. If you want
+to terminate it
 .It Cm from Ar image Ar jail Oo Ar options No "..." Oc
 This is a wrapper for the
 .Cm from
@@ -249,7 +259,7 @@ Lists all environment variables previously specified by
 .Cm set-env Ns "."
 .It Cm mount Ar jail
 Mount the container directory in the jail directory.
-.It Cm run Oo Fl Pd Oc Oo Fl E Ar entrypoint Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl o Ar option Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar args No "..." Oc
+.It Cm run Oo Fl Pdi Oc Oo Fl E Ar entrypoint Oc Oo Oo Fl e Ar name Ns Oo = Ns Ar value Oc Oc No "..." Oc Oo Oo Fl o Ar option Oc No "..." Oc Oo Fl u Ar user Oc Oo Fl w Ar workdir Oc Ar jail Oo Ar args No "..." Oc
 This subcommand first calls
 .Cm from
 with the options specified by
