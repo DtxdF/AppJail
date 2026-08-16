@@ -280,8 +280,8 @@ jail_create()
 			;;
 	esac
 
-	if [ -d "${jail_path}/jail" ] && ! chmod 0700 "${jail_path}/jail"; then
-		lib_err ${EX_SOFTWARE} "Error restricing permissions in ${jail_path}/jail"
+	if [ -d "${jail_path}" ] && ! chmod 0700 "${jail_path}"; then
+		lib_err ${EX_SOFTWARE} "Error restricing permissions in ${jail_path}"
 	fi
 
 	if [ ${notouch} -eq 1 ]; then

@@ -571,8 +571,11 @@ quick_run_from()
 
 		appjail oci mount "${QUICK_JAILNAME}" || exit $?
 	else
+		local rootdir
+		rootdir="${JAILDIR}/${QUICK_JAILNAME}"
+
 		local jaildir
-		jaildir="${JAILDIR}/${QUICK_JAILNAME}/jail"
+		jaildir="${rootdir}/jail"
 
 		lib_debug "Copying content from container '${container_name}' to directory '${jaildir}' ..."
 
@@ -584,8 +587,8 @@ quick_run_from()
 
 		lib_copy "${container_path}" . "${jaildir}" || exit $?
 
-		if [ -d "${jaildir}" ] && ! chmod 0700 "${jaildir}"; then
-			lib_err ${EX_SOFTWARE} "Error restricing permissions in ${jaildir}"
+		if [ -d "${rootdir}" ] && ! chmod 0700 "${rootdir}"; then
+			lib_err ${EX_SOFTWARE} "Error restricing permissions in ${rootdir}"
 		fi
 	fi
 
