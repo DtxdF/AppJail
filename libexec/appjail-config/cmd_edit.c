@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+ * Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,13 +29,10 @@
  */
 
 #include <err.h>
-#include <errno.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include "commands.h"
@@ -126,26 +123,8 @@ edit_file(const char *f)
     if (e == NULL)
         e = CMD_EDIT_EDITOR;
 
-    pid_t p;
-
-    switch ((p = fork())) {
-    case -1:
-        err(EX_OSERR, "fork()");
-        break;
-    case 0:
-        if (execlp(e, e, f, NULL) == -1)
-            err(EX_SOFTWARE, "execlp()");
-        break;
-    default: {
-            int stat_val;
-
-            if (wait(&stat_val) == -1)
-                err(EX_SOFTWARE, "wait()");
-
-            if (WIFEXITED(stat_val) != 0)
-                errcode = WEXITSTATUS(stat_val);
-        }
-    }
+    if (execlp(e, e, f, NULL) == -1)
+        err(EX_SOFTWARE, "execlp()");
 
     return errcode;
 }
