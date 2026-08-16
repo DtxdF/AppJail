@@ -979,6 +979,10 @@ oci_mount()
 	if ! mount_nullfs "${container_path}" "${jaildir}"; then
 		lib_err ${EX_SOFTWARE} "Error mounting \`${container_path}\` in \`${jaildir}\`"
 	fi
+
+	if [ -d "${jaildir}" ] && ! chmod 0700 "${jaildir}"; then
+		lib_err ${EX_SOFTWARE} "Error restricing permissions in ${jaildir}"
+	fi
 }
 
 oci_run()

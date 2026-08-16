@@ -583,6 +583,10 @@ quick_run_from()
 		container_path=`buildah mount "${container_name}"` || exit $?
 
 		lib_copy "${container_path}" . "${jaildir}" || exit $?
+
+		if [ -d "${jaildir}" ] && ! chmod 0700 "${jaildir}"; then
+			lib_err ${EX_SOFTWARE} "Error restricing permissions in ${jaildir}"
+		fi
 	fi
 
 	local arch
