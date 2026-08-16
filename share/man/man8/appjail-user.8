@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd March 24, 2024
+.Dd August 16, 2026
 .Dt APPJAIL-USER 1
 .Os
 .Sh NAME
@@ -90,24 +90,14 @@ After configuring the external tool as specified in
 we should call
 .Sy appjail
 and
-.Sy appjail-config-user
+.Sy appjail-config
 without problems.
-.Pp
-In the case of
-.Xr appjail-config 1 ","
-we must explicitly call it
-.Sy appjail-config-user
-instead of simply
-.Sy appjail-config "."
-This is a design decision since the version with the
-.Sy -user
-suffix introduces a bit of overhead.
 .Pp
 .Bd -literal -compact -offset Ds
 .No $ Nm appjail jail Cm list
 STATUS  NAME   TYPE  VERSION       PORTS  NETWORK_IP4
 UP      jtest  thin  14.0-RELEASE  -      -
-.No $ Nm appjail-config-user Cm set Fl j Ar jtest Ar devfs_ruleset=15
+.No $ Nm appjail-config Cm set Fl j Ar jtest Ar devfs_ruleset=15
 .Ed
 .Sh SEE ALSO
 .Xr appjail 1
@@ -118,9 +108,11 @@ UP      jtest  thin  14.0-RELEASE  -      -
 .An Jesús Daniel Colmenares Oviedo Aq Mt DtxdF@disroot.org
 .Sh CAVEATS
 .Ss Legacy Tool
-There is a legacy and deprecated tool on your system called
-.Sy appjail-user "."
-This is for backward-compatibility and should no be used.
+Your system contains legacy and deprecated tools called
+.Sy appjail-user
+and
+.Sy appjail-config-user Ns "."
+This is for backward-compatibility and should not be used.
 .Ss Filesystem Permissions
 Some Makejail's instructions operate with a file and those instructions don't perform
 any modification, so if you create a file as an unprivileged user and the Makejail

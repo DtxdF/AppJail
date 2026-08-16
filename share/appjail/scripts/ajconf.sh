@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,5 +32,10 @@ CONFIG="%%PREFIX%%/share/appjail/files/config.conf"
 
 . "${CONFIG}"
 
-APPJAIL_CONFIG_JAILDIR="${JAILDIR}" \
-	"${UTILDIR}/appjail-config/appjail-config" "$@"
+if [ `id -u` -eq 0 ]; then
+	export APPJAIL_CONFIG_JAILDIR="${JAILDIR}"
+
+	exec "${UTILDIR}/appjail-config/appjail-config" "$@"
+else
+	exec "${SCRIPTSDIR}/runas.sh" "appjail-config" "$@"
+fi
