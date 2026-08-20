@@ -549,7 +549,7 @@ lib_check_ispath()
 		lib_err ${EX_USAGE} "lib_check_ispath pathname"
 	fi
 
-	if printf "%s" "${pathname}" | grep "[/]"; then
+	if printf "%s" "${pathname}" | grep -q "[/]"; then
 		return 0
 	else
 		return 1
@@ -1249,4 +1249,52 @@ lib_check_yesno()
 		return 1
 		;;
 	esac
+}
+
+lib_check_secret()
+{
+	local secret="$1"
+
+	if [ -z "${secret}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_secret secret"
+	fi
+
+	if printf "%s" "${secret}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9._-]*/[a-zA-Z0-9_][a-zA-Z0-9._-]*$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_secretname()
+{
+	local secretname="$1"
+
+	if [ -z "${secretname}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_secretname secretname"
+	fi
+
+	if printf "%s" "${secretname}" | grep -qEe '^[a-zA-Z0-9_][a-zA-Z0-9._-]*$'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+lib_check_emptydir()
+{
+	local directory="$1"
+
+	if [ -z "${directory}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_emptydir directory"
+	fi
+
+	local count
+	count=`find -- "${directory}" -mindepth 1 -maxdepth 1 -type f -print -quit 2>/dev/null | wc -l`
+
+	if [ ${count} -eq 0 ]; then
+		return 0
+	else
+		return 1
+	fi
 }

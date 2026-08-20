@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 13, 2026
+.Dd August 19, 2026
 .Dt APPJAIL 1
 .Os
 .Sh NAME
@@ -246,6 +246,11 @@ Run user-defined stages.
 .Bl -tag -width xxx
 .It Xr appjail-oci 1
 Commands for interpreting OCI images.
+.Ss SECRETS
+.Bl -tag -width xxx
+.It Xr appjail-secrets 1
+Secrets management for jails.
+.El
 .El
 .Sh SIGNALS
 AppJail returns

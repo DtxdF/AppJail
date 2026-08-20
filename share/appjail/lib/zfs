@@ -36,6 +36,7 @@ ZFS_JAILS_NAME="jails"
 ZFS_LOGS_NAME="logs"
 ZFS_NETWORK_NAME="networks"
 ZFS_RELEASE_NAME="releases"
+ZFS_SECRETS_NAME="secrets"
 
 lib_zfs_mkroot()
 {

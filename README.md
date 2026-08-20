@@ -62,6 +62,7 @@ Its goals are to simplify life for sysadmins and developers by providing a unifi
 * Images - Your jail in a single file!
 * DEVFS support - Dynamic device management!
 * OCI support - Containers everywhere!
+* Secrets management - Securely inject and manage sensitive configuration.
 * ...
 
 ## Documentation

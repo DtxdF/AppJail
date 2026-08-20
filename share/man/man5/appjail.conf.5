@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 2, 2026
+.Dd August 19, 2026
 .Dt APPJAIL.CONF 5
 .Os
 .Sh NAME
@@ -1358,6 +1358,38 @@ Initial number used by
 .br
 Default:
 .Em 1000
+.El
+.Sh SECRETS PARAMETERS
+.Bl -tag -width xxxxx
+.It SECRETSDIR
+Location of secrets.
+.br
+Default:
+.Em ${DATADIR}/secrets
+.It SECRETS_BACKENDSDIR
+Location of data used by backends.
+.br
+Default:
+.Em ${SECRETSDIR}/backends
+.It SECRETS_BACKEND
+Backend to be used for encrypting and decrypting secrets. Currently, only
+.Sy age
+and
+.Sy rage
+are implemented.
+.br
+Default:
+.Em rage
+.It SECRETS_MDMFS_SIZE
+The amount of memory allocated by
+.Xr md 4 Ns "."
+Even though the
+.Li -o reserve
+option is set by default, it is recommended that you set this parameter to
+a realistic value.
+.br
+Default:
+.Em 32m
 .El
 .Sh MISCELLANEOUS PARAMETERS
 .Bl -tag -width xxxxx

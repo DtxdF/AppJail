@@ -1,4 +1,4 @@
-.\"Copyright (c) 2024, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+.\"Copyright (c) 2024-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 .\"All rights reserved.
 .\"
 .\"Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 12, 2024
+.Dd August 19, 2026
 .Dt APPJAIL-FSTAB 1
 .Os
 .Sh NAME
@@ -404,10 +404,34 @@ and
 .Ar mountpoint
 is
 .Ar device Ns "."
+.It Sy <secretsfs>
+This is equivalent to running the
+.Xr appjail-secrets 1
+.Cm use
+command.
+.Pp
+After executing the command mentioned above using
+.Ar device
+as the secret group, that group resolves to a mount point that should point to
+the in-memory file system. The rest of this option is equivalent to
+.Sy nullfs Ns "."
+.Pp
+This pseudo-filesystem honors the options specified via
+.Ar options Ns ,
+but it is strongly recommended to use
+.Sy ro Ns "."
+The
+.Cm secret
+option in
+.Xr appjail-quick 1
+already does this, so it is recommended to use this pseudo-filesystem in
+conjunction with that option.
+.El
 .Sh EXIT STATUS
 .Ex -std "appjail fstab"
 .Sh SEE ALSO
 .Xr appjail-volume 1
+.Xr appjail-secrets 1
 .Xr sysexits 3
 .Xr fstab 5
 .Xr nullfs 5

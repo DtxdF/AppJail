@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -229,6 +229,14 @@ fstab_compile()
 
 				fs_file=`_fstab_pre_mount_volumefs "${jail_name}" "${fs_spec}" "${fs_file}"` || exit $?
 				;;
+			\<secretsfs\>)
+				fs_file="${jail_path}/jail/${fs_file}"
+				fs_vfstype="nullfs"
+				fs_freq=0
+				fs_passno=0
+
+				fs_spec=`_fstab_pre_mount_secretsfs "${fs_spec}" "${fs_file}"` || exit $?
+				;;
 			*)
 				fs_file="${jail_path}/jail/${fs_file}"
 				_fstab_pre_mount "${fs_file}"
@@ -264,6 +272,21 @@ _fstab_pre_mount_pseudofs()
 	case "${type}" in
 		dir) "${SCRIPTSDIR}/super-mv.sh" -f "${CONFIG}" -s "${fs_file}" -d "${fs_spec}" ;;
 	esac
+}
+
+_fstab_pre_mount_secretsfs()
+{
+	local secret_group="$1"
+	local fs_file="$2"
+
+	"${APPJAIL_PROGRAM}" secrets use "${secret_group}" || exit $?
+
+	local fs_spec
+	fs_spec="${SECRETSDIR}/ramdisk/${secret_group}"
+
+	_fstab_pre_mount_nullfs "${fs_spec}" "${fs_file}" > /dev/null || exit $?
+
+	printf "%s\n" "${fs_spec}"
 }
 
 _fstab_pre_mount_nullfs()

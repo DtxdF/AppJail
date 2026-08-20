@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd August 11, 2026
+.Dd August 19, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -1841,6 +1841,29 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm secret Ns = Ns Qo Ar group Qc
+.Pp
+This is equivalent to running the
+.Xr appjail-secrets 1
+.Cm use
+command.
+It also adds an entry to
+.Xr appjail-fstab 1
+to mount the secret in read-only mode inside the jail, with the pseudo-file system
+.Sy <secretsfs>
+as the type.
+.Pp
+.Em Type Ns : Ns " " Ns Sy String
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm secret Ns = Ns Qo nextcloud Qc
+.It
+.Cm secret Ns = Ns Qo postgres Qc
+.El
 .It Cm slaac Ns = Ns Qo Ar interface Qc
 Configure
 .Ar interface
