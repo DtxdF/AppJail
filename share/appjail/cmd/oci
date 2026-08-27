@@ -38,7 +38,7 @@ lib_load "${LIBDIR}/strlen"
 oci_desc="Commands for interpreting OCI images."
 
 APPJAIL_PREPEND_ENTRYPOINT="${APPJAIL_PREPEND_ENTRYPOINT}"
-APPJAIL_PREPEND_ENTRYPOINT_FORCE="${APPJAIL_PREPEND_ENTRYPOINT_FORCE:-false}"
+APPJAIL_PREPEND_ENTRYPOINT_FORCE="${APPJAIL_PREPEND_ENTRYPOINT_FORCE:-0}"
 ATEXIT_STATUS=
 
 oci_main()
@@ -247,7 +247,7 @@ oci_exec()
 	local opt_entrypoint=false
 	local entrypoint=
 
-	if [ $# -gt 0 ] && ! ${APPJAIL_PREPEND_ENTRYPOINT_FORCE}; then
+	if [ $# -gt 0 ] && [ "${APPJAIL_PREPEND_ENTRYPOINT_FORCE}" = "0" ]; then
 		entrypoint="$1"
 		opt_entrypoint=true
 
@@ -1230,7 +1230,7 @@ oci_run()
 		set +T
 	fi
 
-	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=true APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
+	sh -c "APPJAIL_PREPEND_ENTRYPOINT_FORCE=1 APPJAIL_PREPEND_ENTRYPOINT=\"${escape_entrypoint}\" \
 		\"${escape_appjail}\" oci exec ${exec_args}; ERRLEVEL=\$?; echo \${ERRLEVEL} > \"${escape_atexit_status}\"; exit \${ERRLEVEL}"
 
 	errlevel=$?
