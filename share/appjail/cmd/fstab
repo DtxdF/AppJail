@@ -244,6 +244,16 @@ fstab_compile()
 				;;
 		esac
 
+		# umount(8) may encounter issues when unmounting fs_file if the user has specified
+		# its location starting with a slash, but we will resolve both fs_spec and fs_file
+		# to avoid any side effects.
+		if [ -e "${fs_spec}" ]; then
+			fs_spec=`realpath -- "${fs_spec}"` || exit $?
+		fi
+		if [ -e "${fs_file}" ]; then
+			fs_file=`realpath -- "${fs_file}"` || exit $?
+		fi
+
 		fs_spec=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_spec}"`
 		fs_file=`"${SCRIPTSDIR}/ascii2oct.sh" "${fs_file}"`
 
