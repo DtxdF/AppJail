@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -138,4 +138,14 @@ lib_network_getaddr6()
 	fi
 
 	ifconfig -- "${iface}" 2> /dev/null | grep -Ee 'inet6 ' | cut -d' ' -f2
+}
+
+lib_network_mksock()
+{
+	local path="$1"
+	if [ -z "${path}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_network_mksock path"
+	fi
+
+	"${UTILDIR}/mksock/mksock" "${path}"
 }

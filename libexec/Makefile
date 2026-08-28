@@ -7,7 +7,8 @@ TARGETS=appjail-config \
 		ipcheck \
 		network \
 		jexec \
-		juexec
+		juexec \
+		mksock
 
 all:
 .for target in ${TARGETS}

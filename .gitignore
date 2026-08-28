@@ -8,6 +8,7 @@
 /libexec/get_assigned_rulesets/get_assigned_rulesets
 /libexec/jexec/jexec
 /libexec/juexec/juexec
+/libexec/mksock/mksock
 *.o
 /*.vim
 /.cpignore

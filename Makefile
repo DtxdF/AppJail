@@ -158,7 +158,7 @@ install: utils-strip
 	${INSTALL} -m 444 share/examples/appjail/appjail.conf "${DESTDIR}${PREFIX}/share/examples/appjail/appjail.conf"
 
 	# utils
-.for util in get_assigned_rulesets find-number-from-start find-smallest-missing-number getservbyname ipcheck network jexec juexec
+.for util in get_assigned_rulesets find-number-from-start find-smallest-missing-number getservbyname ipcheck network jexec juexec mksock
 	${MKDIR} -m 755 -p "${DESTDIR}${PREFIX}/libexec/appjail/${util}"
 	${INSTALL} -m 555 libexec/${util}/${util} "${DESTDIR}${PREFIX}/libexec/appjail/${util}/${util}"
 .endfor

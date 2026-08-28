@@ -36,6 +36,7 @@ lib_load "${LIBDIR}/replace"
 lib_load "${LIBDIR}/strlen"
 lib_load "${LIBDIR}/table"
 lib_load "${LIBDIR}/tempfile"
+lib_load "${LIBDIR}/network"
 
 FSTAB_DEFAULT_FSFREQ="0"
 FSTAB_DEFAULT_FSMNTOPS="rw"
@@ -316,6 +317,14 @@ _fstab_pre_mount_nullfs()
 		fi
 
 		type="dir"
+	elif [ -S "${fs_spec}" ]; then
+		if [ ! -e "${fs_file}" ]; then
+			lib_network_mksock "${fs_file}" || exit $?
+		elif [ ! -f "${fs_file}" ]; then
+			lib_err ${EX_NOINPUT} -- "${fs_file}: Must be same type as ${fs_spec}"
+		fi
+
+		type="socket"
 	else
 		lib_err ${EX_NOINPUT} "This file system only accepts the \`file\` and \`directory\` types."
 	fi
