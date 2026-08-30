@@ -394,7 +394,7 @@ _limits_on_off()
 	local rule
 	while IFS= read -r rule; do
 		if ! rctl ${rctl_cmd} "${rule}"; then
-			lib_err ${EX_SOFTWARE} "limits ${cmd}: An error ocurred while executing the rctl rule: ${rule}"
+			lib_err ${EX_SOFTWARE} "limits ${cmd}: An error occurred while executing the rctl rule: ${rule}"
 		fi
 	done < "${rctl_conf}"
 }

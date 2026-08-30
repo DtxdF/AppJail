@@ -405,7 +405,7 @@ expose_on()
 	case "${USE_FIREWALL}" in
 		pf)
 			if ! lib_repeat_run -s random pfctl -a "appjail-rdr/${jail_name}" -f "${expose_file}"; then
-				lib_err ${EX_SOFTWARE} "An error ocurred while loading the pf rules."
+				lib_err ${EX_SOFTWARE} "An error occurred while loading the pf rules."
 			fi
 			;;
 	esac

@@ -243,7 +243,7 @@ char *  template_getcolumn(param p, wordindex c);
  * that can be set to `NULL` to not use exceptions (see except.h).
  *
  * Returns (see templateerr.h):
- *   - [TPERRO]: Error parsing the value to convert it into columns or an error ocurred
+ *   - [TPERRO]: Error parsing the value to convert it into columns or an error occurred
  *               while copying `s` into the buffer.
  *   - [TPERRN]: There no errors.
  */
@@ -254,7 +254,7 @@ int     template_setcolumn(param p, wordindex c, const char *s, traceback *trbck
  * to not use exceptions (see except.h).
  *
  * Returns (see templateerr.h):
- *   - [TPERRO]: Error parsing the value to convert it into columns or an error ocurred
+ *   - [TPERRO]: Error parsing the value to convert it into columns or an error occurred
  *               while copying `s` into the buffer.
  *   - [TPERRN]: There are no errors.
  */
