@@ -62,7 +62,7 @@ MANPAGES=man1/appjail.1 \
 	 man1/appjail-x11.1 \
 	 man1/appjail-secrets.1
 
-APPJAIL_VERSION?=5.4.0
+APPJAIL_VERSION?=5.5.0
 
 all: install
 
