@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,8 +28,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-APPJAIL_PROGRAM="%%PREFIX%%/bin/appjail"
-CONFIG="%%PREFIX%%/share/appjail/files/config.conf"
+APPJAIL_PREFIX="${APPJAIL_PREFIX:-%%PREFIX%%}"
+APPJAIL_PROGRAM="${APPJAIL_PREFIX}/bin/appjail"
+CONFIG="${APPJAIL_PREFIX}/share/appjail/files/config.conf"
 
 main()
 {
