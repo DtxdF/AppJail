@@ -790,10 +790,11 @@ image_jail()
 	local arch="host"
 	local image=
 	local tag="${IMAGE_TAG}"
+	local image_file=
 
-	while getopts ":a:i:t:" _o; do
+	while getopts ":a:f:i:t:" _o; do
 		case "${_o}" in
-			a|i|t)
+			a|f|i|t)
 				if lib_check_empty "${OPTARG}"; then
 					image_usage
 					exit ${EX_USAGE}
@@ -804,6 +805,9 @@ image_jail()
 		case "${_o}" in
 			a)
 				arch="${OPTARG}"
+				;;
+			f)
+				image_file="${OPTARG}"
 				;;
 			i)
 				image="${OPTARG}"
@@ -819,7 +823,8 @@ image_jail()
 	done
 	shift $((OPTIND-1))
 
-	if lib_check_empty "${image}"; then
+	if [ -z "${image}" -a -z "${image_file}" ] || \
+			[ -n "${image}" -a -n "${image_file}" ]; then
 		image_usage
 		exit ${EX_USAGE}
 	fi
@@ -830,40 +835,45 @@ image_jail()
 		exit ${EX_USAGE}
 	fi
 
-	if ! lib_check_tagname "${tag}"; then
-		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
-	fi
+	if [ -z "${image_file}" ]; then
+		if ! lib_check_tagname "${tag}"; then
+			lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+		fi
 
-	if [ "${arch}" = "host" ]; then
-		arch="${IMAGE_ARCH}"
-	fi
+		if [ "${arch}" = "host" ]; then
+			arch="${IMAGE_ARCH}"
+		fi
 
-	if ! lib_check_arch "${arch}"; then
-		lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
-	fi
+		if ! lib_check_arch "${arch}"; then
+			lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+		fi
 
-	if ! lib_check_imagename "${image}"; then
-		lib_err ${EX_DATAERR} -- "${image}: invalid image name."
-	fi
+		if ! lib_check_imagename "${image}"; then
+			lib_err ${EX_DATAERR} -- "${image}: invalid image name."
+		fi
 
-	local rootdir
-	rootdir="${IMAGESDIR}/${image}"
+		local rootdir
+		rootdir="${IMAGESDIR}/${image}"
 
-	local image_name
-	image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+		local image_name
+		image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
 
-	local image_file
-	image_file="${rootdir}/${image_name}"
+		image_file="${rootdir}/${image_name}"
 
-	if [ ! -f "${image_file}" ]; then
-		lib_err ${EX_NOINPUT} "Cannot find the image \`${image}\` (arch:${arch}, tag:${tag})"
-	fi
+		if [ ! -f "${image_file}" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the image \`${image}\` (arch:${arch}, tag:${tag})"
+		fi
 
-	local done_file
-	done_file="${rootdir}/.done-${image_name}"
+		local done_file
+		done_file="${rootdir}/.done-${image_name}"
 
-	if [ ! -f "${image_file}" ]; then
-		lib_err ${EX_NOPERM} "Apparently, the installation of the \`${image}\` (arch:${arch}, tag:${tag}) image is incomplete."
+		if [ ! -f "${image_file}" ]; then
+			lib_err ${EX_NOPERM} "Apparently, the installation of the \`${image}\` (arch:${arch}, tag:${tag}) image is incomplete."
+		fi
+	else
+		if [ ! -f "${image_file}" ]; then
+			lib_err ${EX_NOINPUT} "Cannot find the image \`${image_file}\`"
+		fi
 	fi
 
 	local escape_image_file
@@ -1867,6 +1877,7 @@ usage: image export [-f] [-c <algo>] [-n <name>] [-t <tag>] <jail>
        image import [-f] [-a <arch>] [-N <ajspec-name>] [-n <image-name>]
                [-t <tag>] [<method>+]<path>
        image jail [-a <arch>] [-t <tag>] -i <image> <jail> [<options> ...]
+       image jail -f <file> <jail> [<options> ...]
        image list [-eHIpt] [-i <image>] [<keyword> ...]
        image remove [-a <arch>] [-t <tag>] <image>
        image update [<image>]
