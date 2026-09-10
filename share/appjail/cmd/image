@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2022-2025, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2022-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@ image_main()
 	fi
 
 	case "${entity}" in
-		export|get|import|jail|list|metadata|remove|update) ;;
+		export|get|import|jail|list|metadata|realpath|remove|update) ;;
 		*) image_usage; exit ${EX_USAGE} ;;
 	esac
 
@@ -782,6 +782,81 @@ _image_getajspec_gitlab_ssh()
 	local repo="$1" ajspec="$2" branch="$3"
 
 	_image_getajspec_git "git@gitlab.com:${repo}" "${ajspec}" "${branch}"
+}
+
+image_realpath()
+{
+	local _o
+	local arch="host"
+	local tag="${IMAGE_TAG}"
+
+	while getopts ":a:i:t:" _o; do
+		case "${_o}" in
+			a|t)
+				if lib_check_empty "${OPTARG}"; then
+					image_usage
+					exit ${EX_USAGE}
+				fi
+				;;
+		esac
+		
+		case "${_o}" in
+			a)
+				arch="${OPTARG}"
+				;;
+			t)
+				tag="${OPTARG}"
+				;;
+			*)
+				image_usage
+				exit ${EX_USAGE}
+				;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	local image="$1"
+	if lib_check_empty "${image}"; then
+		image_usage
+		exit ${EX_USAGE}
+	fi
+
+	if ! lib_check_tagname "${tag}"; then
+		lib_err ${EX_DATAERR} -- "${tag}: invalid tag."
+	fi
+
+	if [ "${arch}" = "host" ]; then
+		arch="${IMAGE_ARCH}"
+	fi
+
+	if ! lib_check_arch "${arch}"; then
+		lib_err ${EX_DATAERR} -- "${arch}: invalid architecture."
+	fi
+
+	if ! lib_check_imagename "${image}"; then
+		lib_err ${EX_DATAERR} -- "${image}: invalid image name."
+	fi
+
+	local rootdir
+	rootdir="${IMAGESDIR}/${image}"
+
+	local image_name
+	image_name="${tag}-${arch}-${IMAGE_DEFAULT_NAME}"
+
+	image_file="${rootdir}/${image_name}"
+
+	if [ ! -f "${image_file}" ]; then
+		lib_err ${EX_NOINPUT} "Cannot find the image \`${image}\` (arch:${arch}, tag:${tag})"
+	fi
+
+	local done_file
+	done_file="${rootdir}/.done-${image_name}"
+
+	if [ ! -f "${image_file}" ]; then
+		lib_err ${EX_NOPERM} "Apparently, the installation of the \`${image}\` (arch:${arch}, tag:${tag}) image is incomplete."
+	fi
+
+	realpath -- "${image_file}"
 }
 
 image_jail()
@@ -1879,6 +1954,7 @@ usage: image export [-f] [-c <algo>] [-n <name>] [-t <tag>] <jail>
        image jail [-a <arch>] [-t <tag>] -i <image> <jail> [<options> ...]
        image jail -f <file> <jail> [<options> ...]
        image list [-eHIpt] [-i <image>] [<keyword> ...]
+       image realpath [-a <arch>] [-t <tag>] <image>
        image remove [-a <arch>] [-t <tag>] <image>
        image update [<image>]
 
