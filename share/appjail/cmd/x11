@@ -577,7 +577,7 @@ x11_chkdisplay()
 {
 	local display="$1"
 
-	if ! printf "%s" "${display}" | grep -qEe '^:[0-9]+$'; then
+	if ! printf "%s" "${display}" | grep -qEe '^(unix|localhost|127\.0\.0\.1|\[::1\])?:[0-9]+(\.[0-9]+)?$'; then
 		lib_err ${EX_DATAERR} "${display}: invalid display."
 	fi
 }
