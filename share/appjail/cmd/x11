@@ -154,6 +154,8 @@ x11_main()
 	local xauthority
 	xauthority="`lib_generate_tempfile`" || exit $?
 
+	export XAUTHORITY="${xauthority}"
+
 	local escape_xauthority
 	escape_xauthority=`lib_escape_string "${xauthority}"`
 
