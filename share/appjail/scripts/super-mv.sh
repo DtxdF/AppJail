@@ -86,7 +86,7 @@ main()
 			if [ ! -d "${dst_file}" ]; then
 				mkdir -m "${mode}" -p -- "${dst_file}" || exit $?
 			else
-				chmod "${mode}" "${dst_file}" || exit $?
+				chmod -h "${mode}" "${dst_file}" || exit $?
 			fi
 			chown -h -f "${owner_and_group}" "${dst_file}" || exit $?
 			rmdir -- "${src_file}" || exit $?
