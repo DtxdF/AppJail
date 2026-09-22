@@ -79,22 +79,34 @@ main()
 		src_file="${src}/${file}"
 		dst_file="${dst}/${file}"
 
-		if [ ! -e "${dst_file}" ] && [ ! -L "${dst_file}" ]; then
-			lib_debug "Moving ${src_file} -> ${dst_file} ..."
+		if [ -d "${src_file}" ] && [ ! -L "${src_file}" ]; then
+			mode=`stat -f "%OLp" -- "${src_file}"` || exit $?
+			owner_and_group=`stat -f "%u:%g" -- "${src_file}"` || exit $?
 
-			if [ "${file}" != "${file%/*}" ]; then
-				subdir="${file%/*}"
-				
-				mode=`stat -f "%OLp" -- "${src}/${subdir}"` || exit $?
-				owner_and_group=`stat -f "%u:%g" -- "${src}/${subdir}"` || exit $?
-
-				rootdir="${dst}/${subdir}"
-
-				mkdir -m "${mode}" -p -- "${rootdir}" || exit $?
-				chown -h -f "${owner_and_group}" "${rootdir}" || exit $?
+			if [ ! -d "${dst_file}" ]; then
+				mkdir -m "${mode}" -p -- "${dst_file}" || exit $?
+			else
+				chmod "${mode}" "${dst_file}" || exit $?
 			fi
+			chown -h -f "${owner_and_group}" "${dst_file}" || exit $?
+		else
+			if [ ! -e "${dst_file}" ] && [ ! -L "${dst_file}" ]; then
+				lib_debug "Moving ${src_file} -> ${dst_file} ..."
 
-			mv "${src_file}" "${dst_file}" || exit $?
+				if [ "${file}" != "${file%/*}" ]; then
+					subdir="${file%/*}"
+					
+					mode=`stat -f "%OLp" -- "${src}/${subdir}"` || exit $?
+					owner_and_group=`stat -f "%u:%g" -- "${src}/${subdir}"` || exit $?
+
+					rootdir="${dst}/${subdir}"
+
+					mkdir -m "${mode}" -p -- "${rootdir}" || exit $?
+					chown -h -f "${owner_and_group}" "${rootdir}" || exit $?
+				fi
+
+				mv "${src_file}" "${dst_file}" || exit $?
+			fi
 		fi
 	done || exit $?
 }
