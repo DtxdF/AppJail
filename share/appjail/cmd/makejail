@@ -461,9 +461,9 @@ makejail_update()
 
 			local repodir="${GLOBAL_GIT_CACHEDIR}/${repoid}"
 
-			lib_files_create "${TMPDIR}/git.${reponame}.lock"
+			lib_files_create "${TMPDIR}/git.${repoid}.lock"
 
-			lockf -ks "${TMPDIR}/git.${reponame}.lock" \
+			lockf -ks "${TMPDIR}/git.${repoid}.lock" \
 				"${SCRIPTSDIR}/git.sh" \
 					-F \
 					-f "${CONFIG}" \
