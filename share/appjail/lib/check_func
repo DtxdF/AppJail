@@ -1290,7 +1290,7 @@ lib_check_emptydir()
 	fi
 
 	local count
-	count=`find -- "${directory}" -mindepth 1 -maxdepth 1 -type f -print -quit 2>/dev/null | wc -l`
+	count=`find -- "${directory}" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | wc -l`
 
 	if [ ${count} -eq 0 ]; then
 		return 0
