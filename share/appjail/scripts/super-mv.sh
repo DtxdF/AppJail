@@ -106,7 +106,7 @@ main()
 					chown -h -f "${owner_and_group}" "${rootdir}" || exit $?
 				fi
 
-				mv "${src_file}" "${dst_file}" || exit $?
+				mv -- "${src_file}" "${dst_file}" || exit $?
 			fi
 		fi
 	done || exit $?
