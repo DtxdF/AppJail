@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/files"
 lib_load "${LIBDIR}/kern_modules"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/random"
@@ -463,6 +464,8 @@ _network_create_bridge()
 	if [ -z "${bridge}" ]; then
 		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge"
 	fi
+
+	lib_files_create "${TMPDIR}/bridge.${bridge}.lock"
 
 	lockf -ks "${TMPDIR}/bridge.${bridge}.lock" \
 		"${SCRIPTSDIR}/create-bridge.sh" -c "${CONFIG}" -b "${bridge}"
@@ -1521,6 +1524,8 @@ network_reserve()
 	if ! lib_check_empty "${appjail_dns_enable}" &&
 			lib_check_yesno "appjail_dns_enable" "${appjail_dns_enable}"; then
 		lib_debug "appjail-dns is enabled. Reloading ..."
+
+		lib_files_create "${TMPDIR}/appjail-dns.lock"
 
 		lockf -ks "${TMPDIR}/appjail-dns.lock" \
 			service appjail-dns reload >&2 || :

@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 lib_load "${LIBDIR}/check_func"
+lib_load "${LIBDIR}/files"
 lib_load "${LIBDIR}/jail"
 lib_load "${LIBDIR}/mksum"
 lib_load "${LIBDIR}/random"
@@ -459,6 +460,8 @@ makejail_update()
 			local errlevel
 
 			local repodir="${GLOBAL_GIT_CACHEDIR}/${repoid}"
+
+			lib_files_create "${TMPDIR}/git.${reponame}.lock"
 
 			lockf -ks "${TMPDIR}/git.${reponame}.lock" \
 				"${SCRIPTSDIR}/git.sh" \
@@ -1637,6 +1640,8 @@ _makejail_git_clone()
 	repodir="${gitdir}/${reponame}"
 
 	local errlevel
+
+	lib_files_create "${TMPDIR}/git.${reponame}.lock"
 
 	lockf -ks "${TMPDIR}/git.${reponame}.lock" \
 		"${SCRIPTSDIR}/git.sh" \
