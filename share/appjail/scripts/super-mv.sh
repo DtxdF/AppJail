@@ -91,7 +91,9 @@ main()
 			chown -h -f "${owner_and_group}" "${dst_file}" || exit $?
 
 			if lib_check_emptydir "${src_file}"; then
-				rmdir -- "${src_file}" || exit $?
+				if ! rmdir -- "${src_file}"; then
+					lib_warn -- "${src_file}: could not remove the directory!"
+				fi
 			fi
 		else
 			if [ ! -e "${dst_file}" ] && [ ! -L "${dst_file}" ]; then
