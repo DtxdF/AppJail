@@ -80,6 +80,10 @@ main()
 		dst_file="${dst}/${file}"
 
 		if [ -d "${src_file}" ] && [ ! -L "${src_file}" ]; then
+			if [ -d "${dst_file}" ]; then
+				continue
+			fi
+
 			mode=`stat -f "%OLp" -- "${src_file}"` || exit $?
 			owner_and_group=`stat -f "%u:%g" -- "${src_file}"` || exit $?
 
