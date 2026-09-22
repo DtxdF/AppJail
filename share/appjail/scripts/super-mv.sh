@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2023, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
+# Copyright (c) 2023-2026, Jesús Daniel Colmenares Oviedo <DtxdF@disroot.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -69,20 +69,20 @@ main()
 	lib_load "${LIBDIR}/jail"
 	lib_load "${LIBDIR}/log"
 
-	cd -- "${src}"
+	cd -- "${src}" || exit $?
 
-	find . -mindepth 1 | cut -c3- | tail -r | while IFS= read -r file; do
-		if [ ! -e "${file}" ]; then
+	find . -mindepth 1 -depth | cut -c3- | while IFS= read -r file; do
+		if [ ! -e "${file}" ] && [ ! -L "${file}" ]; then
 			lib_err ${EX_NOINPUT} -- "${file}: No such file or directory."
 		fi
 		
 		src_file="${src}/${file}"
 		dst_file="${dst}/${file}"
 
-		if [ ! -e "${dst_file}" ]; then
+		if [ ! -e "${dst_file}" ] && [ ! -L "${dst_file}" ]; then
 			lib_debug "Moving ${src_file} -> ${dst_file} ..."
 
-			if printf "%s" "${file}" | grep -qEe '/'; then
+			if [ "${file}" != "${file%/*}" ]; then
 				subdir="${file%/*}"
 				
 				mode=`stat -f "%OLp" -- "${src}/${subdir}"` || exit $?
@@ -91,7 +91,7 @@ main()
 				rootdir="${dst}/${subdir}"
 
 				mkdir -m "${mode}" -p -- "${rootdir}" || exit $?
-				chown -f "${owner_and_group}" "${rootdir}" || exit $?
+				chown -h -f "${owner_and_group}" "${rootdir}" || exit $?
 			fi
 
 			mv "${src_file}" "${dst_file}" || exit $?
