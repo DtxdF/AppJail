@@ -89,7 +89,10 @@ main()
 				chmod -h "${mode}" "${dst_file}" || exit $?
 			fi
 			chown -h -f "${owner_and_group}" "${dst_file}" || exit $?
-			rmdir -- "${src_file}" || exit $?
+
+			if lib_check_emptydir "${src_file}"; then
+				rmdir -- "${src_file}" || exit $?
+			fi
 		else
 			if [ ! -e "${dst_file}" ] && [ ! -L "${dst_file}" ]; then
 				lib_debug "Moving ${src_file} -> ${dst_file} ..."
