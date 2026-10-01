@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 11, 2026
+.Dd October 01, 2026
 .Dt APPJAIL-X11 1
 .Os
 .Sh NAME
@@ -149,9 +149,7 @@ is undefined.
 .It Cm xephyr_user Ns = Ns Qo Ar user Qc
 Run
 .Xr Xephyr 1
-as another user. For this to work, you must have
-.Em security/su-exec
-installed.
+as another user.
 .It Cm xrandr_refresh Ns = Ns Qo Ar number Qc
 Specify the number of seconds in decimal or an integer to wait before re-running
 .Xr xrandr 1

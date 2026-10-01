@@ -244,15 +244,30 @@ x11_main()
 	local config_file
 	config_file=`lib_escape_string "${CONFIG}"`
 
-	local escape_xephyr_user=
 	local runas=
 
 	if [ -n "${X11_OPTION_XEPHYR_USER}" ]; then
 		lib_debug "Xephyr will run as '${X11_OPTION_XEPHYR_USER}'"
 
-		escape_xephyr_user=`lib_escape_string "${X11_OPTION_XEPHYR_USER}"`
+		local userinfo
+		userinfo=`pw usershow -u "${X11_OPTION_XEPHYR_USER}"` || exit $?
 
-		runas="su-exec \"${escape_xephyr_user}\""
+		local homedir
+		homedir=`printf "%s" "${userinfo}" | cut -d: -f9` || exit $?
+
+		local escape_homedir
+		escape_homedir=`lib_escape_string "${homedir}"`
+
+		local xephyr_user_uid
+		xephyr_user_uid=`id -u "${X11_OPTION_XEPHYR_USER}"` || exit $?
+
+		local xephyr_user_gid
+		xephyr_user_gid=`id -g "${X11_OPTION_XEPHYR_USER}"` || exit $?
+
+		local xephyr_user_ogid
+		xephyr_user_ogid=`id -G "${X11_OPTION_XEPHYR_USER}" | tr ' ' ','` || exit $?
+
+		runas="env HOME=\"${escape_homedir}\" mdo -u ${xephyr_user_uid} -g ${xephyr_user_gid} -G ${xephyr_user_ogid} --"
 
 		lib_debug "runas command is '${runas}'"
 
@@ -470,10 +485,6 @@ x11_set_xephyr_user()
 
 	if ! printf "%s" "${xephyr_user}" | grep -qEe '^[^:]+$'; then
 		lib_err ${xephyr_user} -- "${xephyr_user}: invalid user."
-	fi
-
-	if ! which -s "su-exec"; then
-		lib_err ${EX_UNAVAILABLE} "su-exec is not installed. Cannot continue ..."
 	fi
 
 	X11_OPTION_XEPHYR_USER="${xephyr_user}"
