@@ -87,7 +87,7 @@ main()
 			mode=`stat -f "%OLp" -- "${src_file}"` || exit $?
 			owner_and_group=`stat -f "%u:%g" -- "${src_file}"` || exit $?
 
-			chmod -h "${mode}" "${dst_file}" || exit $?
+			mkdir -m "${mode}" -p -- "${dst_file}" || exit $?
 			chown -h -f "${owner_and_group}" "${dst_file}" || exit $?
 
 			if lib_check_emptydir "${src_file}"; then
