@@ -250,7 +250,11 @@ x11_main()
 		lib_debug "Xephyr will run as '${X11_OPTION_XEPHYR_USER}'"
 
 		local userinfo
-		userinfo=`pw usershow -u "${X11_OPTION_XEPHYR_USER}"` || exit $?
+		if lib_check_number "${X11_OPTION_XEPHYR_USER}"; then
+			userinfo=`pw usershow -u "${X11_OPTION_XEPHYR_USER}"` || exit $?
+		else
+			userinfo=`pw usershow -n "${X11_OPTION_XEPHYR_USER}"` || exit $?
+		fi
 
 		local homedir
 		homedir=`printf "%s" "${userinfo}" | cut -d: -f9` || exit $?
