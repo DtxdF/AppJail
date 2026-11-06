@@ -164,6 +164,11 @@ logs_read()
 		exit ${errlevel}
 	fi
 
+	if [ ! -t 1 ] && [ -z "${PAGER}" ]; then
+		cat -- "${file}"
+		return $?
+	fi
+
 	${PAGER:-less} "$@" -- "${file}"
 }
 
