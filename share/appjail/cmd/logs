@@ -164,6 +164,13 @@ logs_read()
 		exit ${errlevel}
 	fi
 
+	# No terminal to page on and no pager asked for: print the log. A
+	# default less with no terminal never exits and can spin on a core.
+	if [ ! -t 1 ] && [ -z "${PAGER}" ]; then
+		cat -- "${file}"
+		return $?
+	fi
+
 	${PAGER:-less} "$@" -- "${file}"
 }
 

@@ -183,6 +183,13 @@ The program specified by the
 environment variable is open to read the log you specify.
 .Ar args
 are passed to this program.
+If
+.Ev PAGER
+is unset and standard output is not a terminal, the log is written with
+.Xr cat 1
+instead and
+.Ar args
+are ignored.
 .It Cm remove all
 Removes all logs.
 .It Cm remove Oo Fl g Oc Ar type Ns Op Ns / Ns Ar entity Ns Op Ns / Ns Ar subtype Ns Op Ns / Ns Ar log
