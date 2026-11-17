@@ -2390,6 +2390,8 @@ quick_run_bridge()
 	if [ ${QUICK_OPTION_BRIDGE} -eq 0 ]; then
 		return 0
 	fi
+
+	local untagged tagged attach_options
 	
 	# vnet
 	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
@@ -2398,16 +2400,26 @@ quick_run_bridge()
 	do
 		lib_debug "Configuring ${QUICK_JAILNAME} to use ${bridge} bridge ..."
 
+		untagged=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "untagged"`
+		tagged=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "tagged"`
+		attach_options=
+		if [ -n "${untagged}" ]; then
+			attach_options="${attach_options} -u \\\"${untagged}\\\""
+		fi
+		if [ -n "${tagged}" ]; then
+			attach_options="${attach_options} -t \\\"${tagged}\\\""
+		fi
+
 		epairs=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "epairs"`
 		for epair in ${epairs}; do
 			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="\"sb_${epair}\""
-			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"epair:${epair}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\"${attach_options} \\\"epair:${epair}\\\"\""
 			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop="\"appjail network detach -b \\\"${bridge}\\\" -id \\\"epair:${epair}\\\"\""
 		done
 
 		interfaces=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "interfaces"`
 		for interface in ${interfaces}; do
-			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"iface:${interface}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\"${attach_options} \\\"iface:${interface}\\\"\""
 		done
 	done
 }
@@ -2422,7 +2434,7 @@ quick_set_bridge()
 
 	local params="$1"
 	if lib_check_empty "${params}"; then
-		lib_err ${EX_DATAERR} "bridge syntax: [[epair|iface]:]interface ... [bridge:bridge_name]"
+		lib_err ${EX_DATAERR} "bridge syntax: [[epair|iface]:]interface ... [untagged=id] [tagged=id1,id2,...] [bridge:bridge_name]"
 	fi
 
 	params=`lib_split_jailparams "${params}"` || exit $?
@@ -2432,6 +2444,7 @@ quick_set_bridge()
 	local bridge_name=
 	local epairs=
 	local interfaces=
+	local untagged= tagged=
 
 	local arg parameter value
 	while [ ${current_index} -lt ${total_items} ]; do 
@@ -2441,6 +2454,25 @@ quick_set_bridge()
 		if lib_check_empty "${arg}"; then
 			continue
 		fi
+
+		case "${arg}" in
+			untagged=*)
+				untagged=`lib_jailparam_value "${arg}" =`
+				if lib_check_empty "${untagged}" || ! lib_check_number "${untagged}"; then
+					lib_err ${EX_DATAERR} -- "${untagged}: invalid untagged VLAN ID."
+				fi
+				continue
+				;;
+			tagged=*)
+				tagged=`lib_jailparam_value "${arg}" =`
+				case "${tagged}" in
+					''|*[!0-9,]*|,*|*,|*,,*)
+						lib_err ${EX_DATAERR} -- "${tagged}: invalid tagged VLAN list."
+						;;
+				esac
+				continue
+				;;
+		esac
 
 		parameter=`lib_jailparam_name "${arg}" :`
 		value=`lib_jailparam_value "${arg}" :`
@@ -2506,6 +2538,8 @@ quick_set_bridge()
 
 	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "epairs" "${epairs}"
 	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "interfaces" "${interfaces}"
+	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "untagged" "${untagged}"
+	lib_keys_set "${QUICK_KEY_BRIDGE}" "${bridge_name}" "tagged" "${tagged}"
 
 	QUICK_OPTION_BRIDGE=1
 }

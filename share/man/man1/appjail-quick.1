@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd August 19, 2026
+.Dd November 17, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -185,9 +185,26 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
-.It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc
+.It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm untagged Ns = Ns Ar id Oc Ns " " Ns Oo Cm tagged Ns = Ns Ar vlan-list Oc Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc
 .Pp
 Create a bridge if it does not exist and attach one or more interfaces.
+.Pp
+The
+.Cm untagged
+and
+.Cm tagged
+parameters apply to all interfaces specified by this bridge option.
+They add the
+.Fl u
+and
+.Fl t
+options, respectively, to the template's
+.Cm appjail network attach
+commands.
+If either parameter is specified, VLAN filtering must be enabled on the bridge
+before the jail starts; otherwise, attachment fails.
+VLAN filtering is not enabled automatically.
+If neither parameter is specified, interfaces are attached without VLAN options.
 .Pp
 See also
 .Xr appjail-network 1 "."
@@ -235,6 +252,18 @@ parameter is used.
 .Sy epair
 is the default.
 .It
+.Cm untagged Ns = Ns Ar id
+Set the untagged VLAN ID when adding each interface to the bridge.
+The value must be a single numeric VLAN ID.
+.It
+.Cm tagged Ns = Ns Ar vlan-list
+Set the tagged VLANs when adding each interface to the bridge.
+The value must be a comma-separated list of numeric VLAN IDs without spaces,
+such as
+.Cm tagged=51,15 .
+This parameter can be used together with
+.Cm untagged .
+.It
 .Cm bridge Ns :
 Use a different
 .Ar bridge
@@ -261,6 +290,8 @@ parameter.
 .Cm bridge Ns = Ns Qo nginx Qc
 .It
 .Cm bridge Ns = Ns Qo iface:em0 epair:nginx bridge:public Qc
+.It
+.Cm bridge Ns = Ns Qo epair:foo untagged=51 tagged=51,15 bridge:bridge0 Qc
 .El
 .It Cm clone+jail Ns = Ns Qo Ar jail Ns @ Ns Ar snapshot Qc
 .Pp

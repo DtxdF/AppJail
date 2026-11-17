@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd April 19, 2024
+.Dd November 17, 2026
 .Dt APPJAIL-NETWORK 1
 .Os
 .Sh NAME
@@ -49,6 +49,8 @@
 .Nm appjail network
 .Cm attach
 .Op Fl b Ar bridge
+.Op Fl u Ar vlan
+.Op Fl t Ar vlan-list
 .Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
 .Nm appjail network
 .Cm auto-create
@@ -178,7 +180,7 @@ will be set as the default route. No checking is done if a default route already
 See
 .Cm reserve
 to learn how the IPv4 address is reserved.
-.It Cm attach Oo Fl b Ar bridge Oc Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
+.It Cm attach Oo Fl b Ar bridge Oc Oo Fl u Ar vlan Oc Oo Fl t Ar vlan-list Oc Oo Cm epair Ns | Ns Cm iface Ns : Oc Ns Ar interface Ns " " Ns "..."
 Attach
 .Ar interface
 to
@@ -218,6 +220,44 @@ two interfaces are created since that is how
 works, but the interfaces will be called
 .Sy sa_ Ns Ar interface No and Sy sb_ Ns Ar interface Ns ,
 where the first is for the host and the second for the jail.
+.Bl -tag -width xx
+.It Fl u Ar vlan
+Set the untagged VLAN ID when adding each interface to the bridge.
+The value must be a single numeric VLAN ID.
+.It Fl t Ar vlan-list
+Set the tagged VLANs when adding each interface to the bridge.
+The value must be a comma-separated list of numeric VLAN IDs without spaces,
+such as
+.Ar 51,15 .
+.El
+.Pp
+These options can be used separately or together and apply to both
+.Cm epair
+and
+.Cm iface
+members.
+When both are specified, the
+.Xr ifconfig 8
+command that adds each member includes
+.Cm untagged Ar vlan Cm tagged Ar vlan-list .
+If neither option is specified, members are added without VLAN options.
+.Pp
+If either option is specified, the bridge must have VLAN filtering enabled,
+as indicated by
+.Sy VLANFILTER
+on the
+.Cm bridge flags
+line in
+.Xr ifconfig 8
+output.
+Attachment fails before creating epairs or adding members if filtering is
+disabled.
+VLAN filtering is not enabled automatically, including on newly created bridges.
+For example, to enable filtering on an existing bridge and attach an epair:
+.Bd -literal -offset indent
+ifconfig bridge0 vlanfilter
+appjail network attach -b bridge0 -u 51 -t 51,15 epair:foo
+.Ed
 .It Cm auto-create
 Call the
 .Cm add

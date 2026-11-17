@@ -34,14 +34,18 @@ main()
 {
 	local _o
 	local config
+	local opt_vlanfilter=0
 
 	if [ $# -eq 0 ]; then
 		usage
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":b:c:" _o; do
+	while getopts ":vb:c:" _o; do
 		case "${_o}" in
+			v)
+				opt_vlanfilter=1
+				;;
 			b)
 				bridge="${OPTARG}"
 				;;
@@ -80,7 +84,11 @@ main()
 		return 0
 	fi
 
-	ifconfig bridge create name "${bridge}" || exit $?
+	set -- bridge create name "${bridge}"
+	if [ ${opt_vlanfilter} -eq 1 ]; then
+		set -- "$@" vlanfilter
+	fi
+	ifconfig "$@" || exit $?
 	ifconfig -- "${bridge}" up || exit $?
 
 	lib_debug -- "${bridge}: the bridge has been created."
@@ -88,7 +96,8 @@ main()
 
 usage()
 {
-	echo "usage: create-bridge.sh -c config -b bridge"
+	echo "usage: create-bridge.sh [-v] -c config -b bridge"
+	echo "       -v: enable VLAN filtering on newly created bridges"
 }
 
 main "$@"
