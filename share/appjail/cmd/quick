@@ -2928,6 +2928,10 @@ quick_set_tmpdir()
 
 quick_run_secret()
 {
+	if [ -z "${QUICK_OPTION_SECRETS}" ]; then
+		return 0
+	fi
+
 	local secret_group
 
 	lib_debug "Configuring secrets ..."
