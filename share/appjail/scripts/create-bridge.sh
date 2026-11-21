@@ -34,14 +34,18 @@ main()
 {
 	local _o
 	local config
+	local opt_vlanfilter=0
 
 	if [ $# -eq 0 ]; then
 		usage
 		exit ${EX_USAGE}
 	fi
 
-	while getopts ":b:c:" _o; do
+	while getopts ":vb:c:" _o; do
 		case "${_o}" in
+			v)
+				opt_vlanfilter=1
+				;;
 			b)
 				bridge="${OPTARG}"
 				;;
@@ -75,12 +79,22 @@ main()
 			lib_err ${EX_CONFIG} "The ${bridge} bridge exists but is not in the \`${NETWORK_GENERIC_BRG}\` group."
 		fi
 
+		if [ ${opt_vlanfilter} -eq 1 ] && ! lib_check_vlanfilter_flag "${bridge}"; then
+			lib_err ${EX_CONFIG} -- "${bridge}: VLAN filtering is not enabled on an existing bridge, and you have specified an option that depends on it."
+		fi
+
 		lib_debug -- "${bridge}: bridge already created."
 
 		return 0
 	fi
 
-	ifconfig bridge create name "${bridge}" || exit $?
+	set -- bridge create name "${bridge}"
+	if [ ${opt_vlanfilter} -eq 1 ]; then
+		lib_debug "Applying vlanfilter to ${bridge}"
+
+		set -- "$@" vlanfilter
+	fi
+	ifconfig "$@" || exit $?
 	ifconfig -- "${bridge}" up || exit $?
 
 	lib_debug -- "${bridge}: the bridge has been created."
@@ -88,7 +102,7 @@ main()
 
 usage()
 {
-	echo "usage: create-bridge.sh -c config -b bridge"
+	echo "usage: create-bridge.sh [-v] -c config -b bridge"
 }
 
 main "$@"

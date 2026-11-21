@@ -1298,3 +1298,114 @@ lib_check_emptydir()
 		return 1
 	fi
 }
+
+lib_check_vlanset()
+{
+	local vlan_set="$1"
+	local rest item start end
+
+	if [ -z "${vlan_set}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_vlanset vlan_set"
+	fi
+
+	case "${vlan_set}" in
+		all|none) return 0 ;;
+		,*|*,|*,,*) return 1 ;;
+	esac
+
+	rest="${vlan_set}"
+
+	while :; do
+		case "${rest}" in
+			*,*)
+				item="${rest%%,*}"
+				rest="${rest#*,}"
+				;;
+			*)
+				item="${rest}"
+				rest=
+				;;
+		esac
+
+		if lib_check_empty "${item}"; then
+			return 1
+		fi
+
+		case "${item}" in
+			*-*)
+				start="${item%%-*}"
+				end="${item#*-}"
+
+				case "${end}" in
+					*-*) return 1 ;;
+				esac
+
+				if lib_check_empty "${start}"; then
+					return 1
+				fi
+
+				if ! lib_check_vlanid "${start}"; then
+					return 1
+				fi
+
+				if lib_check_empty "${end}"; then
+					return 1
+				fi
+
+				if ! lib_check_vlanid "${end}"; then
+					return 1
+				fi
+
+				if [ "${start}" -gt "${end}" ]; then
+					return 1
+				fi
+
+				;;
+			*)
+				if ! lib_check_vlanid "${item}"; then
+					return 1
+				fi
+				;;
+		esac
+
+		if [ -z "${rest}" ]; then
+			break
+		fi
+	done
+
+	return 0
+}
+
+lib_check_vlanid()
+{
+	local vlanid="$1"
+
+	if [ -z "${vlanid}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_vlanid vlanid"
+	fi
+
+	if ! lib_check_number "${vlanid}"; then
+		return 1
+	fi
+
+	if [ ${vlanid} -lt 1 ] || [ ${vlanid} -gt 4094 ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+lib_check_vlanfilter_flag()
+{
+	local bridge="$1"
+
+	if [ -z "${bridge}" ]; then
+		lib_err ${EX_USAGE} "usage: lib_check_vlanfilter_flag bridge"
+	fi
+
+	if ifconfig -- "${bridge}" | grep -Eq '^[[:space:]]*bridge flags=.*[<,]VLANFILTER[,>]'; then
+		return 0
+	else
+		return 1
+	fi
+}

@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd August 19, 2026
+.Dd November 20, 2026
 .Dt APPJAIL-QUICK 1
 .Os
 .Sh NAME
@@ -185,7 +185,7 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy \&No
-.It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Ns Oo Cm bridge Ns : Ns Ar bridge Oc Qc
+.It Cm bridge Ns = Ns Qo Oo Ar type Ns : Oc Ns Ar interface Ns " " Ns "..." Ns " " Oo Cm bridge Ns : Ns Ar bridge Oc Qc
 .Pp
 Create a bridge if it does not exist and attach one or more interfaces.
 .Pp
@@ -1946,6 +1946,43 @@ See also
 .Em Type Ns : Ns " " Ns Sy String
 .br
 .Em Multiple Ns : Ns " " Ns Sy Yes
+.It Cm tagged Ns = Ns Qo Ar interface Ns : Ns Ar vlan-set Qc
+.Pp
+Set the tagged VLANs when adding each interface to the bridge.
+.Pp
+.Ar interface
+represents an interface specified in the
+.Cm bridge
+option. For
+.Sy epair
+interfaces, you must prefix them with
+.Sy sa_ Ns Ar interface Ns "."
+.Pp
+Please note that this option complements the
+.Cm bridge
+option and has no effect if that option is not specified or if
+.Ar interface
+does not match when processing that option.
+.Pp
+See the
+.Xr appjail-network 1
+man page for more details and to learn about the possible values for
+.Ar vlan-set
+in the
+.Cm attach
+command described in that manual.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm tagged Ns = Ns Qo lan0:10 Qc
+.It
+.Cm tagged Ns = Ns Qo sa_myvlan:10,20-30 Qc
+.El
 .It Cm template Ns = Ns Qo Ar template Qc
 .Pp
 Template file. If not specified, the template file specified by the
@@ -2048,6 +2085,41 @@ parameter is used.
 .Bl -dash -compact
 .It
 .Cm tzdata Ns = Ns Qo America/Caracas Qc
+.El
+.It Cm untagged Ns = Ns Qo Ar interface Ns : Ns Ar vlanid Qc
+.Pp
+Set the untagged VLAN ID when adding each interface to the bridge.
+.Pp
+.Ar interface
+represents an interface specified in the
+.Cm bridge
+option. For
+.Sy epair
+interfaces, you must prefix them with
+.Sy sa_ Ns Ar interface Ns "."
+.Pp
+Please note that this option complements the
+.Cm bridge
+option and has no effect if that option is not specified or if
+.Ar interface
+does not match when processing that option.
+.Pp
+See the
+.Xr appjail-network 1
+man page for more details and to learn about the possible values for
+.Ar vlanid
+in the
+.Cm attach
+command described in that manual.
+.Pp
+.Em Type Ns : Ns " " Ns Sy Options
+.br
+.Em Multiple Ns : Ns " " Ns Sy Yes
+.br
+.Em Examples ":"
+.Bl -dash -compact
+.It
+.Cm untagged Ns = Ns Qo lan0:1 Qc
 .El
 .It Cm virtualnet Ns = Ns Qo Oo Ar network Oc Ns : Ns Ar interface Oo Cm default Oc Oo Cm address Ns : Ns Ar ipv4-address Oc Oo Cm interface_desc Ns : Ns Ar description Oc Qc
 .Pp

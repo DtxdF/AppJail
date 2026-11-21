@@ -334,12 +334,13 @@ network_attach()
 	local _o
 	# options
 	local bridge="${SHARED_BRIDGE}"
+	local untagged= tagged=
 	# misc
 	local errlevel
 
-	while getopts ":b:" _o; do
+	while getopts ":b:u:t:" _o; do
 		case "${_o}" in
-			b)
+			b|u|t)
 				if lib_check_empty "${OPTARG}"; then
 					network_usage
 					exit ${EX_USAGE}
@@ -350,6 +351,12 @@ network_attach()
 		case "${_o}" in
 			b)
 				bridge="${OPTARG}"
+				;;
+			u)
+				untagged="${OPTARG}"
+				;;
+			t)
+				tagged="${OPTARG}"
 				;;
 			*)
 				network_usage
@@ -368,7 +375,19 @@ network_attach()
 		lib_err ${EX_DATAERR} -- "${bridge}: Bridge name too long."
 	fi
 
-	_network_create_bridge "${bridge}"
+	if [ -n "${tagged}" -o -n "${untagged}" ]; then
+		if [ -n "${tagged}" ] && ! lib_check_vlanset "${tagged}"; then
+			lib_err ${EX_DATAERR} -- "${tagged}: invalid VLAN set."
+		fi
+
+		if [ -n "${untagged}" ] && ! lib_check_vlanid "${untagged}"; then
+			lib_err ${EX_DATAERR} -- "${untagged}: invalid VLAN ID."
+		fi
+
+		_network_create_bridge "${bridge}" "vlanfilter"
+	else
+		_network_create_bridge "${bridge}"
+	fi
 
 	local mtu="${DEFAULT_MTU}" first_mtu=
 	local interface type
@@ -399,7 +418,7 @@ network_attach()
 			${NETWORK_ATTACH_TYPE_EPAIR})
 				_network_create_epair "s" "${interface}" "${mtu}"
 
-				_network_addm "${bridge}" "sa_${interface}"
+				_network_addm "${bridge}" "sa_${interface}" "${untagged}" "${tagged}"
 				;;
 			${NETWORK_ATTACH_TYPE_IFACE})
 				if lib_check_ifacelen "${interface}"; then
@@ -423,7 +442,7 @@ network_attach()
 					fi
 				fi
 
-				_network_addm "${bridge}" "${interface}"
+				_network_addm "${bridge}" "${interface}" "${untagged}" "${tagged}"
 				;;
 			*)
 				network_usage
@@ -442,8 +461,9 @@ network_attach()
 _network_addm()
 {
 	local bridge="$1" ether_name="$2"
+	local untagged="$3" tagged="$4"
 	if [ -z "${bridge}" -o -z "${ether_name}" ]; then
-		lib_err ${EX_USAGE} "_network_addm bridge ether_name"
+		lib_err ${EX_USAGE} "_network_addm bridge ether_name [untagged] [tagged]"
 	fi
 
 	if ! lib_check_brgmember "${bridge}" "${ether_name}"; then
@@ -452,7 +472,14 @@ _network_addm()
 		fi
 
 		lib_debug "Adding ${ether_name} as a member of ${bridge} ..."
-		ifconfig -- "${bridge}" addm "${ether_name}" || exit $?
+		set -- "${bridge}" addm "${ether_name}"
+		if [ -n "${untagged}" ]; then
+			set -- "$@" untagged "${untagged}"
+		fi
+		if [ -n "${tagged}" ]; then
+			set -- "$@" tagged "${tagged}"
+		fi
+		ifconfig -- "$@" || exit $?
 	else
 		lib_debug "${ether_name}: already a member of ${bridge}."
 	fi
@@ -460,15 +487,21 @@ _network_addm()
 
 _network_create_bridge()
 {
-	local bridge="$1"
+	local bridge="$1" vlanfilter="$2"
 	if [ -z "${bridge}" ]; then
-		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge"
+		lib_err ${EX_USAGE} "usage: _network_create_bridge bridge [vlanfilter]"
 	fi
 
 	lib_files_create "${TMPDIR}/bridge.${bridge}.lock"
 
+	local flags=
+
+	if [ -n "${vlanfilter}" ]; then
+		flags="-v"
+	fi
+
 	lockf -ks "${TMPDIR}/bridge.${bridge}.lock" \
-		"${SCRIPTSDIR}/create-bridge.sh" -c "${CONFIG}" -b "${bridge}"
+		"${SCRIPTSDIR}/create-bridge.sh" ${flags} -c "${CONFIG}" -b "${bridge}" || exit $?
 }
 
 _network_create_epair()
@@ -1644,7 +1677,8 @@ network_usage()
 usage: network add [-O] [-d <description>] [-m <mtu>] <name> <address>/<cidr>
        network assign -e <interface> -j <jail> -n <network> [-d]
                [-a [auto|forceauto|<address>]]
-       network attach [-b <bridge>] [epair|iface:]<interface> ...
+       network attach [-b <bridge>] [-u <vlanid>] [-t [all|none|<vlan-list>]]
+               [epair|iface:]<interface> ...
        network auto-create
        network detach [-Ddfi] [-b <bridge>] [epair|iface:]<interface> ...
        network fix [all|dup|addr] [-n <network>]

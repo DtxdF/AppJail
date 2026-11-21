@@ -80,6 +80,8 @@ QUICK_KEY_NAT="nat"
 QUICK_KEY_NETWORK="network"
 QUICK_KEY_NONAT="nonat"
 QUICK_KEY_SLAAC="slaac"
+QUICK_KEY_TAGGED="tagged"
+QUICK_KEY_UNTAGGED="untagged"
 QUICK_KEY_VIRTUALNET="virtualnet"
 QUICK_KEY_VOLUME="volume"
 
@@ -177,9 +179,11 @@ QUICK_OPTION_START_ARGS=
 QUICK_OPTION_START_ENV=
 QUICK_OPTION_STOP_ARGS=
 QUICK_OPTION_STOP_ENV=
+QUICK_OPTION_TAGGED=0
 QUICK_OPTION_TEMPLATE="${DEFAULT_TEMPLATE}"
 QUICK_OPTION_TINY_IMPORT=0
 QUICK_OPTION_TMPDIR=0
+QUICK_OPTION_UNTAGGED=0
 QUICK_OPTION_USE_LIMITS=0
 QUICK_OPTION_USE_RESOLV_CONF="${USE_RESOLV_CONF}"; QUICK_OPTION_RESOLV_CONF="${DEFAULT_RESOLV_CONF}"
 QUICK_OPTION_USE_TZDATA="${USE_TIMEZONE}"; QUICK_OPTION_TZDATA="${DEFAULT_TIMEZONE}"
@@ -229,7 +233,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|depend|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|secret|slaac|start|start_args|start_env|stop_args|stop_env|template|tiny+import|tmpdir|type|tzdata|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|depend|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|secret|slaac|start|start_args|start_env|stop_args|stop_env|tagged|template|tiny+import|tmpdir|type|tzdata|untagged|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -2385,11 +2389,73 @@ quick_set_slaac()
 	QUICK_OPTION_SLAAC=1
 }
 
+quick_set_tagged()
+{
+	local parameters
+
+	parameters="$1"; quick_reqoption "tagged" "${parameters}"
+
+	interface=`lib_jailparam_name "${parameters}" :`
+	vlan_set=`lib_jailparam_value "${parameters}" :`
+
+	if lib_check_empty "${interface}" || lib_check_empty "${vlan_set}"; then
+		lib_err ${EX_DATAERR} "tagged syntax: interface:vlan-set"
+	fi
+
+	if lib_check_ifacelen "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+	fi
+
+	if ! lib_check_interfacename "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+	fi
+
+	if ! lib_check_vlanset "${vlan_set}"; then
+		lib_err ${EX_DATAERR} -- "${vlan_set}: invalid VLAN set."
+	fi
+
+	lib_keys_set "${QUICK_KEY_TAGGED}" "${interface}" "vlan_set" "${vlan_set}"
+
+	QUICK_OPTION_TAGGED=1
+}
+
+quick_set_untagged()
+{
+	local parameters
+
+	parameters="$1"; quick_reqoption "untagged" "${parameters}"
+
+	interface=`lib_jailparam_name "${parameters}" :`
+	vlanid=`lib_jailparam_value "${parameters}" :`
+
+	if lib_check_empty "${interface}" || lib_check_empty "${vlanid}"; then
+		lib_err ${EX_DATAERR} "untagged syntax: interface:vlanid"
+	fi
+
+	if lib_check_ifacelen "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: interface name too long."
+	fi
+
+	if ! lib_check_interfacename "${interface}"; then
+		lib_err ${EX_DATAERR} -- "${interface}: invalid interface name."
+	fi
+
+	if ! lib_check_vlanid "${vlanid}"; then
+		lib_err ${EX_DATAERR} -- "${vlanid}: invalid VLAN ID."
+	fi
+
+	lib_keys_set "${QUICK_KEY_UNTAGGED}" "${interface}" "vlanid" "${vlanid}"
+
+	QUICK_OPTION_UNTAGGED=1
+}
+
 quick_run_bridge()
 {
 	if [ ${QUICK_OPTION_BRIDGE} -eq 0 ]; then
 		return 0
 	fi
+
+	local untagged tagged attach_options
 	
 	# vnet
 	lib_ajconf set -t "${QUICK_TEMP_TEMPLATE}" vnet
@@ -2400,14 +2466,58 @@ quick_run_bridge()
 
 		epairs=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "epairs"`
 		for epair in ${epairs}; do
+			untagged=
+			if [ ${QUICK_OPTION_UNTAGGED} -eq 1 ] && lib_keys_check "${QUICK_KEY_UNTAGGED}" "sa_${epair}/vlanid"; then
+				untagged=`lib_keys_get "${QUICK_KEY_UNTAGGED}" "sa_${epair}" "vlanid"`
+			fi
+
+			tagged=
+			if [ ${QUICK_OPTION_TAGGED} -eq 1 ] && lib_keys_check "${QUICK_KEY_TAGGED}" "sa_${epair}/vlan_set"; then
+				tagged=`lib_keys_get "${QUICK_KEY_TAGGED}" "sa_${epair}" "vlan_set"`
+			fi
+
+			attach_options=
+			if [ -n "${untagged}" ]; then
+				lib_debug "Setting VLAN option in sa_${epair}: untagged VLAN ${untagged}"
+
+				attach_options="${attach_options} -u \\\"${untagged}\\\""
+			fi
+			if [ -n "${tagged}" ]; then
+				lib_debug "Setting VLAN option in sa_${epair}: tagged VLANs ${tagged}"
+
+				attach_options="${attach_options} -t \\\"${tagged}\\\""
+			fi
+
 			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" vnet.interface="\"sb_${epair}\""
-			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"epair:${epair}\\\"\""
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\"${attach_options} \\\"epair:${epair}\\\"\""
 			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.poststop="\"appjail network detach -b \\\"${bridge}\\\" -id \\\"epair:${epair}\\\"\""
 		done
 
 		interfaces=`lib_keys_get "${QUICK_KEY_BRIDGE}" "${bridge}" "interfaces"`
 		for interface in ${interfaces}; do
-			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\" \\\"iface:${interface}\\\"\""
+			untagged=
+			if [ ${QUICK_OPTION_UNTAGGED} -eq 1 ] && lib_keys_check "${QUICK_KEY_UNTAGGED}" "${interface}/vlanid"; then
+				untagged=`lib_keys_get "${QUICK_KEY_UNTAGGED}" "${interface}" "vlanid"`
+			fi
+
+			tagged=
+			if [ ${QUICK_OPTION_TAGGED} -eq 1 ] && lib_keys_check "${QUICK_KEY_TAGGED}" "${interface}/vlan_set"; then
+				tagged=`lib_keys_get "${QUICK_KEY_TAGGED}" "${interface}" "vlan_set"`
+			fi
+
+			attach_options=
+			if [ -n "${untagged}" ]; then
+				lib_debug "Setting VLAN option in ${interface}: untagged VLAN ${untagged}"
+
+				attach_options="${attach_options} -u \\\"${untagged}\\\""
+			fi
+			if [ -n "${tagged}" ]; then
+				lib_debug "Setting VLAN option in ${interface}: tagged VLANs ${tagged}"
+
+				attach_options="${attach_options} -t \\\"${tagged}\\\""
+			fi
+
+			lib_ajconf set -It "${QUICK_TEMP_TEMPLATE}" exec.prestart="\"appjail network attach -b \\\"${bridge}\\\"${attach_options} \\\"iface:${interface}\\\"\""
 		done
 	done
 }
@@ -2432,6 +2542,7 @@ quick_set_bridge()
 	local bridge_name=
 	local epairs=
 	local interfaces=
+	local untagged= tagged=
 
 	local arg parameter value
 	while [ ${current_index} -lt ${total_items} ]; do 
