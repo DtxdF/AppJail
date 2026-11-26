@@ -1555,6 +1555,23 @@ jail_destroy()
 		return ${errlevel}
 	fi
 
+	local hook
+	hook="${JAILDIR}/${jail_name}/conf/labels/appjail.exec.clean/value"
+
+	if [ -f "${hook}" ]; then
+		hook=`head -1 "${hook}"` || exit $?
+	else
+		hook=
+	fi
+
+	if [ -n "${hook}" ] && [ -x "${hook}" ]; then
+		lib_debug "Executing hook (${hook}) before destroying the jail ..."
+
+		if ! "${hook}"; then
+			lib_err ${EX_SOFTWARE} "Execution of the hook (${hook}) failed!"
+		fi
+	fi
+
 	local is_container
 	is_container=`jail_get -I -- "${jail_name}" is_container` || exit $?
 

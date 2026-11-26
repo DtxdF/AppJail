@@ -25,7 +25,7 @@
 .\"CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 .\"OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\"OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd February 3, 2026
+.Dd November 26, 2026
 .Dt APPJAIL-jail 1
 .Os
 .Sh NAME
@@ -161,6 +161,11 @@ Destroy
 If
 .Ar jail
 is a container, it will be destroyed before the files are removed.
+.Pp
+The
+.Sy appjail.exec.clean
+label can be used to specify an executable file that will run before the jail is
+removed. If this hook fails, the jail will not be removed.
 .Pp
 .Bl -tag -width xx
 .It Fl f
