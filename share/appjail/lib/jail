@@ -156,7 +156,7 @@ lib_jail_setenv()
 
 	while [ ${env_index} -lt ${env_total} ]; do
 		env_index=$((env_index+1))
-		env_var=`printf "%s\n" "${env_list}" | head -${env_index} | tail -n 1`
+		env_var=`printf "%s\n" "${env_list}" | sed -n "${env_index}p"`
 
 		env_name=`lib_jailparam_name "${env_var}" =`
 

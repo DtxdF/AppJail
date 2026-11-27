@@ -93,7 +93,7 @@ main()
 
 		while [ ${current_index} -lt ${total_items} ]; do 
 			current_index=$((current_index+1))
-			arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+			arg=`printf "%s\n" "${args_list}" | sed -n "${current_index}p"`
 			
 			parameter=`lib_jailparam_name "${arg}" =`
 

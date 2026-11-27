@@ -1404,7 +1404,7 @@ makejail_getinclude_cmd()
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
 
-		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		local arg=`printf "%s\n" "${args_list}" | sed -n "${current_index}p"`
 		if ! lib_check_empty "${arg}"; then
 			arg=`lib_escape_string "${arg}"`
 		fi
@@ -1431,7 +1431,7 @@ makejail_getinclude_fetch()
 		lib_err ${EX_USAGE} "usage: INCLUDE fetch+<url>"
 	fi
 
-	local url=`printf "%s\n" "${args}" | head -1 | tail -n 1`
+	local url=`printf "%s\n" "${args}" | head -1`
 	if lib_check_empty "${url}"; then
 		makejail_getinclude_fetch # usage
 	fi
@@ -1472,7 +1472,7 @@ makejail_getinclude_file()
 		lib_err ${EX_USAGE} "usage: INCLUDE file+<makejail>"
 	fi
 
-	local file=`printf "%s\n" "${args}" | head -1 | tail -n 1`
+	local file=`printf "%s\n" "${args}" | head -1`
 	if lib_check_empty "${file}"; then
 		makejail_getinclude_file # usage
 	fi
@@ -1523,7 +1523,7 @@ makejail_getinclude_git()
 
 	local current_index=1
 
-	local url=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+	local url=`printf "%s\n" "${args_list}" | sed -n "${current_index}p"`
 	if lib_check_empty "${url}"; then
 		makejail_getinclude_git # usage
 	fi
@@ -1539,7 +1539,7 @@ makejail_getinclude_git()
 
 	while [ ${current_index} -lt ${total_items} ]; do 
 		current_index=$((current_index+1))
-		local arg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+		local arg=`printf "%s\n" "${args_list}" | sed -n "${current_index}p"`
 		if lib_check_empty "${arg}"; then
 			continue
 		fi
@@ -1552,7 +1552,7 @@ makejail_getinclude_git()
 					makejail_getinclude_git # usage
 				fi
 
-				optarg=`printf "%s\n" "${args_list}" | head -${current_index} | tail -n 1`
+				optarg=`printf "%s\n" "${args_list}" | sed -n "${current_index}p"`
 				if lib_check_empty "${optarg}"; then
 					makejail_getinclude_git # usage
 				fi

@@ -47,7 +47,7 @@ main()
 	local args_list
 	args_list=`lib_split_jailparams "${args}"` || exit $?
 
-	local cmd=`printf "%s\n" "${args_list}" | head -1 | tail -n 1`
+	local cmd=`printf "%s\n" "${args_list}" | head -1`
 	if lib_check_empty "${cmd}"; then
 		main # usage
 	fi

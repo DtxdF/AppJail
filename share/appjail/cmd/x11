@@ -221,7 +221,7 @@ x11_main()
 		while [ ${current_index} -lt ${total_items} ]; do
 			current_index=$((current_index+1))
 
-			local arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			local arg=`printf "%s\n" "${params}" | sed -n "${current_index}p"`
 			if lib_check_empty "${arg}"; then
 				continue
 			fi
@@ -409,7 +409,7 @@ x11_main()
 		while [ ${current_index} -lt ${total_items} ]; do
 			current_index=$((current_index+1))
 
-			local arg=`printf "%s\n" "${params}" | head -${current_index} | tail -n 1`
+			local arg=`printf "%s\n" "${params}" | sed -n "${current_index}p"`
 			if lib_check_empty "${arg}"; then
 				continue
 			fi
