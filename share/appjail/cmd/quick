@@ -80,6 +80,7 @@ QUICK_KEY_NAT="nat"
 QUICK_KEY_NETWORK="network"
 QUICK_KEY_NONAT="nonat"
 QUICK_KEY_SLAAC="slaac"
+QUICK_KEY_SYSRC="sysrc"
 QUICK_KEY_TAGGED="tagged"
 QUICK_KEY_UNTAGGED="untagged"
 QUICK_KEY_VIRTUALNET="virtualnet"
@@ -179,6 +180,7 @@ QUICK_OPTION_START_ARGS=
 QUICK_OPTION_START_ENV=
 QUICK_OPTION_STOP_ARGS=
 QUICK_OPTION_STOP_ENV=
+QUICK_OPTION_SYSRC=0
 QUICK_OPTION_TAGGED=0
 QUICK_OPTION_TEMPLATE="${DEFAULT_TEMPLATE}"
 QUICK_OPTION_TINY_IMPORT=0
@@ -233,7 +235,7 @@ quick_main()
 		option=`lib_jailparam_name "${option}" =`
 
 		case "${option}" in
-			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|depend|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|secret|slaac|start|start_args|start_env|stop_args|stop_env|tagged|template|tiny+import|tmpdir|type|tzdata|untagged|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
+			alias|boot|brandelf|brandelf_abi|bridge|clone+jail|clone+release|container|copy|copydir|cpuset|create_args|defaultrouter|defaultrouter6|depend|devfs_ruleset|device|dhcp|env|ephemeral|empty|expose|file|files|from|fstab|healthcheck|ifconfig|ifconfig6|import+jail|import+root|initscript|ip4|ip4_disable|ip4_inherit|ip6|ip6_disable|ip6_inherit|jng|label|limits|linuxfs|login|login_user|macaddr|meta|mount_devfs|nat|network|noboot|nomount_devfs|nonat|nologin|nooverwrite|noresolv_conf|norestart|norun|nostart|notzdata|osarch|osversion|overwrite|pkg|priority|release|resolv_conf|restart|run|run_args|run_env|secret|slaac|start|start_args|start_env|stop_args|stop_env|sysrc|tagged|template|tiny+import|tmpdir|type|tzdata|untagged|virtualnet|vnet|volume|x11|zfs+import+jail|zfs+import+root) quick_set_${option} "${value}" ;;
 			*) lib_err ${EX_NOINPUT} -- "${option}: option not found." ;;
 		esac
 	done
@@ -255,6 +257,9 @@ quick_main()
 
 	local file_options
 	file_options="copy tzdata resolv_conf"
+
+	local sysrc_options
+	sysrc_options="sysrc"
 
 	local vnet_options
 	vnet_options="vnet"
@@ -302,7 +307,7 @@ quick_main()
 	args_options="start_env run_env stop_env create_args start_args run_args stop_args"
 
 	local all_options
-	all_options="${oci_options} ${brandelf_options} ${label_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
+	all_options="${oci_options} ${brandelf_options} ${label_options} ${sysrc_options} ${file_options} ${network_options} ${limits_options} ${device_options} ${startup_options} ${health_options} ${args_options}"
 
 	for option in ${all_options}; do
 		quick_run_${option}
@@ -3446,6 +3451,42 @@ quick_set_device()
 	lib_keys_append "${QUICK_KEY_DEVICE}" "rulespec" "${rulespec}" > /dev/null
 
 	QUICK_OPTION_DEVICE=1
+}
+
+quick_run_sysrc()
+{
+	if [ ${QUICK_OPTION_SYSRC} -eq 0 ]; then
+		return 0
+	fi
+
+	lib_debug "Configuring rc.conf(5)  ..."
+
+	mkdir -p "${QUICK_JAILPATH}/jail/etc" || exit $?
+
+	lib_keys_list "${QUICK_KEY_SYSRC}" | sort -n | while IFS= read -r nro
+	do
+		parameter=`lib_keys_get "${QUICK_KEY_SYSRC}" "${nro}" "parameter"`
+
+		lib_debug "Setting ${parameter}"
+
+		sysrc -if "${QUICK_JAILPATH}/jail/etc/rc.conf" -- "${parameter}" >&2 || exit $?
+	done
+
+	errlevel=$?
+	if [ ${errlevel} -ne 0 ]; then
+		exit ${errlevel}
+	fi
+}
+
+quick_set_sysrc()
+{
+	local parameter
+
+	parameter="$1"; quick_reqoption "sysrc" "${parameter}"
+
+	lib_keys_append "${QUICK_KEY_SYSRC}" "parameter" "${parameter}" > /dev/null
+
+	QUICK_OPTION_SYSRC=1
 }
 
 quick_run_defaultrouter()
